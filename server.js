@@ -918,7 +918,10 @@ app.get('/api/chats/:userId', (req, res) => {
     });
     const ts = c => new Date(c.last ? c.last.timestamp : c.createdAt || 0).getTime();
     res.json(read(F.chats)
-        .filter(c => c.members.includes(me))
+        // Показываем чаты где пользователь — участник ИЛИ создатель канала
+        // (создатель мог не попасть в members при создании — и тогда его канал пропадал из списка,
+        //  из-за чего в разделе «Закреплённый канал» было пусто)
+        .filter(c => c.members.includes(me) || (c.type === 'channel' && c.creator === me))
         .map(c => shape(c, me, users, grouped.get(c.id) || []))
         .sort((a, b) => ts(b) - ts(a)));
 });
