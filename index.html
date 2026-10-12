@@ -127,6 +127,8 @@ input,textarea{font:inherit;color:inherit}
 @keyframes slideUp{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
 .modal h2{font-size:20px}
 #lb{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:20;display:flex;align-items:center;justify-content:center;cursor:zoom-out}
+#lb-close{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:21;backdrop-filter:blur(4px);transition:background .15s}
+#lb-close:hover{background:rgba(255,255,255,.28)}
 #lb img{max-width:100%;max-height:100%;object-fit:contain}
 #wallet{display:flex;justify-content:space-between;align-items:center;width:calc(100% - 28px);margin:0 14px 8px;padding:9px 14px;border-radius:12px;background:linear-gradient(90deg,#fff1e6,#ffe0f0);font-weight:600;font-size:14px}
 .gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
@@ -704,6 +706,7 @@ html[data-theme=dark] #rdonly{background:#17212b}
 .a-next{width:56px;height:56px;border-radius:50%;background:#3390ec;color:#fff;display:grid;place-items:center;box-shadow:0 4px 12px rgba(51,144,236,.35)}
 .a-next:hover:not(:disabled){background:#2b7fd1}
 .a-next:active{transform:scale(.94)}
+.a-next:disabled{background:#b0bec5!important;box-shadow:none!important;cursor:not-allowed;opacity:.7;transform:none!important}
 @media(min-width:769px){
   #auth{background:#f4f4f5}
   .a-card{min-height:0;margin:auto;padding:44px 40px 32px;border-radius:14px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
@@ -950,11 +953,10 @@ html[data-theme=dark] .tgp-pin-wrap{background:#17212b;box-shadow:none}
 .tgp-pin-msg{font-size:13px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 html[data-theme=dark] .tgp-pin:active{background:rgba(255,255,255,.06)}
 
-#tosCheck{display:none}
 #tosWrap{display:none;margin:10px 0 4px;align-items:flex-start;gap:8px;font-size:13px;color:var(--t2);line-height:1.4}
 #tosWrap.visible{display:flex}
-#tosWrap label{cursor:pointer;display:flex;align-items:flex-start;gap:8px}
-#tosWrap input[type=checkbox]{width:18px;height:18px;min-width:18px;accent-color:#3390ec;margin-top:1px;cursor:pointer}
+#tosWrap label{cursor:pointer;display:flex;align-items:center;gap:0;justify-content:space-between;width:100%}
+#tosWrap input[type=checkbox]{width:20px;height:20px;min-width:20px;accent-color:#3390ec;margin-left:8px;cursor:pointer;flex-shrink:0}
 #tosLink{color:#3390ec;text-decoration:underline;cursor:pointer;font-weight:500}
 #tosModal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
 #tosModal[hidden]{display:none}
@@ -995,7 +997,7 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
     <div class="af"><input id="ap" type="password" autocomplete="current-password" placeholder=" "><label>Пароль (минимум 6 символов)</label></div>
 
     <div id="tosWrap">
-      <label><input type="checkbox" id="tosCheck"><span>Я принимаю <span id="tosLink">пользовательское соглашение</span></span></label>
+      <label><span>Я принимаю <span id="tosLink">пользовательское соглашение</span></span><input type="checkbox" id="tosCheck"></label>
     </div>
     <div class="err" id="aerr"></div>
     <div class="a-foot">
@@ -1052,9 +1054,70 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
 
 <div class="modal" id="modal" hidden><div class="card" id="card"></div></div>
 <div id="toast" hidden></div>
-<div id="lb" hidden><img id="lbi" alt=""></div>
+<div id="lb" hidden><button id="lb-close" aria-label="Закрыть">←</button><img id="lbi" alt=""></div>
 <input type="file" id="file" hidden>
 
+<div id="tosModal" hidden>
+  <div id="tosCard">
+    <div class="tos-head">
+      <h2>Пользовательское соглашение</h2>
+      <button class="tos-close" id="tosCloseBtn" aria-label="Закрыть">✕</button>
+    </div>
+    <div id="tosBody">
+      <span class="tos-date">Дата вступления в силу: 12 октября 2026 года</span>
+
+      <h3>1. Общие положения</h3>
+      <p>1.1. Настоящее Пользовательское соглашение регулирует использование мессенджера Saimon (далее — «Мессенджер»).</p>
+      <p>1.2. Используя Saimon, пользователь подтверждает, что ознакомился с условиями настоящего соглашения.</p>
+      <p>1.3. Администрация Saimon вправе обновлять условия соглашения с уведомлением пользователей об изменениях.</p>
+
+      <h3>2. Регистрация и учётная запись</h3>
+      <p>2.1. Для использования отдельных функций Saimon может потребоваться регистрация.</p>
+      <p>2.2. Пользователь обязуется предоставлять достоверную информацию, если она запрашивается при регистрации.</p>
+      <p>2.3. Пользователь самостоятельно отвечает за сохранность данных для входа в свою учётную запись.</p>
+
+      <h3>3. Правила использования</h3>
+      <p><b>Пользователю запрещается:</b></p>
+      <ul>
+        <li>Использовать Мессенджер для мошенничества и распространения вредоносных программ.</li>
+        <li>Рассылать нежелательные сообщения и спам.</li>
+        <li>Нарушать права других пользователей.</li>
+        <li>Распространять незаконный контент.</li>
+        <li>Использовать Мессенджер для угроз, преследования и обмана других людей.</li>
+      </ul>
+
+      <h3>4. Конфиденциальность и персональные данные</h3>
+      <p>4.1. Saimon должен обрабатывать персональные данные пользователей в соответствии с применимым законодательством.</p>
+      <p>4.2. Доступ к контактам, микрофону, камере и другим функциям устройства должен запрашиваться только при необходимости и, где требуется, с разрешения пользователя.</p>
+      <p>4.3. Информация о сборе, хранении, использовании и удалении персональных данных должна быть изложена в отдельной Политике конфиденциальности.</p>
+      <p>4.4. Пользователь должен иметь возможность узнать, какие его данные собираются и для каких целей используются.</p>
+
+      <h3>5. Сообщения и контент</h3>
+      <p>5.1. Пользователь сохраняет ответственность за содержание сообщений и файлов, которые он отправляет.</p>
+      <p>5.2. Пользователь не должен публиковать материалы, нарушающие законодательство или права третьих лиц.</p>
+      <p>5.3. Условия хранения сообщений, их удаления и использования сквозного шифрования должны быть описаны в документации Saimon.</p>
+
+      <h3>6. Ограничение доступа</h3>
+      <p>6.1. При нарушении настоящего соглашения администрация может ограничить доступ к отдельным функциям или учётной записи в соответствии с применимым законодательством.</p>
+      <p>6.2. Пользователь может обратиться в службу поддержки для обжалования ограничения, если такая процедура предусмотрена сервисом.</p>
+
+      <h3>7. Удаление учётной записи</h3>
+      <p>7.1. Пользователь может запросить удаление своей учётной записи в порядке, предусмотренном Мессенджером.</p>
+      <p>7.2. Удаление учётной записи и связанных данных осуществляется в соответствии с применимым законодательством и опубликованной Политикой конфиденциальности.</p>
+
+      <h3>8. Ответственность</h3>
+      <p>8.1. Пользователь обязуется соблюдать настоящее соглашение и применимое законодательство.</p>
+      <p>8.2. Ограничения ответственности администрации не могут исключать права и гарантии, которые предоставлены пользователю законом.</p>
+
+      <h3>9. Поддержка и обратная связь</h3>
+      <p>По вопросам работы Saimon пользователь может обращаться через предусмотренные приложением каналы поддержки.</p>
+
+      <h3>10. Заключительные положения</h3>
+      <p>10.1. Настоящее соглашение применяется в пределах, допускаемых действующим законодательством.</p>
+      <p>10.2. До публикации соглашения владелец Saimon должен указать сведения об операторе сервиса, контактные данные и применимое право.</p>
+    </div>
+  </div>
+</div>
 <script>
 const $ = s => document.querySelector(s);
 // Контур значка: окружность с 16 волнами
@@ -1250,20 +1313,31 @@ function authUI() {
   $('#tgl').textContent = reg ? 'Войти' : 'Регистрация';
   $('#aerr').textContent = '';
   $('#ap').autocomplete = reg ? 'new-password' : 'current-password';
-  $('#tosWrap').classList.toggle('visible', reg);
-  if (!reg) $('#tosCheck').checked = false;
+  const tw = $('#tosWrap'); if (tw) tw.classList.toggle('visible', reg);
+  const tc = $('#tosCheck'); if (tc && !reg) tc.checked = false;
+  updateAuthBtn();
 }
-// ToS modal
-$('#tosLink').onclick = () => { $('#tosModal').hidden = false; };
-$('#tosCloseBtn').onclick = () => { $('#tosModal').hidden = true; };
-$('#tosModal').onclick = e => { if (e.target === $('#tosModal')) $('#tosModal').hidden = true; };
+function updateAuthBtn() {
+  const btn = $('#authBtn');
+  if (!btn) return;
+  const tc = $('#tosCheck');
+  btn.disabled = reg && tc && !tc.checked;
+}
 $('#tgl').onclick = () => { reg = !reg; authUI(); };
+// ToS modal handlers (safe — elements exist at this point since scripts are at end of body)
+document.addEventListener('DOMContentLoaded', () => {
+  const tosLink = $('#tosLink'), tosModal = $('#tosModal'), tosCloseBtn = $('#tosCloseBtn');
+  if (tosLink) tosLink.onclick = e => { e.stopPropagation(); if (tosModal) tosModal.hidden = false; };
+  if (tosCloseBtn) tosCloseBtn.onclick = () => { if (tosModal) tosModal.hidden = true; };
+  if (tosModal) tosModal.onclick = e => { if (e.target === tosModal) tosModal.hidden = true; };
+  const tosCheck = $('#tosCheck');
+  if (tosCheck) tosCheck.onchange = () => updateAuthBtn();
+});
 fetch('/api/config').then(r => r.json()).then(c => { cfg = c; authUI(); initPush(); }).catch(() => {});
 $('#authForm').onsubmit = async e => {
   e.preventDefault();
   $('#aerr').textContent = '';
   try {
-    if (reg && !$('#tosCheck').checked) { $('#aerr').textContent = 'Примите пользовательское соглашение'; return; }
     const d = reg
       ? await api('/api/register', 'POST', {username: $('#an').value, handle: $('#ah').value, email: $('#ae').value, password: $('#ap').value})
       : await api('/api/login', 'POST', {email: $('#ae').value, password: $('#ap').value});
@@ -1856,6 +1930,7 @@ msgsEl.addEventListener('touchmove', () => { lpMoved = true; lpCancel(); }, {pas
 msgsEl.addEventListener('touchend', lpCancel, {passive: true});
 msgsEl.addEventListener('touchcancel', lpCancel, {passive: true});
 $('#lb').onclick = () => { $('#lb').hidden = true; $('#lbi').src = ''; };
+$('#lb-close').onclick = e => { e.stopPropagation(); $('#lb').hidden = true; $('#lbi').src = ''; };
 
 /* ---------- Ввод, эмодзи и голосовые ---------- */
 const inp = $('#inp');
@@ -3564,66 +3639,4 @@ if (window.visualViewport) {
 })();
 </script>
 
-<div id="tosModal" hidden>
-  <div id="tosCard">
-    <div class="tos-head">
-      <h2>Пользовательское соглашение</h2>
-      <button class="tos-close" id="tosCloseBtn" aria-label="Закрыть">✕</button>
-    </div>
-    <div id="tosBody">
-      <span class="tos-date">Дата вступления в силу: 12 октября 2026 года</span>
-
-      <h3>1. Общие положения</h3>
-      <p>1.1. Настоящее Пользовательское соглашение регулирует использование мессенджера Saimon (далее — «Мессенджер»).</p>
-      <p>1.2. Используя Saimon, пользователь подтверждает, что ознакомился с условиями настоящего соглашения.</p>
-      <p>1.3. Администрация Saimon вправе обновлять условия соглашения с уведомлением пользователей об изменениях.</p>
-
-      <h3>2. Регистрация и учётная запись</h3>
-      <p>2.1. Для использования отдельных функций Saimon может потребоваться регистрация.</p>
-      <p>2.2. Пользователь обязуется предоставлять достоверную информацию, если она запрашивается при регистрации.</p>
-      <p>2.3. Пользователь самостоятельно отвечает за сохранность данных для входа в свою учётную запись.</p>
-
-      <h3>3. Правила использования</h3>
-      <p><b>Пользователю запрещается:</b></p>
-      <ul>
-        <li>Использовать Мессенджер для мошенничества и распространения вредоносных программ.</li>
-        <li>Рассылать нежелательные сообщения и спам.</li>
-        <li>Нарушать права других пользователей.</li>
-        <li>Распространять незаконный контент.</li>
-        <li>Использовать Мессенджер для угроз, преследования и обмана других людей.</li>
-      </ul>
-
-      <h3>4. Конфиденциальность и персональные данные</h3>
-      <p>4.1. Saimon должен обрабатывать персональные данные пользователей в соответствии с применимым законодательством.</p>
-      <p>4.2. Доступ к контактам, микрофону, камере и другим функциям устройства должен запрашиваться только при необходимости и, где требуется, с разрешения пользователя.</p>
-      <p>4.3. Информация о сборе, хранении, использовании и удалении персональных данных должна быть изложена в отдельной Политике конфиденциальности.</p>
-      <p>4.4. Пользователь должен иметь возможность узнать, какие его данные собираются и для каких целей используются.</p>
-
-      <h3>5. Сообщения и контент</h3>
-      <p>5.1. Пользователь сохраняет ответственность за содержание сообщений и файлов, которые он отправляет.</p>
-      <p>5.2. Пользователь не должен публиковать материалы, нарушающие законодательство или права третьих лиц.</p>
-      <p>5.3. Условия хранения сообщений, их удаления и использования сквозного шифрования должны быть описаны в документации Saimon.</p>
-
-      <h3>6. Ограничение доступа</h3>
-      <p>6.1. При нарушении настоящего соглашения администрация может ограничить доступ к отдельным функциям или учётной записи в соответствии с применимым законодательством.</p>
-      <p>6.2. Пользователь может обратиться в службу поддержки для обжалования ограничения, если такая процедура предусмотрена сервисом.</p>
-
-      <h3>7. Удаление учётной записи</h3>
-      <p>7.1. Пользователь может запросить удаление своей учётной записи в порядке, предусмотренном Мессенджером.</p>
-      <p>7.2. Удаление учётной записи и связанных данных осуществляется в соответствии с применимым законодательством и опубликованной Политикой конфиденциальности.</p>
-
-      <h3>8. Ответственность</h3>
-      <p>8.1. Пользователь обязуется соблюдать настоящее соглашение и применимое законодательство.</p>
-      <p>8.2. Ограничения ответственности администрации не могут исключать права и гарантии, которые предоставлены пользователю законом.</p>
-
-      <h3>9. Поддержка и обратная связь</h3>
-      <p>По вопросам работы Saimon пользователь может обращаться через предусмотренные приложением каналы поддержки.</p>
-
-      <h3>10. Заключительные положения</h3>
-      <p>10.1. Настоящее соглашение применяется в пределах, допускаемых действующим законодательством.</p>
-      <p>10.2. До публикации соглашения владелец Saimon должен указать сведения об операторе сервиса, контактные данные и применимое право.</p>
-    </div>
-  </div>
-</div>
 </body>
-</html>
