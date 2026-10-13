@@ -2471,7 +2471,7 @@ function picker(box, exclude) {
 $('#meBtn').onclick = () => myProfile('hub');
 
 // Настройки профиля: разделы в стиле мессенджера (группы строк с цветными иконками)
-const PROF_TITLES = { hub: 'Настройки', account: 'Аккаунт', premium: 'SAIMONPREMIYM', market: 'Магазин и рынок', pinchan: 'Закреплённый канал' };
+const PROF_TITLES = { hub: 'Настройки', account: 'Аккаунт', premium: 'SAIMONPREMIYM', market: 'Магазин и рынок' };
 const profRow = (ic, bg, t, sub, attr) => `<button type="button" class="tgs-row" ${attr}><span class="tgs-ic" style="background:${bg}">${ic}</span><span class="tgs-tx"><b>${t}</b><small>${sub}</small></span><span class="tgs-go">›</span></button>`;
 function myProfile(view = 'hub') {
   const binders = [];
@@ -2496,50 +2496,9 @@ ${profRow('💎', '#8e44ff', 'SAIMONPREMIYM', me.premium ? (me.premium === 'fore
 <div class="tgp-card">
 ${profRow('🎁', '#ff9500', 'Магазин и рынок', 'Подарки и юзернеймы', 'data-go="market"')}
 ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-панель', 'Каналы и пользователи', 'id="padm"') : ''}
-${profRow('📢', '#3390ec', 'Закреплённый канал', me.pinnedChannel && (chats.get(me.pinnedChannel)||me.pinnedChannelData) ? '📌 ' + esc((chats.get(me.pinnedChannel)||me.pinnedChannelData).name) + ((chats.get(me.pinnedChannel)||me.pinnedChannelData).subscribers ? ' · ' + (chats.get(me.pinnedChannel)||me.pinnedChannelData).subscribers + ' подп.' : '') : 'Не выбран', 'data-go="pinchan"')}
 </div>
 <div class="tgp-sec">Мои подарки</div><div class="gg tgp-gifts" id="pgifts"></div>
 <div class="tgp-card"><button type="button" class="tgp-item tgp-danger" id="lo">Выйти из аккаунта</button></div>`;
-  } else if (view === 'pinchan') {
-    // Собираем каналы пользователя из локального кэша (включает все варианты хранения creator)
-    const myChs = [...chats.values()].filter(c => c.type === 'channel' && (String(c.creator) === String(me.id) || Number(c.creator) === me.id));
-    body = `<div class="tgp-card">
-<div class="tgp-row"><small>Канал отображается на странице вашего профиля</small></div>
-<div id="pinch-list">${myChs.length ? myChs.map(c => `<button type="button" class="tgp-item ${me.pinnedChannel === c.id ? 'tgp-accent' : ''}" data-pinch="${esc(c.id)}">${me.pinnedChannel === c.id ? '📌 ' : ''}${esc(c.name)}</button>`).join('') : '<div class="tgp-row"><small>Загрузка каналов…</small></div>'}</div>
-${me.pinnedChannel ? '<button type="button" class="tgp-item tgp-danger" id="unpinch">Убрать закреплённый канал</button>' : ''}
-</div>`;
-    binders.push(async () => {
-      // Если в локальном кэше каналов нет — подгружаем с сервера
-      if (!myChs.length) {
-        try {
-          const serverChats = await api('/api/chats');
-          const fromServer = serverChats.filter(c => c.type === 'channel' && (String(c.creator) === String(me.id) || Number(c.creator) === me.id));
-          fromServer.forEach(c => chats.set(c.id, c));
-          const pl = $('#pinch-list');
-          if (pl) pl.innerHTML = fromServer.length
-            ? fromServer.map(c => `<button type="button" class="tgp-item ${me.pinnedChannel === c.id ? 'tgp-accent' : ''}" data-pinch="${esc(c.id)}">${me.pinnedChannel === c.id ? '📌 ' : ''}${esc(c.name)}</button>`).join('')
-            : '<div class="tgp-row"><small>У вас нет каналов. Создайте канал сначала.</small></div>';
-          // Перепривязываем обработчики после обновления
-          $('#card').querySelectorAll('[data-pinch]').forEach(b => b.onclick = doPinch);
-        } catch {}
-      }
-      async function doPinch() {
-        try {
-          await api('/api/profile/pin-channel', 'PUT', { chatId: this.dataset.pinch });
-          me = { ...me, pinnedChannel: this.dataset.pinch }; save();
-          toast('📌 Канал закреплён'); myProfile();
-        } catch (x) { toast(x.message); }
-      }
-      $('#card').querySelectorAll('[data-pinch]').forEach(b => b.onclick = doPinch);
-      const up = $('#unpinch');
-      if (up) up.onclick = async () => {
-        try {
-          await api('/api/profile/pin-channel', 'PUT', { chatId: null });
-          me = { ...me, pinnedChannel: null }; save();
-          toast('Канал откреплён'); myProfile();
-        } catch (x) { toast(x.message); }
-      };
-    });
   } else if (view === 'account') {
     body = `<div class="tgp-head"><div id="pav">${uav(me, 'l')}</div>
 <div class="tgp-photo"><button type="button" class="lnk" id="pph">Сменить фото</button><button type="button" class="lnk" id="prm" ${me.avatar ? '' : 'hidden'}>Убрать</button></div></div>
@@ -2905,14 +2864,36 @@ ${ch.description ? `<p style="margin-top:12px">${esc(ch.description)}</p>` : ''}
 function channelInfo(id) {
   const c = chats.get(id);
   if (!c) return;
-  if (c.creator !== me.id) { // подписчик: описание и отписка
+  if (c.creator !== me.id) { // подписчик: описание, подарки и отписка
     modal(`<div style="text-align:center">${cav(c, 'l')}
 <h2 style="margin-top:12px">📢 ${esc(c.name)}${c.verified ? BADGE : ''}</h2>
 ${c.handle ? `<div style="color:var(--p)">@${esc(c.handle)}</div>` : ''}
 <div style="color:var(--t2);font-size:13px">${subs(c.subscribers)}${c.open ? ' · писать могут все' : ''}</div>
-${c.description ? `<p style="margin-top:12px">${esc(c.description)}</p>` : ''}</div>
+${c.description ? `<p style="margin-top:12px">${esc(c.description)}</p>` : ''}
+</div>
+<div class="sec" style="padding-left:0;margin-top:8px">Подарки канала</div>
+<div class="gg tgp-gifts" id="ch-gifts-list" style="min-height:48px"><span style="color:var(--t2);font-size:13px;padding:8px">Загрузка…</span></div>
 <div class="err" id="ge"></div>
-<div class="row"><button class="btn r" id="cl">Отписаться</button><button type="button" class="btn g" data-x>Закрыть</button></div>`);
+<div class="row">
+  <button class="btn" id="send-gift-ch">🎁 Подарить каналу</button>
+  <button class="btn r" id="cl">Отписаться</button>
+  <button type="button" class="btn g" data-x>Закрыть</button>
+</div>`);
+    // Загружаем подарки канала
+    api('/api/gifts/channel/' + encodeURIComponent(id)).then(gifts => {
+      const el = $('#ch-gifts-list');
+      if (!el) return;
+      if (!gifts.length) { el.innerHTML = '<span style="color:var(--t2);font-size:13px;padding:8px">Подарков пока нет</span>'; return; }
+      el.innerHTML = gifts.map(g => {
+        const k = kindInfo(g.kind);
+        return `<div class="gc" style="background:${gradient(k)};position:relative">
+          <div class="ge">${k.emoji}</div>
+          <div class="gn">${esc(k.name)}</div>
+          <div class="gs">#${g.serial}</div>
+        </div>`;
+      }).join('');
+    }).catch(() => {});
+    $('#send-gift-ch').onclick = () => { closeModal(); openShopForChannel(id, c.name); };
     $('#cl').onclick = async () => {
       try {
         await api(`/api/channels/${encodeURIComponent(id)}/leave`, 'POST', {});
@@ -2933,7 +2914,9 @@ ${c.description ? `<p style="margin-top:12px">${esc(c.description)}</p>` : ''}</
 <label class="chk"><input type="checkbox" id="gopen" ${c.open ? 'checked' : ''}><span><b>Текстовый канал</b><small>Писать могут все подписчики. Просмотры и комментарии к постам отключаются.</small></span></label>
 <div class="err" id="ge"></div>
 <button class="btn">Сохранить</button></form>
-<div class="sec" style="padding-left:0;margin-top:10px">${subs(c.subscribers)}</div>
+<div class="sec" style="padding-left:0;margin-top:10px">Подарки канала</div>
+<div class="gg tgp-gifts" id="ch-gifts-creator" style="min-height:48px"><span style="color:var(--t2);font-size:13px;padding:8px">Загрузка…</span></div>
+<div class="sec" style="padding-left:0;margin-top:6px">${subs(c.subscribers)}</div>
 <div style="max-height:200px;overflow:auto">${(c.members || []).map(u =>
   `<div class="it" style="padding-left:0;padding-right:0;cursor:default">${uav(u, 's', true)}<div class="im">${nmH(cnames[u.id] || u.username, u.verified, u.id === me.id ? ' (вы)' : '', u.acc, u.ng, !!u.premium)}<div class="lm"><span>@${esc(u.handle)}</span></div></div></div>`).join('')}</div>
 <div class="row"><button type="button" class="btn g" data-x>Закрыть</button></div>`);
@@ -2955,6 +2938,35 @@ ${c.description ? `<p style="margin-top:12px">${esc(c.description)}</p>` : ''}</
     if ($('#gph')) { b.textContent = 'Сменить фото'; b.disabled = false; }
   };
   $('#grm').onclick = () => patch({avatar: ''}).catch(x => { $('#ge').textContent = x.message; });
+
+  // Загружаем подарки канала для создателя
+  const loadChGifts = async () => {
+    const el = $('#ch-gifts-creator');
+    if (!el) return;
+    try {
+      const gifts = await api('/api/gifts/channel/' + encodeURIComponent(id));
+      if (!gifts.length) { el.innerHTML = '<span style="color:var(--t2);font-size:13px;padding:8px">Подарков пока нет — подписчики могут дарить подарки каналу</span>'; return; }
+      el.innerHTML = gifts.map(g => {
+        const k = kindInfo(g.kind);
+        return `<div class="gc" style="background:${gradient(k)};position:relative;cursor:pointer" data-claimgift="${esc(g.id)}">
+          <div class="ge">${k.emoji}</div>
+          <div class="gn">${esc(k.name)}</div>
+          <div class="gs">#${g.serial}</div>
+          <div style="position:absolute;bottom:4px;right:4px;font-size:10px;background:rgba(0,0,0,.5);color:#fff;border-radius:6px;padding:2px 5px">Забрать</div>
+        </div>`;
+      }).join('');
+      el.querySelectorAll('[data-claimgift]').forEach(btn => {
+        btn.onclick = async () => {
+          try {
+            await api('/api/gifts/channel/' + encodeURIComponent(id) + '/claim/' + btn.dataset.claimgift, 'POST', {});
+            toast('🎁 Подарок забран себе в профиль');
+            loadChGifts();
+          } catch (x) { toast(x.message); }
+        };
+      });
+    } catch { el.innerHTML = '<span style="color:var(--t2);font-size:13px;padding:8px">Не удалось загрузить</span>'; }
+  };
+  loadChGifts();
 }
 
 /* ---------- Mars и подарки ---------- */
@@ -3470,6 +3482,53 @@ ${RARITY.map(([r, title]) => {
     const el = e.target.closest('[data-k]');
     if (el && !el.classList.contains('off')) giftBuy(el.dataset.k, to);
   });
+}
+
+// Магазин для покупки подарка каналу
+async function openShopForChannel(chatId, channelName) {
+  modal('<div class="sec" style="padding:0">Загрузка…</div>');
+  let d;
+  try { d = await api('/api/shop'); }
+  catch (x) { modal(`<div class="err">${esc(x.message)}</div><div class="row"><button type="button" class="btn g" data-x>Закрыть</button></div>`); return; }
+  catalog = new Map(d.catalog.map(c => [c.kind, c]));
+  backdrops = new Map((d.backdrops || []).map(b => [b.id, b]));
+  patterns = new Map((d.patterns || []).map(p => [p.id, p]));
+  setMars(d.mars, d.unlimited);
+  modal(`<h2>🎁 Подарить каналу «${esc(channelName)}»</h2>
+<div style="margin:6px 0 10px;font-weight:600">👽 <span class="mars-n">${me.unlimited ? '∞' : (me.mars || 0)}</span> Mars</div>
+${RARITY.map(([r, title]) => {
+    const items = d.catalog.filter(c => c.rarity === r);
+    return items.length ? `<div class="sec" style="padding:10px 0 6px">${title}</div><div class="gg">${items.map(c => {
+      const left = c.supply - c.sold;
+      return `<div class="gc r-${c.rarity} ${left ? '' : 'off'}" data-k="${c.kind}" style="background:${gradient(c)}"><div class="gi">${c.emoji}</div><div class="gn">${esc(c.name)}</div><div class="gs">👽 ${c.price}</div><div class="gs">${left ? 'осталось ' + left : 'распродано'}</div></div>`;
+    }).join('')}</div>` : '';
+  }).join('')}
+<div class="row"><button type="button" class="btn g" data-x>Закрыть</button></div>`);
+  $('#card').querySelectorAll('.gg').forEach(g => g.onclick = e => {
+    const el = e.target.closest('[data-k]');
+    if (el && !el.classList.contains('off')) giftBuyForChannel(el.dataset.k, chatId, channelName);
+  });
+}
+
+function giftBuyForChannel(kind, chatId, channelName) {
+  const k = kindInfo(kind);
+  modal(`<div class="gc big" style="background:${gradient(k)}"><div class="gi">${k.emoji}</div><div class="gn">${esc(k.name)}</div></div>
+<div style="text-align:center;margin-top:12px;font-weight:600">👽 ${k.price} Mars</div>
+<div style="text-align:center;color:var(--t2);font-size:13px">Подарок каналу «${esc(channelName)}»</div>
+<div class="f" style="margin-top:12px"><label>Сообщение (необязательно)</label><input id="gmsg" maxlength="120"></div>
+<div class="err" id="ge"></div>
+<div class="row"><button class="btn" id="gb1">Подарить каналу за 👽 ${k.price}</button></div>
+<div class="row"><button type="button" class="btn g" id="gbk">Назад</button></div>`);
+  $('#gbk').onclick = () => openShopForChannel(chatId, channelName);
+  $('#gb1').onclick = async () => {
+    const b = $('#gb1'); b.disabled = true;
+    try {
+      const r = await api('/api/gifts/buy-for-channel', 'POST', {kind, chatId, message: $('#gmsg').value});
+      setMars(r.mars, r.unlimited);
+      toast(`🎁 Подарок отправлен в канал «${channelName}»!`);
+      closeModal();
+    } catch (x) { const e = $('#ge'); if (e) e.textContent = x.message; b.disabled = false; }
+  };
 }
 
 function giftBuy(kind, to) {
