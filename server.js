@@ -1364,7 +1364,7 @@ app.get('/api/blocks', (req, res) => {
 const MARS_PER_MIN = Number(process.env.MARS_PER_MIN) || 1;
 const CATALOG = [
     // обычные
-    { kind: 'heart',    rarity: 'common',    emoji: '💝', name: 'Сердечко',     price: 15,    supply: 5000, bg: ['#ff9aa2', '#ff5e7e'] },
+    { kind: 'heart',    rarity: 'common',    emoji: '💝', name: 'Сердечко',     price: 15,    supply: 10000, bg: ['#ff9aa2', '#ff5e7e'] },
     { kind: 'star',     rarity: 'common',    emoji: '⭐', name: 'Звезда',       price: 20,    supply: 5000, bg: ['#ffe29a', '#ffa751'] },
     { kind: 'flower',   rarity: 'common',    emoji: '🌸', name: 'Сакура',       price: 25,    supply: 4000, bg: ['#ffd1dc', '#f78fb3'] },
     { kind: 'coffee',   rarity: 'common',    emoji: '☕', name: 'Кофе',         price: 30,    supply: 4000, bg: ['#d7b899', '#8b5e3c'] },
@@ -1473,6 +1473,80 @@ app.get('/api/shop', (req, res) => {
     res.json({ backdrops: BACKDROPS, patterns: PATTERNS, catalog: CATALOG.map(c => ({ ...c, sold: sold[c.kind] || 0 })), ...(me ? walletOf(me) : { mars: 0 }), perMin: MARS_PER_MIN });
 });
 
+// ─── Подарки каналов ───────────────────────────────────────────────────────
+
+// Подарки конкретного канала (публичная витрина)
+app.get('/api/gifts/channel/:chatId', (req, res) => {
+    const users = read(F.users);
+    res.json(read(F.gifts)
+        .filter(g => g.channelId === req.params.chatId && !g.ownerId)
+        .sort((a, b) => b.at.localeCompare(a.at))
+        .slice(0, 200)
+        .map(g => giftOut(g, users)));
+});
+
+// Купить подарок и отправить его в канал
+app.post('/api/gifts/buy-for-channel', async (req, res) => {
+    const me = req.uid;
+    const item = CATALOG.find(c => c.kind === req.body.kind);
+    if (!item) return res.status(400).json({ error: 'Такого подарка нет' });
+    const chatId = String(req.body.chatId || '');
+    if (!chatId) return res.status(400).json({ error: 'Не указан канал' });
+    const allChats = read(F.chats);
+    const ch = allChats.find(c => c.id === chatId && c.type === 'channel');
+    if (!ch) return res.status(404).json({ error: 'Канал не найден' });
+    const users = read(F.users), gifts = read(F.gifts);
+    const buyer = users.find(u => u.id === me);
+    if (!buyer) return res.status(400).json({ error: 'Пользователь не найден' });
+    const minted = gifts.filter(g => g.kind === item.kind).length;
+    if (minted >= item.supply) return res.status(400).json({ error: 'Этот подарок распродан' });
+    const unlimited = isUnlimited(buyer);
+    if (!unlimited && (buyer.mars || 0) < item.price)
+        return res.status(400).json({ error: `Не хватает Mars: нужно ${item.price}, у вас ${buyer.mars || 0}` });
+    const now = new Date().toISOString();
+    if (!unlimited) buyer.mars -= item.price;
+    const note = String(req.body.message || '').trim().slice(0, 120);
+    const gift = {
+        id: 'k_' + crypto.randomUUID(), kind: item.kind, serial: minted + 1,
+        ownerId: null, channelId: chatId, fromId: me,
+        price: item.price, at: now,
+        bd: pickBackdrop(buyer).id, pt: pickPattern().id, note
+    };
+    gifts.push(gift);
+    write(F.users, users);
+    write(F.gifts, gifts);
+    sendTo([me], { type: 'wallet', data: walletOf(buyer) });
+    // Отправляем сообщение-подарок в канал
+    const msgs = read(F.messages);
+    const msg = {
+        id: crypto.randomUUID(), chatId, senderId: me, text: note,
+        gift: { kind: gift.kind, serial: gift.serial, bd: gift.bd, pt: gift.pt },
+        timestamp: now
+    };
+    msgs.push(msg);
+    write(F.messages, msgs);
+    sendTo(ch.members || [], { type: 'message', data: msg });
+    await persist();
+    res.json({ success: true, ...walletOf(buyer), gift: giftOut(gift, users) });
+});
+
+// Создатель канала: забрать подарок из канала себе в профиль
+app.post('/api/gifts/channel/:chatId/claim/:giftId', async (req, res) => {
+    const me = req.uid;
+    const allChats = read(F.chats);
+    const ch = allChats.find(c => c.id === req.params.chatId && c.type === 'channel' && c.creator === me);
+    if (!ch) return res.status(403).json({ error: 'Только создатель канала может забрать подарок' });
+    const gifts = read(F.gifts);
+    const g = gifts.find(x => x.id === req.params.giftId && x.channelId === req.params.chatId && !x.ownerId);
+    if (!g) return res.status(404).json({ error: 'Подарок не найден или уже забран' });
+    g.ownerId = me;
+    g.channelId = null;
+    g.claimedAt = new Date().toISOString();
+    write(F.gifts, gifts);
+    await persist();
+    res.json({ success: true, gift: giftOut(g, read(F.users)) });
+});
+
 // Подарки пользователя — видны всем, это витрина в профиле
 app.get('/api/gifts/:userId', (req, res) => {
     const uid = Number(req.params.userId), users = read(F.users);
@@ -1526,6 +1600,51 @@ app.post('/api/gifts/:id/wear', async (req, res) => {
     broadcast({ type: 'chat' }); // у всех обновится ник
     await persist();
     res.json({ success: true, acc: u.acc || null });
+});
+
+// ---------- Улучшение NFT ----------
+// Платишь Mars → получаешь случайный новый фон + узор (с честными шансами из таблиц выпадения).
+// Старая модель заменяется новой. Улучшать можно сколько угодно раз.
+// Цена улучшения = 30% от стоимости NFT, минимум 10 Mars.
+app.post('/api/gifts/:id/upgrade', async (req, res) => {
+    const me = req.uid;
+    const gifts = read(F.gifts);
+    const g = gifts.find(x => x.id === req.params.id);
+    if (!g || g.ownerId !== me) return res.status(403).json({ error: 'Это не ваш подарок' });
+    if (g.listing) return res.status(400).json({ error: 'Снимите подарок с продажи перед улучшением' });
+    const item = CATALOG.find(c => c.kind === g.kind);
+    if (!item) return res.status(400).json({ error: 'Подарок не найден в каталоге' });
+    const upgCost = Math.max(10, Math.round(item.price * 0.3));
+    const users = read(F.users);
+    const u = users.find(x => x.id === me);
+    if (!u) return res.status(401).json({ error: 'Не авторизован' });
+    const unlimited = isUnlimited(u);
+    if (!unlimited && (u.mars || 0) < upgCost)
+        return res.status(400).json({ error: `Не хватает Mars: нужно ${upgCost}, у вас ${u.mars || 0}` });
+    const oldBd = g.bd, oldPt = g.pt;
+    // Крутим рандом пока не выпадет что-то другое (чтобы улучшение реально что-то меняло)
+    let newBd, newPt, attempts = 0;
+    do {
+        newBd = pickBackdrop(u).id;
+        newPt = pickPattern().id;
+        attempts++;
+    } while (attempts < 10 && newBd === oldBd && newPt === oldPt);
+    if (!unlimited) u.mars -= upgCost;
+    g.bd = newBd;
+    g.pt = newPt;
+    g.upgradedAt = new Date().toISOString();
+    g.upgrades = (g.upgrades || 0) + 1;
+    // Обновляем acc (виджет рядом с ником) если пользователь носит именно этот подарок
+    if (u.acc && u.acc.gid === g.id) u.acc = { ...u.acc, bd: newBd };
+    write(F.gifts, gifts);
+    write(F.users, users);
+    sendTo([me], { type: 'wallet', data: walletOf(u) });
+    broadcast({ type: 'chat' }); // обновляем acc у всех
+    await persist();
+    const bdInfo  = BACKDROPS.find(b => b.id === newBd);
+    const ptInfo  = PATTERNS.find(p => p.id === newPt);
+    res.json({ success: true, ...walletOf(u), gift: giftOut(g, users), upgCost,
+        bdName: bdInfo?.name || newBd, ptName: ptInfo?.name || newPt });
 });
 
 // ---------- Рынок NFT: выставить свой подарок за Mars, купить чужой ----------

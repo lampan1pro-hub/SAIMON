@@ -3407,7 +3407,12 @@ ${g.note ? `<div class="gr"><div class="gv gnv">${esc(g.note)}</div></div>` : ''
 </div>
 <div class="err" id="ge"></div>
 <div class="row"><button class="btn gok" id="gbk">OK</button></div>
-${mine ? `${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gwr">${me.acc && me.acc.gid === g.id ? '✨ Снять с ника' : '✨ Носить рядом с ником'}</button></div>`}<div class="row"><button class="btn g gok" id="gsl">${g.listing ? `💰 На рынке за ${g.listing.price} Mars — изменить` : '💰 Продать на рынке'}</button></div>${g.listing ? '<div class="row"><button class="btn r gok" id="gun">Снять с продажи</button></div>' : ''}<div class="row"><button class="btn g gok" id="gtr">Передать</button></div>` : ''}`);
+${mine ? `
+${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gwr">${me.acc && me.acc.gid === g.id ? '✨ Снять с ника' : '✨ Носить рядом с ником'}</button></div>`}
+${g.listing ? '' : `<div class="row"><button class="btn gok" id="gupg" style="background:linear-gradient(135deg,#a259ff,#3390ec);color:#fff">🎲 Улучшить модель · 👽 ${Math.max(10, Math.round((g.price||k.price) * 0.3))} Mars</button></div>`}
+<div class="row"><button class="btn g gok" id="gsl">${g.listing ? `💰 На рынке за ${g.listing.price} Mars — изменить` : '💰 Продать на рынке'}</button></div>
+${g.listing ? '<div class="row"><button class="btn r gok" id="gun">Снять с продажи</button></div>' : ''}
+<div class="row"><button class="btn g gok" id="gtr">Передать</button></div>` : ''}`);
   $('#gbk').onclick = back;
   if (mine) {
     $('#gsl').onclick = () => askPrice(g, k, () => giftInfo(g, mine, back));
@@ -3425,6 +3430,45 @@ ${mine ? `${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gwr
       giftInfo(g, mine, back); renderList(); renderHead();
     } catch (x) { const e = $('#ge'); if (e) e.textContent = x.message; b.disabled = false; }
   };
+  if (mine && $('#gupg')) $('#gupg').onclick = async () => {
+    const upgCost = Math.max(10, Math.round((g.price || kindInfo(g.kind).price) * 0.3));
+    const k2 = kindInfo(g.kind);
+    const bd2 = bdOf(g), pt2 = patterns.get(g.pt);
+    const oldBd = bd2 ? bd2.name : '—';
+    const oldPt = pt2 ? pt2.name : '—';
+    modal(`<div class="gc big" style="background:${giftBg(g, k2)}"><div class="gi">${k2.emoji}</div><div class="gn">${k2.name}</div></div>
+<h2 style="margin-top:12px">🎲 Улучшение модели</h2>
+<p style="color:var(--t2);font-size:14px;text-align:center">Случайный новый фон и узор заменят текущие.<br>Шанс получить редкий — такой же, как при покупке.<br>Текущие: <b>${esc(oldBd)}</b> / <b>${esc(oldPt)}</b></p>
+<div class="err" id="ge"></div>
+<div class="row"><button class="btn" id="doUpg" style="background:linear-gradient(135deg,#a259ff,#3390ec);color:#fff">🎲 Крутить за 👽 ${upgCost} Mars</button></div>
+<div class="row"><button class="btn g" id="upgBk">Отмена</button></div>`);
+    $('#upgBk').onclick = () => giftInfo(g, mine, back);
+    $('#doUpg').onclick = async () => {
+      const b = $('#doUpg'); b.disabled = true; b.textContent = 'Улучшаю…';
+      try {
+        const r = await api(`/api/gifts/${encodeURIComponent(g.id)}/upgrade`, 'POST', {});
+        g.bd = r.gift.bd; g.pt = r.gift.pt; g.upgrades = r.gift.upgrades;
+        me.mars = r.mars; if (r.unlimited !== undefined) me.unlimited = r.unlimited;
+        save();
+        // Показываем результат с анимацией
+        const newBd = r.bdName, newPt = r.ptName;
+        const isRareBd = (backdrops.get(g.bd)?.pct || 99) < 5;
+        const isRarePt = (patterns.get(g.pt)?.pct || 99) < 5;
+        modal(`<div class="gc big" style="background:${giftBg(g, k2)};animation:popIn .4s var(--ease-out) both"><div class="gi">${k2.emoji}</div><div class="gn">${k2.name}</div></div>
+<h2 style="margin-top:12px;text-align:center">✨ Новая модель!</h2>
+<div style="text-align:center;margin:12px 0">
+  <div style="font-size:18px;margin-bottom:6px"><b>${esc(newBd)}</b>${isRareBd ? ' 🔥' : ''}</div>
+  <div style="font-size:15px;color:var(--t2)">Узор: <b>${esc(newPt)}</b>${isRarePt ? ' ✨' : ''}</div>
+  ${(isRareBd || isRarePt) ? '<div style="color:#f59e0b;font-weight:700;margin-top:8px">Редкая комбинация! 🎉</div>' : ''}
+  <div style="color:var(--t2);font-size:13px;margin-top:8px">Улучшений всего: ${r.gift.upgrades || 1}</div>
+</div>
+<div class="row"><button class="btn g" id="upOk">Отлично!</button></div>`);
+        $('#upOk').onclick = () => giftInfo(g, mine, back);
+        toast(`🎲 Новая модель: ${newBd} / ${newPt}`);
+      } catch (x) { const e = $('#ge'); if (e) e.textContent = x.message; b.disabled = false; b.textContent = `🎲 Крутить за 👽 ${upgCost} Mars`; }
+    };
+  };
+
   if (mine) $('#gtr').onclick = () => pickUser('Кому передать подарок?', u => {
     if (!confirm(`Передать «${k.name} №${g.serial}» пользователю ${u.username}? Подарок уйдёт из вашего профиля.`)) return;
     api(`/api/gifts/${encodeURIComponent(g.id)}/transfer`, 'POST', {toId: u.id})
