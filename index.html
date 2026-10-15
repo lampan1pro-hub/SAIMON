@@ -927,80 +927,6 @@ html[data-theme=dark] .tgp-row input,html[data-theme=dark] .tgp-row textarea{col
 .tgs-tx small{color:var(--t2,#7d8790);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tgs-go{color:var(--t2,#7d8790);font-size:22px;line-height:1}
 html[data-theme=dark] .tgs-row{background:#17212b;color:var(--t);border-color:#0e1621}
-/* ── MINI GAMES ───────────────────────────────────────────────────── */
-.mg-wrap{padding:8px 12px 16px}
-.mg-tabs{display:flex;gap:6px;margin-bottom:12px}
-.mg-tab{flex:1;padding:9px 4px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid #ddd;background:#fff;cursor:pointer;transition:.15s;color:#555;text-align:center}
-.mg-tab.active{background:var(--tg-blue,#3390ec);color:#fff;border-color:var(--tg-blue,#3390ec)}
-html[data-theme=dark] .mg-tab{background:#1e2c3a;border-color:#2e4560;color:#aaa}
-html[data-theme=dark] .mg-tab.active{background:var(--tg-blue,#3390ec);color:#fff}
-.mg-panel{display:none}.mg-panel.show{display:block}
-/* Crash */
-.mg-crash-screen{background:linear-gradient(160deg,#0f0f20,#1a1a35);border-radius:14px;padding:16px;margin-bottom:10px;position:relative;overflow:hidden;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.mg-crash-screen::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 120%,rgba(240,180,41,.15),transparent 70%)}
-.mg-mult{font-size:56px;font-weight:900;color:#f0b429;line-height:1;filter:drop-shadow(0 0 14px rgba(240,180,41,.5));transition:color .15s;position:relative}
-.mg-mult.crashed{color:#ff3b5c;filter:drop-shadow(0 0 14px rgba(255,59,92,.5))}
-.mg-phase{font-size:11px;font-weight:600;color:rgba(255,255,255,.5);letter-spacing:1px;text-transform:uppercase;margin-top:4px;position:relative}
-.mg-hist{display:flex;flex-wrap:wrap;gap:4px;padding:4px 0 8px}
-.mg-hc{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
-.mg-hc.lo{color:#ff3b5c;background:rgba(255,59,92,.1)}
-.mg-hc.md{color:#f0b429;background:rgba(240,180,41,.1)}
-.mg-hc.hi{color:#2dce89;background:rgba(45,206,137,.1)}
-.mg-cd{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
-.mg-cd-n{font-size:60px;font-weight:900;color:#f0b429;line-height:1}
-.mg-cd-t{font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px}
-.mg-bet-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-.mg-inp{flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid #ddd;background:#fff;font-size:15px;font-weight:700;outline:none;min-width:0}
-html[data-theme=dark] .mg-inp{background:#0e1621;border-color:#2e4560;color:#fff}
-.mg-inp:focus{border-color:var(--tg-blue,#3390ec)}
-.mg-qb{display:flex;gap:4px;margin-bottom:8px}
-.mg-qb button{flex:1;padding:5px 0;border-radius:7px;border:1.5px solid #ddd;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#555;transition:.1s}
-html[data-theme=dark] .mg-qb button{background:#1e2c3a;border-color:#2e4560;color:#aaa}
-.mg-qb button:hover{border-color:var(--tg-blue,#3390ec);color:var(--tg-blue,#3390ec)}
-.mg-btn{width:100%;padding:13px;border-radius:11px;border:0;font-size:15px;font-weight:700;cursor:pointer;transition:.15s;margin-bottom:6px}
-.mg-btn-bet{background:linear-gradient(135deg,#f0b429,#ff6b35);color:#000}
-.mg-btn-cash{background:linear-gradient(135deg,#2dce89,#00b894);color:#fff;animation:mg-pulse .9s infinite}
-@keyframes mg-pulse{0%,100%{box-shadow:0 0 0 0 rgba(45,206,137,.3)}50%{box-shadow:0 0 0 6px rgba(45,206,137,0)}}
-.mg-btn:disabled{opacity:.35;cursor:not-allowed;animation:none}
-.mg-status{text-align:center;font-size:13px;font-weight:600;padding:6px;border-radius:8px;margin-bottom:6px}
-.mg-status.win{background:rgba(45,206,137,.1);color:#2dce89}
-.mg-status.lose{background:rgba(255,59,92,.1);color:#ff3b5c}
-.mg-status.wait{background:rgba(74,158,255,.1);color:var(--tg-blue,#3390ec)}
-/* Upgrade */
-.mg-nft-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px;max-height:200px;overflow-y:auto}
-.mg-nft{aspect-ratio:1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;border:2px solid transparent;transition:.15s;position:relative}
-.mg-nft:hover{transform:scale(1.06)}
-.mg-nft.sel{border-color:#f0b429;box-shadow:0 0 10px rgba(240,180,41,.4)}
-.mg-nft .sn{position:absolute;top:2px;right:3px;font-size:9px;font-weight:800;background:#f0b429;color:#000;border-radius:4px;padding:0 3px;line-height:14px;opacity:0;transition:.15s}
-.mg-nft.sel .sn{opacity:1}
-.mg-up-slots{display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0}
-.mg-slot{width:56px;height:56px;border-radius:10px;border:2px dashed #ddd;display:flex;align-items:center;justify-content:center;font-size:24px;background:#f8f8f8;transition:.15s}
-html[data-theme=dark] .mg-slot{border-color:#2e4560;background:#0e1621}
-.mg-slot.filled{border-style:solid;border-color:#f0b429}
-.mg-arrow{font-size:22px;color:#f0b429}
-.mg-result{width:66px;height:66px;border-radius:12px;border:2px solid #ddd;display:flex;align-items:center;justify-content:center;font-size:30px;background:#f8f8f8;transition:.2s}
-html[data-theme=dark] .mg-result{border-color:#2e4560;background:#0e1621}
-.mg-result.ready{border-color:#f0b429;box-shadow:0 0 14px rgba(240,180,41,.4)}
-.mg-info{text-align:center;font-size:13px;color:var(--t2,#7d8790);margin-bottom:10px;line-height:1.6}
-.mg-info b{color:#f0b429}
-/* Arena */
-.mg-arena-screen{background:linear-gradient(160deg,#10081e,#1e0b2e);border-radius:14px;padding:16px;margin-bottom:10px;text-align:center;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.mg-arena-screen::before{content:'⚔️';position:absolute;font-size:80px;opacity:.06;top:50%;left:50%;transform:translate(-50%,-50%)}
-.mg-fighters{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:10px}
-.mg-fighter{display:flex;flex-direction:column;align-items:center;gap:4px}
-.mg-fighter .av{width:54px;height:54px;border-radius:50%;background:#2a1a4a;display:flex;align-items:center;justify-content:center;font-size:26px;border:2px solid #5a2d9a;transition:.3s}
-.mg-fighter .av.winner{border-color:#f0b429;box-shadow:0 0 16px rgba(240,180,41,.5)}
-.mg-fighter .av.loser{opacity:.4;filter:grayscale(1)}
-.mg-fighter .nm{font-size:11px;color:rgba(255,255,255,.6);font-weight:600}
-.mg-vs{font-size:22px;font-weight:900;color:#b44dff;text-shadow:0 0 14px rgba(180,77,255,.5)}
-.mg-arena-result{font-size:20px;font-weight:800;padding:8px 16px;border-radius:10px;margin-bottom:8px}
-.mg-arena-result.win{background:rgba(45,206,137,.15);color:#2dce89}
-.mg-arena-result.lose{background:rgba(255,59,92,.15);color:#ff3b5c}
-.mg-arena-idle{font-size:13px;color:rgba(255,255,255,.4);position:relative}
-.mg-r-common{background:linear-gradient(135deg,#3a7bd5,#00d2ff)}
-.mg-r-rare{background:linear-gradient(135deg,#7928ca,#ff0080)}
-.mg-r-epic{background:linear-gradient(135deg,#f7971e,#ffd200)}
-.mg-r-legendary{background:linear-gradient(135deg,#ff416c,#ff4b2b)}
 .prem-desc{color:var(--t2,#7d8790);font-size:14px;margin-bottom:8px}
 .prem-price{float:right;color:var(--t2,#7d8790);font-size:14px}
 .ngrow{display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap}
@@ -1832,8 +1758,6 @@ async function onWs(m) {
     toast(`💰 ${d.buyer} купил «${kindInfo(d.kind).name} №${d.serial}» за ${d.price} Mars`);
   } else if (m.type === 'wallet') {
     setMars(d.mars, d.unlimited);
-  } else if (m.type.startsWith('casino_')) {
-    mgOnWs(m);
   } else if (m.type === 'gift') {
     toast('🎁 Вам подарили подарок!');
   } else if (m.type === 'auth') {
@@ -2547,7 +2471,7 @@ function picker(box, exclude) {
 $('#meBtn').onclick = () => myProfile('hub');
 
 // Настройки профиля: разделы в стиле мессенджера (группы строк с цветными иконками)
-const PROF_TITLES = { hub: 'Настройки', account: 'Аккаунт', premium: 'SAIMONPREMIYM', market: 'Магазин и рынок', games: '🎮 Мини-игры' };
+const PROF_TITLES = { hub: 'Настройки', account: 'Аккаунт', premium: 'SAIMONPREMIYM', market: 'Магазин и рынок' };
 const profRow = (ic, bg, t, sub, attr) => `<button type="button" class="tgs-row" ${attr}><span class="tgs-ic" style="background:${bg}">${ic}</span><span class="tgs-tx"><b>${t}</b><small>${sub}</small></span><span class="tgs-go">›</span></button>`;
 function myProfile(view = 'hub') {
   const binders = [];
@@ -2571,7 +2495,6 @@ ${profRow('💎', '#8e44ff', 'SAIMONPREMIYM', me.premium ? (me.premium === 'fore
 </div>
 <div class="tgp-card">
 ${profRow('🎁', '#ff9500', 'Магазин и рынок', 'Подарки и юзернеймы', 'data-go="market"')}
-${profRow('🎮', '#2dce89', 'Мини-игры', 'Краш, Апгрейд НФТ, Арена', 'data-go="games"')}
 ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-панель', 'Каналы и пользователи', 'id="padm"') : ''}
 </div>
 <div class="tgp-sec">Мои подарки</div><div class="gg tgp-gifts" id="pgifts"></div>
@@ -2605,87 +2528,6 @@ ${me.premium ? `<button type="button" class="tgp-item ${me.rainbowBorder ? 'tgp-
     body = `<div class="tgp-card">
 ${profRow('🎁', '#ff9500', 'Магазин подарков', 'Купить и отправить подарки', 'id="pshop"')}
 ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка и продажа юзернеймов', 'id="punm"')}
-</div>`;
-  } else if (view === 'games') {
-    body = `<div class="mg-wrap">
-<div class="mg-tabs">
-  <button class="mg-tab active" data-gt="crash">🚀 Краш</button>
-  <button class="mg-tab" data-gt="upgrade">⚡ Апгрейд</button>
-  <button class="mg-tab" data-gt="arena">⚔️ Арена</button>
-</div>
-
-<!-- CRASH -->
-<div class="mg-panel show" id="mg-crash">
-  <div class="mg-crash-screen">
-    <div id="mg-cd" style="display:none"><div class="mg-cd-n" id="mg-cd-n">5</div><div class="mg-cd-t">Ставки открыты</div></div>
-    <div class="mg-mult" id="mg-mult">1.00×</div>
-    <div class="mg-phase" id="mg-phase">Загрузка...</div>
-  </div>
-  <div class="mg-hist" id="mg-hist"></div>
-  <div class="mg-bet-row">
-    <input class="mg-inp" id="mg-bet-amt" type="number" value="10" min="1" placeholder="Ставка">
-    <span style="font-size:13px;color:var(--t2);white-space:nowrap">Mars</span>
-  </div>
-  <div class="mg-qb">
-    <button onclick="mgSetBet(10)">10</button>
-    <button onclick="mgSetBet(50)">50</button>
-    <button onclick="mgSetBet(100)">100</button>
-    <button onclick="mgSetBet(500)">500</button>
-  </div>
-  <button class="mg-btn mg-btn-bet" id="mg-btn-bet" onclick="mgBet()">🎲 Поставить</button>
-  <button class="mg-btn mg-btn-cash" id="mg-btn-cash" onclick="mgCash()" style="display:none">💰 Забрать <span id="mg-cash-prev"></span></button>
-  <div class="mg-status" id="mg-status" style="display:none"></div>
-</div>
-
-<!-- UPGRADE -->
-<div class="mg-panel" id="mg-upgrade">
-  <div style="font-size:13px;color:var(--t2);margin-bottom:10px;line-height:1.6">
-    Выбери <b style="color:#f0b429">3 НФТ одного типа</b> → получи 1 более редкий.<br>
-    Common→Rare (50♂) · Rare→Epic (200♂) · Epic→Legendary (500♂)
-  </div>
-  <div class="mg-nft-grid" id="mg-nft-grid"><div style="color:var(--t2);font-size:13px;padding:10px">Загрузка...</div></div>
-  <div class="mg-up-slots">
-    <div class="mg-slot" id="mgs0">?</div>
-    <div class="mg-slot" id="mgs1">?</div>
-    <div class="mg-slot" id="mgs2">?</div>
-    <div class="mg-arrow">→</div>
-    <div class="mg-result" id="mg-res">?</div>
-  </div>
-  <div class="mg-info" id="mg-upinfo">Выбери НФТ выше</div>
-  <button class="mg-btn" id="mg-btn-up" disabled onclick="mgUpgrade()" style="background:linear-gradient(135deg,#7c4dff,#e040fb);color:#fff">⚡ Улучшить</button>
-  <div class="mg-status" id="mg-up-status" style="display:none"></div>
-</div>
-
-<!-- ARENA -->
-<div class="mg-panel" id="mg-arena">
-  <div class="mg-arena-screen">
-    <div class="mg-fighters">
-      <div class="mg-fighter">
-        <div class="av" id="mg-ar-me">${uav(me, 's')}</div>
-        <div class="nm">${esc(me.username||me.handle||'Ты')}</div>
-      </div>
-      <div class="mg-vs">VS</div>
-      <div class="mg-fighter">
-        <div class="av" id="mg-ar-opp">🤖</div>
-        <div class="nm" id="mg-ar-opp-nm">Противник</div>
-      </div>
-    </div>
-    <div id="mg-ar-result" class="mg-arena-idle">Сделай ставку и войди в арену!</div>
-  </div>
-  <div style="font-size:12px;color:var(--t2);text-align:center;margin-bottom:8px">Победитель забирает удвоенную ставку (шанс 50/50)</div>
-  <div class="mg-bet-row">
-    <input class="mg-inp" id="mg-ar-amt" type="number" value="25" min="10" placeholder="Ставка">
-    <span style="font-size:13px;color:var(--t2);white-space:nowrap">Mars</span>
-  </div>
-  <div class="mg-qb">
-    <button onclick="mgArSetBet(25)">25</button>
-    <button onclick="mgArSetBet(100)">100</button>
-    <button onclick="mgArSetBet(250)">250</button>
-    <button onclick="mgArSetBet(500)">500</button>
-  </div>
-  <button class="mg-btn" id="mg-btn-arena" onclick="mgArena()" style="background:linear-gradient(135deg,#b44dff,#7c4dff);color:#fff">⚔️ В бой!</button>
-  <div class="mg-status" id="mg-ar-status" style="display:none"></div>
-</div>
 </div>`;
   }
   profileModal(`<div class="tgp">${top}${body}</div>`);
@@ -2729,7 +2571,6 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
   if ($('#lo')) $('#lo').onclick = () => logout();
   if ($('#pshop')) $('#pshop').onclick = () => shop();
   if ($('#punm')) $('#punm').onclick = () => usernameMarket();
-  if (view === 'games') setTimeout(mgInit, 0);
   if ($('#pbl')) $('#pbl').onclick = blockedList;
   if ($('#padm')) $('#padm').onclick = adminPanel;
   if ($('#pprem')) $('#pprem').onclick = () => premiumShop(null);
@@ -4082,241 +3923,6 @@ if (window.visualViewport) {
   const fitVV = () => { if (rafId == null) rafId = requestAnimationFrame(applyVV); };
   vv.addEventListener('resize', fitVV);
   vv.addEventListener('scroll', fitVV);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   MINI GAMES
-══════════════════════════════════════════════════════════════ */
-let mgPhase = 'waiting', mgMult = 1.0, mgBetInfo = null, mgHistory = [], mgRoundId = 0, mgCdTimer = null;
-let mgNFTs = [], mgSel = [], mgCatalog = [];
-let mgSubscribed = false;
-
-// Subscribe to casino WS when profile games tab opens
-function mgSubscribe() {
-  if (mgSubscribed) return;
-  if (ws && ws.readyState === 1) { ws.send(JSON.stringify({ type: 'casino_subscribe' })); mgSubscribed = true; }
-}
-
-function mgOnWs(m) {
-  switch (m.type) {
-    case 'casino_crash_waiting': mgPhase='waiting'; mgRoundId=m.roundId; mgHistory=m.history||[]; mgMult=1.0; mgBetInfo=null; mgRenderHist(); mgRenderMult(); mgStartCd(m.countdown||5); mgResetBetUI(); break;
-    case 'casino_crash_start': mgPhase='running'; mgRoundId=m.roundId; mgHideCd(); mgSetPhase('▲ Летим!'); if(mgBetInfo&&!mgBetInfo.cashedOut) mgShowCash(); break;
-    case 'casino_crash_tick': if(m.roundId!==mgRoundId)return; mgMult=m.multiplier; mgRenderMult(); if(mgBetInfo&&!mgBetInfo.cashedOut){const p=Math.floor(mgBetInfo.amount*mgMult);const el=$('#mg-cash-prev');if(el)el.textContent=p+' Mars';if(mgBetInfo.autoCash&&mgMult>=mgBetInfo.autoCash)mgCash();} break;
-    case 'casino_crash_end': mgPhase='crashed'; mgMult=m.crashAt; mgHistory.unshift(m.crashAt); if(mgHistory.length>12)mgHistory.pop(); mgRenderMult(true); mgRenderHist(); mgSetPhase('💥 КРАШ!'); mgHideCd(); if(mgBetInfo&&!mgBetInfo.cashedOut){mgShowStatus('lose','💥 Краш на '+m.crashAt+'× — потеряно '+mgBetInfo.amount+' Mars');const b=$('#mg-btn-bet');if(b){b.style.display='';b.disabled=false;} const bc=$('#mg-btn-cash');if(bc)bc.style.display='none';} break;
-  }
-}
-
-function mgRenderMult(crashed) {
-  const el = $('#mg-mult'); if (!el) return;
-  el.textContent = mgMult.toFixed(2) + '×';
-  el.className = 'mg-mult' + (crashed ? ' crashed' : '');
-}
-function mgSetPhase(t) { const el = $('#mg-phase'); if (el) el.textContent = t; }
-function mgRenderHist() {
-  const el = $('#mg-hist'); if (!el) return;
-  if (!mgHistory.length) { el.innerHTML = ''; return; }
-  el.innerHTML = mgHistory.map(m => `<span class="mg-hc ${m<1.5?'lo':m<3?'md':'hi'}">${m.toFixed(2)}×</span>`).join('');
-}
-function mgStartCd(s) {
-  const cdEl = $('#mg-cd'); const numEl = $('#mg-cd-n'); if (!cdEl) return;
-  cdEl.style.display = ''; numEl.textContent = s;
-  clearInterval(mgCdTimer); let v = s;
-  mgCdTimer = setInterval(() => { v--; if (numEl) numEl.textContent = v; if (v <= 0) clearInterval(mgCdTimer); }, 1000);
-  mgSetPhase('Принимаем ставки...');
-  const multEl = $('#mg-mult'); if (multEl) { multEl.textContent = ''; multEl.className = 'mg-mult'; }
-}
-function mgHideCd() {
-  const cdEl = $('#mg-cd'); if (cdEl) cdEl.style.display = 'none';
-  clearInterval(mgCdTimer);
-  mgRenderMult();
-}
-function mgResetBetUI() {
-  const bb = $('#mg-btn-bet'); if (bb) { bb.style.display = ''; bb.disabled = (mgPhase !== 'waiting'); }
-  const bc = $('#mg-btn-cash'); if (bc) bc.style.display = 'none';
-  const st = $('#mg-status'); if (st) st.style.display = 'none';
-}
-function mgShowCash() {
-  const bb = $('#mg-btn-bet'); if (bb) bb.style.display = 'none';
-  const bc = $('#mg-btn-cash'); if (bc) { bc.style.display = ''; const p=$('#mg-cash-prev');if(p)p.textContent=Math.floor(mgBetInfo.amount*mgMult)+' Mars'; }
-}
-function mgShowStatus(type, text) {
-  const st = $('#mg-status'); if (!st) return;
-  st.className = 'mg-status ' + type; st.textContent = text; st.style.display = '';
-  const bb = $('#mg-btn-bet'); if (bb) { bb.style.display = ''; bb.disabled = (mgPhase !== 'waiting'); }
-  const bc = $('#mg-btn-cash'); if (bc) bc.style.display = 'none';
-}
-
-function mgSetBet(v) { const el = $('#mg-bet-amt'); if (el) el.value = v; }
-
-async function mgBet() {
-  if (mgPhase !== 'waiting') return toast('Ставки только до старта');
-  if (mgBetInfo) return toast('Ставка уже сделана');
-  const amount = parseInt($('#mg-bet-amt')?.value || '0');
-  if (!amount || amount < 1) return toast('Введи сумму');
-  const btn = $('#mg-btn-bet'); if (btn) btn.disabled = true;
-  try {
-    const r = await api('/api/casino/crash/bet', 'POST', { amount });
-    mgBetInfo = { amount, cashedOut: false };
-    setMars(r.mars);
-    mgShowStatus('wait', '✅ Ставка ' + amount + ' Mars принята. Ждём старта...');
-  } catch (x) { toast(x.message); if (btn) btn.disabled = false; }
-}
-
-async function mgCash() {
-  if (!mgBetInfo || mgBetInfo.cashedOut) return;
-  try {
-    const r = await api('/api/casino/crash/cashout', 'POST');
-    mgBetInfo.cashedOut = true;
-    setMars(r.mars);
-    mgShowStatus('win', '🎉 Забрал ' + r.won + ' Mars на ' + r.multiplier.toFixed(2) + '×!');
-  } catch (x) { toast(x.message); }
-}
-
-// Load crash state when opening games tab
-async function mgLoadCrash() {
-  try {
-    const s = await api('/api/casino/crash/state');
-    mgPhase = s.phase; mgMult = s.multiplier; mgHistory = s.history || []; mgRoundId = s.roundId;
-    mgRenderHist();
-    mgRenderMult(mgPhase === 'crashed');
-    if (mgPhase === 'waiting') { mgStartCd(5); mgSetPhase('Принимаем ставки...'); }
-    else if (mgPhase === 'running') { mgHideCd(); mgSetPhase('▲ Летим!'); }
-    else { mgSetPhase('💥 КРАШ!'); }
-    if (s.myBet) { mgBetInfo = s.myBet; if (!mgBetInfo.cashedOut && mgPhase === 'running') mgShowCash(); }
-  } catch {}
-}
-
-// ── UPGRADE ──
-const MG_RARITY_NEXT = { common:'rare', rare:'epic', epic:'legendary' };
-const MG_UP_FEE = { common:50, rare:200, epic:500 };
-const MG_RAR_LABEL = { common:'Common', rare:'Rare', epic:'Epic', legendary:'Legendary' };
-
-async function mgLoadNFTs() {
-  try {
-    const r = await api('/api/gifts/my');
-    const gifts = r.gifts || r;
-    mgNFTs = gifts.filter(g => g.ownerId === me.id || (!g.channelId && g.ownerId));
-    mgSel = [];
-    mgRenderNFTs();
-  } catch { document.getElementById('mg-nft-grid') && (document.getElementById('mg-nft-grid').innerHTML = '<div style="color:var(--t2);font-size:13px;padding:10px">Нет НФТ</div>'); }
-}
-
-function mgRenderNFTs() {
-  const el = $('#mg-nft-grid'); if (!el) return;
-  if (!mgNFTs.length) { el.innerHTML = '<div style="color:var(--t2);font-size:13px;padding:10px">Нет НФТ для апгрейда 🎁</div>'; return; }
-  el.innerHTML = mgNFTs.map(g => {
-    const idx = mgSel.indexOf(g.id);
-    const sel = idx >= 0;
-    const rar = g.rarity || 'common';
-    return `<div class="mg-nft mg-r-${rar} ${sel?'sel':''}" onclick="mgToggleNFT('${g.id}')">${g.emoji||'🎁'}<span class="sn">${sel?idx+1:''}</span></div>`;
-  }).join('');
-  mgUpdateUpSlots();
-}
-
-function mgToggleNFT(id) {
-  if (mgSel.includes(id)) { mgSel = mgSel.filter(x => x !== id); }
-  else {
-    if (mgSel.length >= 3) return toast('Максимум 3 НФТ');
-    if (mgSel.length > 0) {
-      const fk = mgNFTs.find(g => g.id === mgSel[0])?.kind;
-      const tk = mgNFTs.find(g => g.id === id)?.kind;
-      if (fk !== tk) return toast('Только одинаковые НФТ!');
-    }
-    mgSel.push(id);
-  }
-  mgRenderNFTs();
-}
-
-function mgUpdateUpSlots() {
-  [0,1,2].forEach(i => {
-    const el = $(`#mgs${i}`); if (!el) return;
-    const g = mgSel[i] ? mgNFTs.find(x => x.id === mgSel[i]) : null;
-    el.textContent = g ? (g.emoji||'🎁') : '?';
-    el.classList.toggle('filled', !!g);
-  });
-  const infoEl = $('#mg-upinfo'); const btn = $('#mg-btn-up'); const resEl = $('#mg-res');
-  if (mgSel.length === 3) {
-    const g = mgNFTs.find(x => x.id === mgSel[0]);
-    const rar = g?.rarity || 'common';
-    const next = MG_RARITY_NEXT[rar];
-    if (!next) { if(infoEl)infoEl.innerHTML='<span style="color:#ff3b5c">Legendary нельзя улучшить!</span>'; if(btn)btn.disabled=true; if(resEl)resEl.textContent='❌'; return; }
-    const fee = MG_UP_FEE[rar]||0;
-    if(infoEl)infoEl.innerHTML=`3× <b>${MG_RAR_LABEL[rar]}</b> → 1× <b style="color:#f0b429">${MG_RAR_LABEL[next]}</b><br>Стоимость: <b>${fee} Mars</b>`;
-    if(btn)btn.disabled=false; if(resEl){resEl.textContent='✨';resEl.className='mg-result ready';}
-  } else {
-    if(infoEl)infoEl.textContent=`Выбрано ${mgSel.length}/3 НФТ`;
-    if(btn)btn.disabled=true; if(resEl){resEl.textContent='?';resEl.className='mg-result';}
-  }
-}
-
-async function mgUpgrade() {
-  if (mgSel.length !== 3) return;
-  const btn = $('#mg-btn-up'); if (btn) { btn.disabled = true; btn.textContent = 'Улучшение...'; }
-  const st = $('#mg-up-status'); if (st) st.style.display = 'none';
-  try {
-    const r = await api('/api/casino/nft-upgrade', 'POST', { ids: mgSel });
-    setMars(r.mars);
-    mgNFTs = mgNFTs.filter(g => !mgSel.includes(g.id));
-    if (r.gift) mgNFTs.push(r.gift);
-    mgSel = [];
-    mgRenderNFTs();
-    if (st) { st.className='mg-status win'; st.textContent='✨ Успешно! Получен: '+(r.gift?.name||'НФТ'); st.style.display=''; }
-    toast('✨ Апгрейд успешен!');
-  } catch (x) {
-    if (st) { st.className='mg-status lose'; st.textContent=x.message; st.style.display=''; }
-    toast(x.message);
-  } finally { if (btn) { btn.disabled = false; btn.textContent = '⚡ Улучшить'; } }
-}
-
-// ── ARENA ──
-function mgArSetBet(v) { const el = $('#mg-ar-amt'); if (el) el.value = v; }
-
-async function mgArena() {
-  const amount = parseInt($('#mg-ar-amt')?.value || '0');
-  if (!amount || amount < 10) return toast('Минимум 10 Mars');
-  const btn = $('#mg-btn-arena'); if (btn) { btn.disabled = true; btn.textContent = '⚔️ Сражаемся...'; }
-  const st = $('#mg-ar-status'); if (st) st.style.display = 'none';
-  const resEl = $('#mg-ar-result');
-  if (resEl) { resEl.className = 'mg-arena-idle'; resEl.textContent = '⚔️ Бой идёт...'; }
-  // Animate VS
-  const meEl = $('#mg-ar-me'); const oppEl = $('#mg-ar-opp');
-  if (meEl) { meEl.className = 'av'; } if (oppEl) { oppEl.className = 'av'; }
-  try {
-    const r = await api('/api/casino/arena', 'POST', { amount });
-    setMars(r.mars);
-    const won = r.won;
-    if (oppEl) oppEl.textContent = r.oppEmoji || '🤖';
-    const oppNm = $('#mg-ar-opp-nm'); if (oppNm) oppNm.textContent = r.oppName || 'Арена';
-    setTimeout(() => {
-      if (meEl) meEl.className = 'av ' + (won ? 'winner' : 'loser');
-      if (oppEl) oppEl.className = 'av ' + (!won ? 'winner' : 'loser');
-      if (resEl) {
-        resEl.className = 'mg-arena-result ' + (won ? 'win' : 'lose');
-        resEl.textContent = won ? `🏆 Победа! +${r.prize} Mars` : `💀 Поражение! -${amount} Mars`;
-      }
-      if (st) { st.className='mg-status '+(won?'win':'lose'); st.textContent=won?`+${r.prize} Mars`:`-${amount} Mars`; st.style.display=''; }
-    }, 800);
-  } catch (x) {
-    if (resEl) { resEl.className='mg-arena-idle'; resEl.textContent=x.message; }
-    toast(x.message);
-  } finally { setTimeout(() => { if (btn) { btn.disabled=false; btn.textContent='⚔️ В бой!'; } }, 1200); }
-}
-
-// ── Init mini games view ──
-function mgInit() {
-  mgSubscribe();
-  mgLoadCrash();
-  // tab switching
-  document.querySelectorAll('.mg-tab').forEach(t => {
-    t.onclick = () => {
-      document.querySelectorAll('.mg-tab').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      const gt = t.dataset.gt;
-      document.querySelectorAll('.mg-panel').forEach(p => p.classList.remove('show'));
-      const panel = $(`#mg-${gt}`); if (panel) panel.classList.add('show');
-      if (gt === 'upgrade') mgLoadNFTs();
-    };
-  });
 }
 
 /* ---------- Запуск ---------- */
