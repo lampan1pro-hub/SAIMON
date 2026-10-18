@@ -704,6 +704,23 @@ html[data-theme=dark] #rdonly{background:#17212b}
 .a-logo{width:112px;height:112px;margin:0 auto 22px;border-radius:50%;background:linear-gradient(160deg,#6bbdf8,#3390ec);display:grid;place-items:center;box-shadow:0 6px 20px rgba(51,144,236,.3)}
 .a-title{text-align:center;font-size:24px;font-weight:500;color:#000;margin-bottom:8px}
 .a-sub{text-align:center;color:#707579;font-size:15px;line-height:1.4;margin:0 12px 30px}
+/* Шаги регистрации */
+.reg-step{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:52px}
+.reg-step span{width:28px;height:28px;border-radius:50%;background:#e8eaed;color:#707579;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:background .3s,color .3s}
+.reg-step small{font-size:10px;color:#707579;font-weight:500;transition:color .3s}
+.reg-step.active span{background:#3390ec;color:#fff}
+.reg-step.active small{color:#3390ec}
+.reg-step.done span{background:#3fb950;color:#fff}
+.reg-step.done small{color:#3fb950}
+.reg-step-line{flex:1;height:2px;background:#e8eaed;margin:0 4px;margin-bottom:14px;transition:background .3s;max-width:40px}
+.reg-step-line.done{background:#3fb950}
+html[data-theme=dark] .reg-step span{background:#2a3a4a;color:#8b949e}
+html[data-theme=dark] .reg-step small{color:#8b949e}
+html[data-theme=dark] .reg-step-line{background:#2a3a4a}
+html[data-theme=dark] .reg-step.done small{color:#3fb950}
+/* Глаз в поле пароля */
+#fP{position:relative}
+#fP input{padding-right:44px}
 .af{position:relative;margin-bottom:16px}
 .af input{width:100%;height:56px;padding:22px 16px 6px;border:1.5px solid #d5dade;border-radius:12px;background:#fff;font-size:16px;color:#000;transition:border-color .15s}
 .af input:focus{outline:0;border-color:#3390ec;background:#fff}
@@ -999,6 +1016,7 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
 </svg>
 
 <div id="auth">
+  <!-- ШАГ 1: Данные -->
   <form class="a-card" id="authForm" novalidate>
     <p class="a-top" style="text-align:center;margin:0 0 6px;font-size:14px;color:var(--t2,#7d8790)">Самый обычный мессенджер от saimona</p>
     <p id="aDisclaimer" style="text-align:center;margin:0 0 10px;font-size:12px;line-height:1.4;color:var(--t2,#7d8790)">SAIMON — самостоятельный мессенджер. Это не Telegram и не копия Telegram.</p>
@@ -1007,10 +1025,34 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
     <h1 class="a-title" id="aT">Регистрация</h1>
     <p class="a-sub" id="aS">Заполните данные, чтобы создать аккаунт</p>
 
+    <!-- Прогресс-бар (только при регистрации) -->
+    <div id="regSteps" style="display:none;margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:0;justify-content:center">
+        <div class="reg-step active" id="rs1"><span>1</span><small>Данные</small></div>
+        <div class="reg-step-line" id="rsl1"></div>
+        <div class="reg-step" id="rs2"><span>2</span><small>Email</small></div>
+        <div class="reg-step-line" id="rsl2"></div>
+        <div class="reg-step" id="rs3"><span>3</span><small>Готово</small></div>
+      </div>
+    </div>
+
     <div class="af" id="fN"><input id="an" maxlength="40" autocomplete="name" placeholder=" "><label>Имя</label></div>
-    <div class="af" id="fH"><input id="ah" maxlength="21" autocapitalize="off" autocomplete="off" placeholder=" "><label>Юзернейм</label></div>
-    <div class="af"><input id="ae" autocapitalize="off" autocomplete="username" placeholder=" "><label id="el">Email</label></div>
-    <div class="af"><input id="ap" type="password" autocomplete="current-password" placeholder=" "><label>Пароль (минимум 6 символов)</label></div>
+    <div class="af" id="fH"><input id="ah" maxlength="21" autocapitalize="off" autocomplete="off" placeholder=" "><label>Юзернейм (@username)</label></div>
+    <div class="af"><input id="ae" autocapitalize="off" autocomplete="email" type="email" placeholder=" "><label id="el">Email</label></div>
+    <div class="af" id="fP"><input id="ap" type="password" autocomplete="current-password" placeholder=" "><label>Пароль (минимум 6 символов)</label>
+      <button type="button" id="eyeBtn" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t2);font-size:18px;padding:4px;cursor:pointer">👁</button>
+    </div>
+
+    <!-- Поле кода (шаг 2 регистрации) -->
+    <div id="fCode" style="display:none">
+      <div style="background:rgba(51,144,236,.08);border:1px solid rgba(51,144,236,.25);border-radius:14px;padding:14px;margin-bottom:12px;text-align:center">
+        <div style="font-size:22px;margin-bottom:6px">📬</div>
+        <div style="font-size:13px;color:var(--t);font-weight:600" id="codeSentTo"></div>
+        <div style="font-size:12px;color:var(--t2);margin-top:3px">Введите 6-значный код из письма</div>
+      </div>
+      <div class="af"><input id="aCode" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder=" " style="text-align:center;font-size:22px;font-weight:800;letter-spacing:10px"><label>Код подтверждения</label></div>
+      <button type="button" id="resendBtn" style="width:100%;background:none;border:none;color:var(--p);font-size:13px;padding:6px;cursor:pointer;margin-top:-4px">Отправить повторно</button>
+    </div>
 
     <div id="tosWrap">
       <label><span>Я принимаю <span id="tosLink">пользовательское соглашение</span></span><input type="checkbox" id="tosCheck"></label>
@@ -1475,45 +1517,121 @@ async function uploadAvatar(file) {
 /* ---------- Вход ---------- */
 let reg = true;
 let cfg = {vapidKey: ''};
+let regStep = 1; // 1=данные, 2=код, 3=готово
+
+function setRegStep(step) {
+  regStep = step;
+  const steps = [1,2,3];
+  steps.forEach(i => {
+    const el = document.getElementById('rs'+i), line = document.getElementById('rsl'+i);
+    if (!el) return;
+    el.classList.remove('active','done');
+    if (i < step) el.classList.add('done');
+    else if (i === step) el.classList.add('active');
+    if (line) line.classList.toggle('done', i < step);
+  });
+}
+
 function authUI() {
-  $('#fN').hidden = $('#fH').hidden = !reg;
-  $('#el').textContent = reg ? 'Email' : 'Email или @юзернейм';
-  $('#aT').textContent = reg ? 'Регистрация' : 'Вход';
-  $('#aS').textContent = reg ? 'Заполните данные, чтобы создать аккаунт' : 'Введите email или юзернейм и пароль';
-  $('#authBtn').setAttribute('aria-label', reg ? 'Создать аккаунт' : 'Войти');
-  $('#tgl').textContent = reg ? 'Войти' : 'Регистрация';
+  const isReg = reg;
+  $('#fN').hidden = $('#fH').hidden = !isReg;
+  $('#el').textContent = isReg ? 'Email' : 'Email или @юзернейм';
+  $('#aT').textContent = isReg ? 'Регистрация' : 'Вход';
+  $('#aS').textContent = isReg ? (regStep===1 ? 'Создайте аккаунт SAIMON' : regStep===2 ? 'Подтвердите email' : '🎉 Добро пожаловать!') : 'Введите email или юзернейм и пароль';
+  $('#authBtn').setAttribute('aria-label', isReg ? (regStep===1 ? 'Далее' : 'Подтвердить') : 'Войти');
+  $('#tgl').textContent = isReg ? 'Войти' : 'Регистрация';
   $('#aerr').textContent = '';
-  $('#ap').autocomplete = reg ? 'new-password' : 'current-password';
-  const tw = $('#tosWrap'); if (tw) tw.classList.toggle('visible', reg);
-  const tc = $('#tosCheck'); if (tc && !reg) tc.checked = false;
+  $('#ap').autocomplete = isReg ? 'new-password' : 'current-password';
+  const tw = $('#tosWrap'); if (tw) tw.classList.toggle('visible', isReg && regStep===1);
+  const tc = $('#tosCheck'); if (tc && !isReg) tc.checked = false;
+  const steps = document.getElementById('regSteps'); if (steps) steps.style.display = isReg ? '' : 'none';
+  const fCode = document.getElementById('fCode'); if (fCode) fCode.style.display = isReg && regStep===2 ? '' : 'none';
+  const fP = document.getElementById('fP'); if (fP) fP.style.display = regStep===2 && isReg ? 'none' : '';
+  const fN = $('#fN'), fH = $('#fH'), fE = $('#ae')?.closest('.af');
+  if (isReg && regStep===2) { if (fN) fN.hidden=true; if (fH) fH.hidden=true; }
+  if (isReg) setRegStep(regStep);
   updateAuthBtn();
 }
+
 function updateAuthBtn() {
-  const btn = $('#authBtn');
-  if (!btn) return;
+  const btn = $('#authBtn'); if (!btn) return;
   const tc = $('#tosCheck');
-  btn.disabled = reg && tc && !tc.checked;
+  btn.disabled = reg && regStep===1 && tc && !tc.checked;
 }
-$('#tgl').onclick = () => { reg = !reg; authUI(); };
-// ToS modal handlers (safe — elements exist at this point since scripts are at end of body)
+
+$('#tgl').onclick = () => { reg = !reg; regStep = 1; authUI(); };
+
+// Показать/скрыть пароль
+$('#eyeBtn') && ($('#eyeBtn').onclick = () => {
+  const inp = $('#ap'); inp.type = inp.type==='password' ? 'text' : 'password';
+  $('#eyeBtn').textContent = inp.type==='password' ? '👁' : '🙈';
+});
+
+// Автоформат юзернейма
+$('#ah') && ($('#ah').oninput = () => { $('#ah').value = $('#ah').value.toLowerCase().replace(/[^a-z0-9_]/g,''); });
+
+// Автоперевод кода в цифры
+$('#aCode') && ($('#aCode').oninput = () => { $('#aCode').value = $('#aCode').value.replace(/\D/g,''); });
+
+// ToS modal
 document.addEventListener('DOMContentLoaded', () => {
   const tosLink = $('#tosLink'), tosModal = $('#tosModal'), tosCloseBtn = $('#tosCloseBtn');
   if (tosLink) tosLink.onclick = e => { e.stopPropagation(); if (tosModal) tosModal.hidden = false; };
   if (tosCloseBtn) tosCloseBtn.onclick = () => { if (tosModal) tosModal.hidden = true; };
   if (tosModal) tosModal.onclick = e => { if (e.target === tosModal) tosModal.hidden = true; };
-  const tosCheck = $('#tosCheck');
-  if (tosCheck) tosCheck.onchange = () => updateAuthBtn();
+  const tosCheck = $('#tosCheck'); if (tosCheck) tosCheck.onchange = () => updateAuthBtn();
 });
+
+// Повторная отправка кода
+document.getElementById('resendBtn') && (document.getElementById('resendBtn').onclick = async () => {
+  const btn = document.getElementById('resendBtn'); btn.disabled = true; btn.textContent = 'Отправляем…';
+  try {
+    await api('/api/register/send-code', 'POST', {username:$('#an').value, handle:$('#ah').value, email:$('#ae').value, password:$('#ap').value});
+    toast('📬 Код отправлен повторно'); btn.textContent = 'Отправить повторно';
+  } catch(x) { $('#aerr').textContent = x.message; btn.textContent = 'Отправить повторно'; }
+  setTimeout(() => btn.disabled=false, 30000); // защита от спама
+});
+
 fetch('/api/config').then(r => r.json()).then(c => { cfg = c; authUI(); initPush(); }).catch(() => {});
+
 $('#authForm').onsubmit = async e => {
   e.preventDefault();
   $('#aerr').textContent = '';
+  const btn = $('#authBtn'); btn.disabled = true;
+
   try {
-    const d = reg
-      ? await api('/api/register', 'POST', {username: $('#an').value, handle: $('#ah').value, email: $('#ae').value, password: $('#ap').value})
-      : await api('/api/login', 'POST', {email: $('#ae').value, password: $('#ap').value});
-    me = normMe({...d.user, token: d.token}); save(); saveCreds($('#ae').value, $('#ap').value); boot();
-  } catch (x) { $('#aerr').textContent = x.message; }
+    if (!reg) {
+      // Обычный вход
+      const d = await api('/api/login', 'POST', {email: $('#ae').value, password: $('#ap').value});
+      me = normMe({...d.user, token: d.token}); save(); saveCreds($('#ae').value, $('#ap').value); boot();
+    } else if (regStep === 1) {
+      // Шаг 1: отправляем код
+      await api('/api/register/send-code', 'POST', {
+        username: $('#an').value, handle: $('#ah').value,
+        email: $('#ae').value, password: $('#ap').value
+      });
+      regStep = 2;
+      const sent = document.getElementById('codeSentTo');
+      if (sent) sent.textContent = `Код отправлен на ${$('#ae').value}`;
+      authUI();
+      setTimeout(() => document.getElementById('aCode')?.focus(), 100);
+    } else if (regStep === 2) {
+      // Шаг 2: проверяем код и создаём аккаунт
+      const code = (document.getElementById('aCode')?.value||'').trim();
+      if (code.length !== 6) { $('#aerr').textContent = 'Введите 6-значный код'; btn.disabled=false; return; }
+      const d = await api('/api/register', 'POST', {email: $('#ae').value, code});
+      me = normMe({...d.user, token: d.token}); save(); saveCreds($('#ae').value, $('#ap').value);
+      // Показываем шаг 3 на секунду перед входом
+      regStep = 3; authUI(); $('#aT').textContent = 'Добро пожаловать!'; $('#aS').textContent = '🎉 Аккаунт создан!';
+      setTimeout(() => boot(), 1200);
+    }
+  } catch (x) {
+    $('#aerr').textContent = x.message;
+    btn.disabled = false;
+    return;
+  }
+  if (regStep !== 2) btn.disabled = false; // при переходе на шаг 2 — не разблокируем сразу
+  updateAuthBtn();
 };
 
 function boot() {

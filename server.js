@@ -616,26 +616,93 @@ app.get('/icon-192.png', (req, res) => res.set({ 'Content-Type': 'image/png', 'C
 app.get('/icon-512.png', (req, res) => res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }).send(ICON_512));
 
 // ---------- Авторизация ----------
-app.post('/api/register', async (req, res) => {
+// ─── Email-подтверждение при регистрации ──────────────────────────────────
+// Хранит pending-регистрации: {username,handle,email,passHash,code,expiresAt}
+const pendingRegs = new Map();
+
+async function sendVerifyEmail(email, code, username) {
+    if (!process.env.RESEND_API_KEY) {
+        // Нет ключа Resend — пропускаем отправку, выводим код в лог (для разработки)
+        console.log(`[DEV] Код подтверждения для ${email}: ${code}`);
+        return true;
+    }
+    try {
+        const r = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + process.env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                from: process.env.RESEND_FROM || 'SAIMON <noreply@resend.dev>',
+                to: email,
+                subject: `${code} — код подтверждения SAIMON`,
+                html: `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0d1117;color:#e6edf3;border-radius:18px">
+  <div style="text-align:center;margin-bottom:24px">
+    <div style="font-size:40px;margin-bottom:8px">👽</div>
+    <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px">SAIMON</div>
+  </div>
+  <p style="color:#8b949e;font-size:15px;margin-bottom:20px">Привет, <b style="color:#e6edf3">${username}</b>! Вот твой код подтверждения:</p>
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:14px;padding:24px;text-align:center;margin-bottom:20px">
+    <div style="font-size:42px;font-weight:900;letter-spacing:12px;color:#3390ec">${code}</div>
+    <div style="color:#8b949e;font-size:13px;margin-top:8px">Действует 10 минут</div>
+  </div>
+  <p style="color:#8b949e;font-size:13px;line-height:1.6">Если ты не регистрировался в SAIMON — просто проигнорируй это письмо.</p>
+</div>`
+            })
+        });
+        return r.ok;
+    } catch (e) { console.error('Resend error:', e.message); return false; }
+}
+
+// Шаг 1: валидация данных + отправка кода
+app.post('/api/register/send-code', async (req, res) => {
     const username = String(req.body.username || '').trim().slice(0, 40);
-    const handle = String(req.body.handle || '').trim().replace(/^@/, '').toLowerCase();
-    const email = String(req.body.email || '').trim().toLowerCase();
+    const handle   = String(req.body.handle   || '').trim().replace(/^@/, '').toLowerCase();
+    const email    = String(req.body.email    || '').trim().toLowerCase();
     const password = String(req.body.password || '');
 
     if (!username || !email || !password) return res.status(400).json({ error: 'Заполните все поля' });
-    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Введите корректный email' });
-    if (password.length < 6) return res.status(400).json({ error: 'Пароль — минимум 6 символов' });
-    if (!HANDLE_RE.test(handle)) return res.status(400).json({ error: 'Юзернейм: 3–20 символов, латиница, цифры и _' });
+    if (!EMAIL_RE.test(email))            return res.status(400).json({ error: 'Введите корректный email' });
+    if (password.length < 6)             return res.status(400).json({ error: 'Пароль — минимум 6 символов' });
+    if (!HANDLE_RE.test(handle))         return res.status(400).json({ error: 'Юзернейм: 3–20 символов, латиница, цифры и _' });
 
     const users = read(F.users);
-    if (users.some(u => u.email === email)) return res.status(400).json({ error: 'Этот email уже зарегистрирован' });
-    if (handleTaken(users, handle)) return res.status(400).json({ error: 'Этот юзернейм уже занят' });
+    if (users.some(u => u.email === email))       return res.status(400).json({ error: 'Этот email уже зарегистрирован' });
+    if (handleTaken(users, handle))               return res.status(400).json({ error: 'Этот юзернейм уже занят' });
+
+    // Генерируем 6-значный код
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 минут
+    pendingRegs.set(email, { username, handle, email, passHash: hashPass(password), code, expiresAt });
+
+    const sent = await sendVerifyEmail(email, code, username);
+    if (!sent) return res.status(500).json({ error: 'Не удалось отправить письмо. Проверьте email и попробуйте снова.' });
+
+    res.json({ success: true, message: `Код отправлен на ${email}` });
+});
+
+// Шаг 2: проверка кода и создание аккаунта
+app.post('/api/register', async (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const code  = String(req.body.code  || '').trim();
+
+    const pending = pendingRegs.get(email);
+    if (!pending)                    return res.status(400).json({ error: 'Сначала запросите код подтверждения' });
+    if (Date.now() > pending.expiresAt) { pendingRegs.delete(email); return res.status(400).json({ error: 'Код истёк. Зарегистрируйтесь заново.' }); }
+    if (pending.code !== code)       return res.status(400).json({ error: 'Неверный код. Проверьте письмо.' });
+
+    // Повторная проверка (вдруг кто-то зарегался пока ждали)
+    const users = read(F.users);
+    if (users.some(u => u.email === email))         return res.status(400).json({ error: 'Этот email уже зарегистрирован' });
+    if (handleTaken(users, pending.handle))         return res.status(400).json({ error: 'Этот юзернейм уже занят' });
+
     const user = {
-        id: Date.now(), username, handle, email, password: hashPass(password),
+        id: Date.now(), username: pending.username, handle: pending.handle,
+        email: pending.email, password: pending.passHash,
         bio: '', avatar: '', mars: START_MARS, createdAt: new Date().toISOString()
     };
     users.push(user);
     write(F.users, users);
+    pendingRegs.delete(email);
     const token = newSession(user.id);
     await persist();
     res.json({ success: true, user: self(user), token });
