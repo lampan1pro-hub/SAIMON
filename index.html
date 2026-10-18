@@ -549,10 +549,31 @@ html[data-theme=dark] #recbar{background:#242f3d}
 .emo-body{overflow-y:auto;padding:8px;display:flex;flex-wrap:wrap;gap:4px;flex:1}
 .emo-body button{font-size:26px;padding:4px;border:0;background:transparent;cursor:pointer;border-radius:8px;line-height:1;transition:transform .1s}
 .emo-body button:active{transform:scale(1.2)}
-.stk-body{overflow-y:auto;padding:6px;display:grid;grid-template-columns:repeat(5,1fr);gap:5px;flex:1}
-.stk-body button{border:0;background:transparent;cursor:pointer;padding:4px;border-radius:10px;transition:transform .12s}
+.stk-body{overflow-y:auto;padding:6px;display:grid;grid-template-columns:repeat(5,1fr);gap:5px;flex:1;min-height:0}
+.stk-body button{border:0;background:transparent;cursor:pointer;padding:4px;border-radius:10px;transition:transform .12s,background .15s}
+.stk-body button:hover{background:rgba(51,144,236,.1)}
 .stk-body button:active{transform:scale(1.1)}
-.stk-body img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:6px}.m.stk{background:transparent!important;box-shadow:none!important;padding:0!important;border-radius:0!important}
+.stk-body img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:6px}
+.m.stk{background:transparent!important;box-shadow:none!important;padding:0!important;border-radius:0!important}
+/* Паки стикеров */
+.stk-packs{display:flex;gap:4px;padding:4px 6px;overflow-x:auto;flex-shrink:0;border-bottom:1px solid var(--b2,#ddd);scrollbar-width:none}
+.stk-packs::-webkit-scrollbar{display:none}
+.stk-pack-btn{flex-shrink:0;width:36px;height:36px;border-radius:10px;border:2px solid transparent;background:transparent;cursor:pointer;display:grid;place-items:center;font-size:20px;transition:background .15s,border-color .15s;padding:0}
+.stk-pack-btn.on{border-color:var(--tg-blue,#3390ec);background:rgba(51,144,236,.1)}
+.stk-pack-btn img{width:28px;height:28px;object-fit:contain;border-radius:6px}
+.stk-pack-new{font-size:22px;opacity:.6}
+.stk-pack-new:hover{opacity:1}
+/* Модалка создания пака */
+#stkModal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+#stkModal[hidden]{display:none!important}
+.stk-sheet{background:var(--bg,#fff);border-radius:18px 18px 0 0;padding:20px 20px 32px;width:100%;max-width:480px;max-height:80dvh;display:flex;flex-direction:column;gap:12px;animation:slideUp .3s var(--ease-out)}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+.stk-grid-edit{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;overflow-y:auto;max-height:200px}
+.stk-grid-edit button{border:0;background:rgba(51,144,236,.08);border-radius:10px;aspect-ratio:1;display:grid;place-items:center;cursor:pointer;font-size:24px;position:relative;overflow:hidden;transition:background .15s}
+.stk-grid-edit img{width:100%;height:100%;object-fit:contain;border-radius:8px}
+.stk-del{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(220,53,69,.8);color:#fff;font-size:11px;display:grid;place-items:center;opacity:0;transition:opacity .15s}
+.stk-grid-edit button:hover .stk-del{opacity:1}
+html[data-theme=dark] .stk-sheet{background:var(--bg,#17212b)}
 .m.stk img.ph{width:130px!important;height:130px!important;border-radius:0!important;object-fit:contain;background:transparent!important}
 .m.stk time{color:rgba(255,255,255,.7);text-shadow:0 1px 3px rgba(0,0,0,.5);position:absolute;bottom:4px;right:6px}
 .m.stk{position:relative}
@@ -698,58 +719,60 @@ html[data-theme=dark] #rdonly{background:#17212b}
   .it{margin:0}
   .sh{padding:6px 8px}
 }
-/* ===== Экран регистрации/входа в стиле Telegram ===== */
+/* ===== Экран регистрации/входа ===== */
 #auth{height:100dvh;display:flex;align-items:center;justify-content:center;padding:0;background:#fff;overflow:auto}
-.a-card{width:100%;max-width:420px;min-height:100%;padding:56px 28px 28px;display:flex;flex-direction:column;background:#fff;border-radius:0;box-shadow:none;max-height:none}
+.a-card{width:100%;max-width:420px;min-height:100%;padding:56px 28px 32px;display:flex;flex-direction:column;background:#fff;border-radius:0;box-shadow:none;max-height:none}
 .a-logo{width:112px;height:112px;margin:0 auto 22px;border-radius:50%;background:linear-gradient(160deg,#6bbdf8,#3390ec);display:grid;place-items:center;box-shadow:0 6px 20px rgba(51,144,236,.3)}
 .a-title{text-align:center;font-size:24px;font-weight:500;color:#000;margin-bottom:8px}
 .a-sub{text-align:center;color:#707579;font-size:15px;line-height:1.4;margin:0 12px 30px}
-/* Шаги регистрации */
-.reg-step{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:52px}
-.reg-step span{width:28px;height:28px;border-radius:50%;background:#e8eaed;color:#707579;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:background .3s,color .3s}
-.reg-step small{font-size:10px;color:#707579;font-weight:500;transition:color .3s}
-.reg-step.active span{background:#3390ec;color:#fff}
-.reg-step.active small{color:#3390ec}
-.reg-step.done span{background:#3fb950;color:#fff}
-.reg-step.done small{color:#3fb950}
-.reg-step-line{flex:1;height:2px;background:#e8eaed;margin:0 4px;margin-bottom:14px;transition:background .3s;max-width:40px}
-.reg-step-line.done{background:#3fb950}
-html[data-theme=dark] .reg-step span{background:#2a3a4a;color:#8b949e}
-html[data-theme=dark] .reg-step small{color:#8b949e}
-html[data-theme=dark] .reg-step-line{background:#2a3a4a}
-html[data-theme=dark] .reg-step.done small{color:#3fb950}
 /* Глаз в поле пароля */
 #fP{position:relative}
 #fP input{padding-right:44px}
-.af{position:relative;margin-bottom:16px}
-.af input{width:100%;height:56px;padding:22px 16px 6px;border:1.5px solid #d5dade;border-radius:12px;background:#fff;font-size:16px;color:#000;transition:border-color .15s}
-.af input:focus{outline:0;border-color:#3390ec;background:#fff}
-.af label{position:absolute;left:16px;top:17px;color:#8e979e;font-size:16px;pointer-events:none;transition:top .15s,font-size .15s,color .15s;background:#fff;padding:0 2px;max-width:calc(100% - 32px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.af input:focus+label,.af input:not(:placeholder-shown)+label{top:-9px;font-size:13px;color:#3390ec}
+.af{position:relative;margin-bottom:14px}
+.af input{width:100%;height:56px;padding:22px 16px 6px;border:1.5px solid #d5dade;border-radius:14px;background:#fff;font-size:16px;color:#000;transition:border-color .2s ease,box-shadow .25s ease,background .2s ease}
+.af input:hover:not(:focus){border-color:#b8c0c8}
+.af input:focus{outline:0;border-color:#3390ec;box-shadow:0 0 0 3px rgba(51,144,236,.12);background:#fff}
+.af label{position:absolute;left:16px;top:17px;color:#8e979e;font-size:16px;pointer-events:none;transition:top .2s var(--ease),font-size .2s var(--ease),color .2s ease;background:#fff;padding:0 2px;max-width:calc(100% - 32px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.af input:focus+label,.af input:not(:placeholder-shown)+label{top:-9px;font-size:12px;color:#3390ec;font-weight:500}
 .af input:not(:focus):not(:placeholder-shown)+label{color:#8e979e}
+/* Анимация полей при появлении */
+.af{opacity:0;transform:translateY(8px);transition:border-color .2s ease,box-shadow .25s ease,background .2s ease,opacity .35s var(--ease-out),transform .35s var(--ease-out)}
+.af.visible{opacity:1;transform:none}
 .cr-row{display:flex;gap:10px;align-items:flex-start}
 .cr-row .af{flex:1;min-width:0;margin-bottom:16px}
 .cr-row .af input{letter-spacing:3px;text-align:center;font-size:18px}
 .a-code{height:56px;padding:0 14px;border-radius:12px;color:#3390ec;font-weight:500;font-size:14px;white-space:nowrap;background:transparent;border:1.5px solid #d5dade}
 .a-code:disabled{opacity:.5}
-#aerr{text-align:center;min-height:20px;margin:0 0 8px}
-.a-foot{margin-top:auto;padding-top:24px;display:flex;align-items:center;justify-content:space-between}
-.a-link{color:#3390ec;font-weight:500;font-size:15px;padding:12px 4px;background:none}
+#aerr{text-align:center;min-height:20px;margin:0 0 6px;font-size:13px;color:#e53935;transition:opacity .2s ease}
+/* Встряска при ошибке */
+@keyframes shake{0%,100%{transform:none}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+#aerr.shake{animation:shake .35s ease}
+.a-foot{margin-top:auto;padding-top:20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.a-link{color:#3390ec;font-weight:500;font-size:15px;padding:12px 4px;background:none;white-space:nowrap;flex-shrink:0}
 .a-link:hover{background:none;text-decoration:underline}
-.a-next{width:56px;height:56px;border-radius:50%;background:#3390ec;color:#fff;display:grid;place-items:center;box-shadow:0 4px 12px rgba(51,144,236,.35)}
-.a-next:hover:not(:disabled){background:#2b7fd1}
-.a-next:active{transform:scale(.94)}
-.a-next:disabled{background:#b0bec5!important;box-shadow:none!important;cursor:not-allowed;opacity:.7;transform:none!important}
+/* Кнопка регистрации — широкая, с градиентом */
+.a-next{flex:1;height:52px;border-radius:26px;background:linear-gradient(135deg,#4da8ff,#3390ec);color:#fff;font-size:16px;font-weight:600;letter-spacing:.2px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(51,144,236,.38);border:none;cursor:pointer;transition:background .2s ease,box-shadow .2s ease,transform .15s var(--ease),opacity .2s ease}
+.a-next:hover:not(:disabled){background:linear-gradient(135deg,#5bb2ff,#2b7fd1);box-shadow:0 6px 20px rgba(51,144,236,.48)}
+.a-next:active:not(:disabled){transform:scale(.97)}
+.a-next:disabled{background:linear-gradient(135deg,#b0bec5,#9eaab4)!important;box-shadow:none!important;cursor:not-allowed;opacity:.7}
+/* Спиннер в кнопке */
+@keyframes spin{to{transform:rotate(360deg)}}
+.a-next .spin{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+.a-next .a-arrow{display:flex;align-items:center;gap:8px}
 @media(min-width:769px){
-  #auth{background:#f4f4f5}
-  .a-card{min-height:0;margin:auto;padding:44px 40px 32px;border-radius:14px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
+  #auth{background:linear-gradient(135deg,#f0f4ff 0%,#e8f0fe 50%,#f4f0ff 100%)}
+  .a-card{min-height:0;margin:auto;padding:44px 40px 32px;border-radius:18px;box-shadow:0 8px 40px rgba(51,144,236,.12),0 2px 8px rgba(0,0,0,.06)}
 }
 html[data-theme=dark] #auth{background:#0e1621}
 html[data-theme=dark] .a-card{background:#17212b}
 html[data-theme=dark] .a-title{color:#f5f5f5}
-html[data-theme=dark] .af input{background:#17212b;border-color:#3a4a5c;color:#f5f5f5}
-html[data-theme=dark] .af label{background:#17212b;color:#7f91a4}
+html[data-theme=dark] .af input{background:#1e2c3a;border-color:#3a4a5c;color:#f5f5f5}
+html[data-theme=dark] .af input:hover:not(:focus){border-color:#4a5e74}
+html[data-theme=dark] .af input:focus{border-color:#6ab2f2;box-shadow:0 0 0 3px rgba(106,178,242,.12)}
+html[data-theme=dark] .af label{background:#1e2c3a;color:#7f91a4}
 html[data-theme=dark] .af input:focus+label,html[data-theme=dark] .af input:not(:placeholder-shown)+label{color:#6ab2f2}
+html[data-theme=dark] .a-next{background:linear-gradient(135deg,#4da8ff,#3390ec)}
+html[data-theme=dark] @media(min-width:769px){#auth{background:#0d1117}}
 html[data-theme=dark] .a-code{border-color:#3a4a5c;color:#6ab2f2}
 html[data-theme=dark] .a-link{color:#6ab2f2}
 /* ===== Логотип-Марс на чёрном фоне ===== */
@@ -784,11 +807,16 @@ body{-webkit-tap-highlight-color:transparent}
 
 /* Появление приложения и экранов */
 @keyframes appIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@keyframes popIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes popIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
 @keyframes shimmer{from{background-position:-200px 0}to{background-position:200px 0}}
+@keyframes logoIn{from{opacity:0;transform:scale(.7);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
 #app:not([hidden]){animation:appIn .4s var(--ease-out)}
-#auth:not([hidden]) .a-card{animation:fadeUp .45s var(--ease-out)}
+#auth:not([hidden]) .a-card{animation:fadeUp .5s var(--ease-out)}
+#auth:not([hidden]) .a-logo{animation:logoIn .55s var(--ease-out)}
+#auth:not([hidden]) .a-title{animation:fadeUp .5s .08s var(--ease-out) both}
+#auth:not([hidden]) .a-sub{animation:fadeUp .5s .13s var(--ease-out) both}
+#auth:not([hidden]) .a-foot{animation:fadeUp .5s .18s var(--ease-out) both}
 #empty:not([hidden]){animation:fadeUp .4s var(--ease-out)}
 
 /* Переход между списком и чатом на телефоне */
@@ -1015,7 +1043,7 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
   </symbol>
 </svg>
 
-<div id="auth">
+<div id="auth" hidden>
   <!-- ШАГ 1: Данные -->
   <form class="a-card" id="authForm" novalidate>
     <p class="a-top" style="text-align:center;margin:0 0 6px;font-size:14px;color:var(--t2,#7d8790)">Самый обычный мессенджер от saimona</p>
@@ -1025,33 +1053,11 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
     <h1 class="a-title" id="aT">Регистрация</h1>
     <p class="a-sub" id="aS">Заполните данные, чтобы создать аккаунт</p>
 
-    <!-- Прогресс-бар (только при регистрации) -->
-    <div id="regSteps" style="display:none;margin-bottom:18px">
-      <div style="display:flex;align-items:center;gap:0;justify-content:center">
-        <div class="reg-step active" id="rs1"><span>1</span><small>Данные</small></div>
-        <div class="reg-step-line" id="rsl1"></div>
-        <div class="reg-step" id="rs2"><span>2</span><small>Email</small></div>
-        <div class="reg-step-line" id="rsl2"></div>
-        <div class="reg-step" id="rs3"><span>3</span><small>Готово</small></div>
-      </div>
-    </div>
-
     <div class="af" id="fN"><input id="an" maxlength="40" autocomplete="name" placeholder=" "><label>Имя</label></div>
     <div class="af" id="fH"><input id="ah" maxlength="21" autocapitalize="off" autocomplete="off" placeholder=" "><label>Юзернейм (@username)</label></div>
     <div class="af"><input id="ae" autocapitalize="off" autocomplete="email" type="email" placeholder=" "><label id="el">Email</label></div>
     <div class="af" id="fP"><input id="ap" type="password" autocomplete="current-password" placeholder=" "><label>Пароль (минимум 6 символов)</label>
       <button type="button" id="eyeBtn" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t2);font-size:18px;padding:4px;cursor:pointer">👁</button>
-    </div>
-
-    <!-- Поле кода (шаг 2 регистрации) -->
-    <div id="fCode" style="display:none">
-      <div style="background:rgba(51,144,236,.08);border:1px solid rgba(51,144,236,.25);border-radius:14px;padding:14px;margin-bottom:12px;text-align:center">
-        <div style="font-size:22px;margin-bottom:6px">📬</div>
-        <div style="font-size:13px;color:var(--t);font-weight:600" id="codeSentTo"></div>
-        <div style="font-size:12px;color:var(--t2);margin-top:3px">Введите 6-значный код из письма</div>
-      </div>
-      <div class="af"><input id="aCode" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder=" " style="text-align:center;font-size:22px;font-weight:800;letter-spacing:10px"><label>Код подтверждения</label></div>
-      <button type="button" id="resendBtn" style="width:100%;background:none;border:none;color:var(--p);font-size:13px;padding:6px;cursor:pointer;margin-top:-4px">Отправить повторно</button>
     </div>
 
     <div id="tosWrap">
@@ -1061,7 +1067,10 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
     <div class="a-foot">
       <button type="button" class="a-link" id="tgl">Войти</button>
       <button class="a-next" id="authBtn" type="submit" aria-label="Далее">
-        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg>
+        <span class="a-arrow">
+          <span id="authBtnLabel">Создать аккаунт</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" id="authBtnArrow"><path fill="currentColor" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg>
+        </span>
       </button>
     </div>
   </form>
@@ -1517,19 +1526,33 @@ async function uploadAvatar(file) {
 /* ---------- Вход ---------- */
 let reg = true;
 let cfg = {vapidKey: ''};
-let regStep = 1; // 1=данные, 2=код, 3=готово
-
-function setRegStep(step) {
-  regStep = step;
-  const steps = [1,2,3];
-  steps.forEach(i => {
-    const el = document.getElementById('rs'+i), line = document.getElementById('rsl'+i);
-    if (!el) return;
-    el.classList.remove('active','done');
-    if (i < step) el.classList.add('done');
-    else if (i === step) el.classList.add('active');
-    if (line) line.classList.toggle('done', i < step);
+function staggerFields() {
+  const fields = document.querySelectorAll('.af');
+  fields.forEach((f, i) => {
+    f.classList.remove('visible');
+    f.style.transitionDelay = '';
   });
+  // Показываем только видимые
+  const visible = Array.from(fields).filter(f => !f.hidden && f.offsetParent !== null);
+  visible.forEach((f, i) => {
+    f.style.transitionDelay = (i * 55) + 'ms';
+    requestAnimationFrame(() => requestAnimationFrame(() => f.classList.add('visible')));
+  });
+}
+
+function setAuthBtnLoading(loading) {
+  const btn = $('#authBtn'); if (!btn) return;
+  const arrow = btn.querySelector('.a-arrow');
+  if (loading) {
+    btn.disabled = true;
+    if (arrow) { arrow.innerHTML = '<span class="spin"></span>'; }
+  } else {
+    const isReg = reg;
+    if (arrow) {
+      arrow.innerHTML = `<span id="authBtnLabel">${isReg ? 'Создать аккаунт' : 'Войти'}</span><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg>`;
+    }
+    updateAuthBtn();
+  }
 }
 
 function authUI() {
@@ -1537,29 +1560,26 @@ function authUI() {
   $('#fN').hidden = $('#fH').hidden = !isReg;
   $('#el').textContent = isReg ? 'Email' : 'Email или @юзернейм';
   $('#aT').textContent = isReg ? 'Регистрация' : 'Вход';
-  $('#aS').textContent = isReg ? (regStep===1 ? 'Создайте аккаунт SAIMON' : regStep===2 ? 'Подтвердите email' : '🎉 Добро пожаловать!') : 'Введите email или юзернейм и пароль';
-  $('#authBtn').setAttribute('aria-label', isReg ? (regStep===1 ? 'Далее' : 'Подтвердить') : 'Войти');
+  $('#aS').textContent = isReg ? 'Создайте аккаунт SAIMON' : 'Введите email или юзернейм и пароль';
+  const lbl = document.getElementById('authBtnLabel');
+  if (lbl) lbl.textContent = isReg ? 'Создать аккаунт' : 'Войти';
+  $('#authBtn').setAttribute('aria-label', isReg ? 'Зарегистрироваться' : 'Войти');
   $('#tgl').textContent = isReg ? 'Войти' : 'Регистрация';
   $('#aerr').textContent = '';
   $('#ap').autocomplete = isReg ? 'new-password' : 'current-password';
-  const tw = $('#tosWrap'); if (tw) tw.classList.toggle('visible', isReg && regStep===1);
+  const tw = $('#tosWrap'); if (tw) tw.classList.toggle('visible', isReg);
   const tc = $('#tosCheck'); if (tc && !isReg) tc.checked = false;
-  const steps = document.getElementById('regSteps'); if (steps) steps.style.display = isReg ? '' : 'none';
-  const fCode = document.getElementById('fCode'); if (fCode) fCode.style.display = isReg && regStep===2 ? '' : 'none';
-  const fP = document.getElementById('fP'); if (fP) fP.style.display = regStep===2 && isReg ? 'none' : '';
-  const fN = $('#fN'), fH = $('#fH'), fE = $('#ae')?.closest('.af');
-  if (isReg && regStep===2) { if (fN) fN.hidden=true; if (fH) fH.hidden=true; }
-  if (isReg) setRegStep(regStep);
   updateAuthBtn();
+  setTimeout(staggerFields, 30);
 }
 
 function updateAuthBtn() {
   const btn = $('#authBtn'); if (!btn) return;
   const tc = $('#tosCheck');
-  btn.disabled = reg && regStep===1 && tc && !tc.checked;
+  btn.disabled = reg && tc && !tc.checked;
 }
 
-$('#tgl').onclick = () => { reg = !reg; regStep = 1; authUI(); };
+$('#tgl').onclick = () => { reg = !reg; authUI(); };
 
 // Показать/скрыть пароль
 $('#eyeBtn') && ($('#eyeBtn').onclick = () => {
@@ -1570,9 +1590,6 @@ $('#eyeBtn') && ($('#eyeBtn').onclick = () => {
 // Автоформат юзернейма
 $('#ah') && ($('#ah').oninput = () => { $('#ah').value = $('#ah').value.toLowerCase().replace(/[^a-z0-9_]/g,''); });
 
-// Автоперевод кода в цифры
-$('#aCode') && ($('#aCode').oninput = () => { $('#aCode').value = $('#aCode').value.replace(/\D/g,''); });
-
 // ToS modal
 document.addEventListener('DOMContentLoaded', () => {
   const tosLink = $('#tosLink'), tosModal = $('#tosModal'), tosCloseBtn = $('#tosCloseBtn');
@@ -1582,56 +1599,38 @@ document.addEventListener('DOMContentLoaded', () => {
   const tosCheck = $('#tosCheck'); if (tosCheck) tosCheck.onchange = () => updateAuthBtn();
 });
 
-// Повторная отправка кода
-document.getElementById('resendBtn') && (document.getElementById('resendBtn').onclick = async () => {
-  const btn = document.getElementById('resendBtn'); btn.disabled = true; btn.textContent = 'Отправляем…';
-  try {
-    await api('/api/register/send-code', 'POST', {username:$('#an').value, handle:$('#ah').value, email:$('#ae').value, password:$('#ap').value});
-    toast('📬 Код отправлен повторно'); btn.textContent = 'Отправить повторно';
-  } catch(x) { $('#aerr').textContent = x.message; btn.textContent = 'Отправить повторно'; }
-  setTimeout(() => btn.disabled=false, 30000); // защита от спама
-});
-
 fetch('/api/config').then(r => r.json()).then(c => { cfg = c; authUI(); initPush(); }).catch(() => {});
 
 $('#authForm').onsubmit = async e => {
   e.preventDefault();
-  $('#aerr').textContent = '';
-  const btn = $('#authBtn'); btn.disabled = true;
+  const errEl = $('#aerr');
+  errEl.textContent = '';
+  setAuthBtnLoading(true);
 
   try {
     if (!reg) {
-      // Обычный вход
       const d = await api('/api/login', 'POST', {email: $('#ae').value, password: $('#ap').value});
       me = normMe({...d.user, token: d.token}); save(); saveCreds($('#ae').value, $('#ap').value); boot();
-    } else if (regStep === 1) {
-      // Шаг 1: отправляем код
-      await api('/api/register/send-code', 'POST', {
+    } else {
+      const d = await api('/api/register', 'POST', {
         username: $('#an').value, handle: $('#ah').value,
         email: $('#ae').value, password: $('#ap').value
       });
-      regStep = 2;
-      const sent = document.getElementById('codeSentTo');
-      if (sent) sent.textContent = `Код отправлен на ${$('#ae').value}`;
-      authUI();
-      setTimeout(() => document.getElementById('aCode')?.focus(), 100);
-    } else if (regStep === 2) {
-      // Шаг 2: проверяем код и создаём аккаунт
-      const code = (document.getElementById('aCode')?.value||'').trim();
-      if (code.length !== 6) { $('#aerr').textContent = 'Введите 6-значный код'; btn.disabled=false; return; }
-      const d = await api('/api/register', 'POST', {email: $('#ae').value, code});
       me = normMe({...d.user, token: d.token}); save(); saveCreds($('#ae').value, $('#ap').value);
-      // Показываем шаг 3 на секунду перед входом
-      regStep = 3; authUI(); $('#aT').textContent = 'Добро пожаловать!'; $('#aS').textContent = '🎉 Аккаунт создан!';
-      setTimeout(() => boot(), 1200);
+      const arrow = $('#authBtn').querySelector('.a-arrow');
+      if (arrow) arrow.innerHTML = '<span>🎉 Добро пожаловать!</span>';
+      $('#aT').textContent = 'Готово!'; $('#aS').textContent = 'Аккаунт создан, заходим…';
+      setTimeout(() => boot(), 900);
+      return;
     }
   } catch (x) {
-    $('#aerr').textContent = x.message;
-    btn.disabled = false;
+    errEl.textContent = x.message;
+    errEl.classList.remove('shake');
+    requestAnimationFrame(() => requestAnimationFrame(() => errEl.classList.add('shake')));
+    setAuthBtnLoading(false);
     return;
   }
-  if (regStep !== 2) btn.disabled = false; // при переходе на шаг 2 — не разблокируем сразу
-  updateAuthBtn();
+  setAuthBtnLoading(false);
 };
 
 function boot() {
@@ -4045,10 +4044,14 @@ if (window.visualViewport) {
 
 /* ---------- Запуск ---------- */
 (async () => {
-  authUI();
   try { me = JSON.parse(localStorage.getItem('ovk_user')); } catch { me = null; }
   me = normMe(me);
-  if (me && await checkSession()) boot();
+  if (me && await checkSession()) {
+    boot();
+  } else {
+    authUI();
+    $('#auth').hidden = false;
+  }
 })();
 </script>
 
