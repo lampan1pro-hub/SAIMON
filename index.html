@@ -713,6 +713,70 @@ html[data-theme=dark] #rdonly{background:#17212b}
 /* Фон чата — мягкий в светлой теме */
 #chat{background-color:#e7e0d5}
 
+/* ===== Обои и темы ===== */
+:root{
+  --wall-light:linear-gradient(160deg,#dce8f8 0%,#eef4fc 40%,#f5f0fa 70%,#e8f0fb 100%);
+  --wall-dark:linear-gradient(160deg,#0d1b2a 0%,#0e1f30 40%,#111827 100%);
+  --accent:#3390ec;
+  --accent-d:#2b7fd1;
+  --accent-l:#e7f3ff;
+  --accent-out:#effdde;
+  --accent-out-t:#4fae4e;
+}
+/* Светлые обои — плавный сине-лиловый градиент + узор из иконок */
+html:not([data-theme=dark]) #chat{
+  background:var(--wall-light);
+  background-attachment:fixed;
+}
+/* Тёмные обои — глубокий тёмно-синий + узор */
+html[data-theme=dark] #chat{
+  background:var(--wall-dark)!important;
+  background-attachment:fixed!important;
+}
+/* Пользовательские обои через data-атрибут */
+html[data-wall] #chat{
+  background:attr(data-wall)!important;
+}
+/* Узор поверх обоев */
+#chat::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:0;
+  opacity:.18;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%233390ec' stroke-width='1.5'%3E%3Crect x='8' y='14' width='22' height='18' rx='5'/%3E%3Cpath d='M11 20h16M11 26h10'/%3E%3Cpath d='M30 20 22 26'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%233390ec' stroke-width='1.5'%3E%3Cpath d='M18 40 L36 28 L54 40' stroke-linejoin='round'/%3E%3Cpath d='M36 28 L36 52'/%3E%3Cpath d='M54 40 L64 34'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:80px 80px,120px 120px;
+  background-position:20px 10px,60px 55px;
+}
+html[data-theme=dark] #chat::before{opacity:.08}
+/* Убрать узор если пользовательские обои */
+html[data-wallpaper-custom] #chat::before{display:none}
+#msgs{position:relative;z-index:1}
+#empty{position:relative;z-index:1}
+
+/* ===== Акцентные темы ===== */
+html[data-accent=purple]{
+  --p:#8e44ff;--pd:#7030e0;--pl:#f3edff;--tg-blue:#8e44ff;
+  --accent:#8e44ff;--accent-l:#f3edff;
+  --wall-light:linear-gradient(160deg,#ede0ff 0%,#f5f0ff 40%,#faf5ff 70%,#ede8ff 100%);
+  --wall-dark:linear-gradient(160deg,#1a0d2e 0%,#1e1035 40%,#150d22 100%);
+}
+html[data-accent=green]{
+  --p:#27ae60;--pd:#1e8449;--pl:#e9f7ef;--tg-blue:#27ae60;
+  --accent:#27ae60;--accent-l:#e9f7ef;
+  --wall-light:linear-gradient(160deg,#d5f5e3 0%,#eafaf1 40%,#f4fdf6 70%,#d9f0e6 100%);
+  --wall-dark:linear-gradient(160deg,#0a1f14 0%,#0d2618 40%,#091a10 100%);
+}
+html[data-accent=orange]{
+  --p:#e67e22;--pd:#d35400;--pl:#fef3e9;--tg-blue:#e67e22;
+  --accent:#e67e22;--accent-l:#fef3e9;
+  --wall-light:linear-gradient(160deg,#fdebd0 0%,#fef5e7 40%,#fff9f4 70%,#fcebd4 100%);
+  --wall-dark:linear-gradient(160deg,#2c1500 0%,#341a00 40%,#231100 100%);
+}
+
 /* Мобильный вид: список во всю ширину, чат поверх */
 @media(max-width:768px){
   #side{width:100%}
@@ -725,9 +789,32 @@ html[data-theme=dark] #rdonly{background:#17212b}
 .a-logo{width:112px;height:112px;margin:0 auto 22px;border-radius:50%;background:linear-gradient(160deg,#6bbdf8,#3390ec);display:grid;place-items:center;box-shadow:0 6px 20px rgba(51,144,236,.3)}
 .a-title{text-align:center;font-size:24px;font-weight:500;color:#000;margin-bottom:8px}
 .a-sub{text-align:center;color:#707579;font-size:15px;line-height:1.4;margin:0 12px 30px}
-/* Глаз в поле пароля */
-#fP{position:relative}
-#fP input{padding-right:44px}
+/* ── Прогресс регистрации ── */
+.rsp{display:flex;flex-direction:column;align-items:center;gap:4px}
+.rsp-dot{width:30px;height:30px;border-radius:50%;background:#e8eaed;color:#9aa3ab;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .35s var(--ease)}
+.rsp-dot.active{background:#3390ec;color:#fff;box-shadow:0 0 0 4px rgba(51,144,236,.15)}
+.rsp-dot.done{background:#3fb950;color:#fff}
+.rsp-lbl{font-size:10px;font-weight:600;color:#9aa3ab;transition:color .35s;white-space:nowrap}
+.rsp-line{width:40px;height:2px;background:#e8eaed;margin:0 3px;margin-bottom:18px;transition:background .35s;border-radius:2px;flex-shrink:0}
+.rsp-line.done{background:#3fb950}
+html[data-theme=dark] .rsp-dot{background:#2a3a4a;color:#7f91a4}
+html[data-theme=dark] .rsp-line{background:#2a3a4a}
+/* ── Кнопка показать пароль ── */
+#eyeBtn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t2);padding:6px;cursor:pointer;border-radius:8px;display:flex;align-items:center;transition:color .2s}
+#eyeBtn:hover{color:var(--p)}
+#ap{padding-right:44px!important}
+/* ── Поле пароля — обёртка ── */
+#authFields .af:has(#ap){position:relative}
+/* ── Код из email ── */
+.code-sent-box{background:rgba(51,144,236,.07);border:1px solid rgba(51,144,236,.2);border-radius:18px;padding:20px;text-align:center;margin-bottom:16px;animation:fadeSlideIn .35s ease both}
+.code-af input{text-align:center;font-size:28px;font-weight:800;letter-spacing:12px;height:64px;padding:16px}
+.resend-btn{width:100%;background:none;border:none;color:var(--p);font-size:13px;font-weight:500;padding:8px;cursor:pointer;border-radius:10px;margin-top:-4px;transition:background .2s}
+.resend-btn:hover{background:rgba(51,144,236,.08)}
+.resend-btn:disabled{color:var(--t2);pointer-events:none}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes popBounce{0%{transform:scale(1)}40%{transform:scale(1.18)}70%{transform:scale(.93)}100%{transform:scale(1)}}
+.a-logo.pop{animation:popBounce .5s ease both}
+html[data-theme=dark] .code-sent-box{background:rgba(51,144,236,.1);border-color:rgba(51,144,236,.25)}
 .af{position:relative;margin-bottom:14px}
 .af input{width:100%;height:56px;padding:22px 16px 6px;border:1.5px solid #d5dade;border-radius:14px;background:#fff;font-size:16px;color:#000;transition:border-color .2s ease,box-shadow .25s ease,background .2s ease}
 .af input:hover:not(:focus){border-color:#b8c0c8}
@@ -973,6 +1060,19 @@ html[data-theme=dark] .tgp-row input,html[data-theme=dark] .tgp-row textarea{col
 .tgs-go{color:var(--t2,#7d8790);font-size:22px;line-height:1}
 html[data-theme=dark] .tgs-row{background:#17212b;color:var(--t);border-color:#0e1621}
 .prem-desc{color:var(--t2,#7d8790);font-size:14px;margin-bottom:8px}
+/* ===== Кастомизация ===== */
+.theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 16px}
+.theme-btn{border:2px solid transparent;border-radius:14px;padding:0;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:5px;background:none;transition:transform .15s,border-color .15s}
+.theme-btn:active{transform:scale(.93)}
+.theme-btn.active{border-color:var(--p,#3390ec)}
+.theme-preview{width:100%;aspect-ratio:1;border-radius:12px}
+.theme-label{font-size:12px;padding-bottom:6px;color:var(--t)}
+.wall-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 16px}
+.wall-btn{border:2px solid transparent;border-radius:14px;overflow:hidden;cursor:pointer;background:none;padding:0;transition:transform .15s,border-color .15s}
+.wall-btn:active{transform:scale(.95)}
+.wall-btn.active{border-color:var(--p,#3390ec)}
+.wall-preview{width:100%;aspect-ratio:16/10;border-radius:12px;display:block}
+.cust-up{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 16px;font-size:15px;color:var(--p,#3390ec);cursor:pointer;border:0;background:none;width:100%;text-align:left}
 .prem-price{float:right;color:var(--t2,#7d8790);font-size:14px}
 .ngrow{display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap}
 .ngrow input[type=color]{width:44px;height:32px;border:0;background:none;padding:0;cursor:pointer}
@@ -1044,32 +1144,70 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
 </svg>
 
 <div id="auth" hidden>
-  <!-- ШАГ 1: Данные -->
   <form class="a-card" id="authForm" novalidate>
-    <p class="a-top" style="text-align:center;margin:0 0 6px;font-size:14px;color:var(--t2,#7d8790)">Самый обычный мессенджер от saimona</p>
-    <p id="aDisclaimer" style="text-align:center;margin:0 0 10px;font-size:12px;line-height:1.4;color:var(--t2,#7d8790)">SAIMON — самостоятельный мессенджер. Это не Telegram и не копия Telegram.</p>
-    <div class="a-logo mars-logo" role="img" aria-label="Марс"></div>
-    <div class="a-brand" style="display:none">SAIMON</div>
-    <h1 class="a-title" id="aT">Регистрация</h1>
-    <p class="a-sub" id="aS">Заполните данные, чтобы создать аккаунт</p>
 
-    <div class="af" id="fN"><input id="an" maxlength="40" autocomplete="name" placeholder=" "><label>Имя</label></div>
-    <div class="af" id="fH"><input id="ah" maxlength="21" autocapitalize="off" autocomplete="off" placeholder=" "><label>Юзернейм (@username)</label></div>
-    <div class="af"><input id="ae" autocapitalize="off" autocomplete="email" type="email" placeholder=" "><label id="el">Email</label></div>
-    <div class="af" id="fP"><input id="ap" type="password" autocomplete="current-password" placeholder=" "><label>Пароль (минимум 6 символов)</label>
-      <button type="button" id="eyeBtn" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t2);font-size:18px;padding:4px;cursor:pointer">👁</button>
+    <!-- Логотип -->
+    <div class="a-logo mars-logo" role="img" aria-label="Марс"></div>
+
+    <!-- Прогресс шагов (только регистрация) -->
+    <div id="regProgress" style="display:none;margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:center;gap:0">
+        <div class="rsp" id="rsp1"><div class="rsp-dot active">1</div><div class="rsp-lbl">Данные</div></div>
+        <div class="rsp-line" id="rspl1"></div>
+        <div class="rsp" id="rsp2"><div class="rsp-dot">2</div><div class="rsp-lbl">Email</div></div>
+        <div class="rsp-line" id="rspl2"></div>
+        <div class="rsp" id="rsp3"><div class="rsp-dot">3</div><div class="rsp-lbl">Готово</div></div>
+      </div>
+    </div>
+
+    <h1 class="a-title" id="aT">С возвращением</h1>
+    <p class="a-sub" id="aS">Войдите в свой аккаунт SAIMON</p>
+
+    <!-- Шаг 1: поля данных -->
+    <div id="authFields">
+      <div class="af" id="fN"><input id="an" maxlength="40" autocomplete="name" placeholder=" "><label>Имя</label></div>
+      <div class="af" id="fH">
+        <input id="ah" maxlength="21" autocapitalize="off" autocomplete="off" placeholder=" ">
+        <label>Юзернейм</label>
+        <span id="ahPrefix" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--p);font-weight:600;font-size:16px;pointer-events:none;display:none">@</span>
+      </div>
+      <div class="af"><input id="ae" autocapitalize="off" autocomplete="email" type="email" placeholder=" "><label id="el">Email</label></div>
+      <div class="af" style="position:relative">
+        <input id="ap" type="password" autocomplete="current-password" placeholder=" ">
+        <label>Пароль</label>
+        <button type="button" id="eyeBtn" aria-label="Показать пароль">
+          <svg id="eyeIcon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Шаг 2: код из email -->
+    <div id="codeStep" style="display:none">
+      <div class="code-sent-box">
+        <div style="font-size:36px;margin-bottom:10px">📬</div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">Письмо отправлено</div>
+        <div id="codeSentTo" style="font-size:13px;color:var(--t2)"></div>
+        <div style="font-size:12px;color:var(--t2);margin-top:4px">Код действует 10 минут</div>
+      </div>
+      <div class="af code-af">
+        <input id="aCode" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder=" ">
+        <label>Код подтверждения</label>
+      </div>
+      <button type="button" id="resendBtn" class="resend-btn">
+        <span id="resendLabel">Отправить повторно</span>
+      </button>
     </div>
 
     <div id="tosWrap">
-      <label><span>Я принимаю <span id="tosLink">пользовательское соглашение</span></span><input type="checkbox" id="tosCheck"></label>
+      <label><span>Принимаю <span id="tosLink">пользовательское соглашение</span></span><input type="checkbox" id="tosCheck"></label>
     </div>
     <div class="err" id="aerr"></div>
     <div class="a-foot">
       <button type="button" class="a-link" id="tgl">Войти</button>
-      <button class="a-next" id="authBtn" type="submit" aria-label="Далее">
+      <button class="a-next" id="authBtn" type="submit">
         <span class="a-arrow">
-          <span id="authBtnLabel">Создать аккаунт</span>
-          <svg viewBox="0 0 24 24" width="18" height="18" id="authBtnArrow"><path fill="currentColor" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg>
+          <span id="authBtnLabel">Войти</span>
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg>
         </span>
       </button>
     </div>
@@ -1109,10 +1247,10 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
       <div id="recbar" hidden>🔴 <b class="rt">0:00</b><span>Тапни 🎤 ещё раз — отправить</span><button type="button" class="ib" id="recx" aria-label="Отменить запись">✕</button></div>
       <div id="emobar" hidden><div class="emo-tabs"><button type="button" class="emo-tab on" data-tab="emoji">😊 Эмодзи</button><button type="button" class="emo-tab" data-tab="stickers">🎭 Стикеры</button></div><div class="emo-body" id="emoEmoji"></div><div class="stk-body" id="emoStickers" hidden></div></div>
       <form id="form">
-        <button type="button" class="ib" id="emojiBtn" aria-label="Эмодзи" title="Эмодзи"><img src="data:image/png;base64,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" alt="😊" style="width:28px;height:28px;object-fit:contain;display:block"></button>
+        <button type="button" class="ib" id="emojiBtn" aria-label="Эмодзи" title="Эмодзи"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 13s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
         <textarea id="inp" rows="1" placeholder="Сообщение" enterkeyhint="send"></textarea>
-        <button type="button" class="ib" id="attach" aria-label="Прикрепить одно фото или видео" title="Одно фото/видео"><img src="data:image/png;base64,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" alt="📷" class="btn-icon"></button>
-        <button type="button" id="send" data-mode="mic" aria-label="Голосовое сообщение"><img src="data:image/png;base64,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" alt="🎤" class="btn-icon btn-icon-mic" id="micImg"></button>
+        <button type="button" class="ib" id="attach" aria-label="Прикрепить одно фото или видео" title="Одно фото/видео"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+        <button type="button" id="send" data-mode="mic" aria-label="Голосовое сообщение"><svg id="micImg" class="btn-icon btn-icon-mic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
       </form>
       <div id="rdonly" hidden>Писать в канал может только его автор</div>
     </section>
@@ -1540,55 +1678,146 @@ function staggerFields() {
   });
 }
 
-function setAuthBtnLoading(loading) {
-  const btn = $('#authBtn'); if (!btn) return;
-  const arrow = btn.querySelector('.a-arrow');
-  if (loading) {
-    btn.disabled = true;
-    if (arrow) { arrow.innerHTML = '<span class="spin"></span>'; }
-  } else {
-    const isReg = reg;
-    if (arrow) {
-      arrow.innerHTML = `<span id="authBtnLabel">${isReg ? 'Создать аккаунт' : 'Войти'}</span><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg>`;
-    }
-    updateAuthBtn();
-  }
+/* ── AUTH STATE ── */
+let authStep = 1; // 1 = поля, 2 = код, 3 = успех
+
+function setRspStep(step) {
+  [1,2,3].forEach(i => {
+    const dot = document.querySelector(`#rsp${i} .rsp-dot`);
+    const line = document.getElementById(`rspl${i}`);
+    if (!dot) return;
+    dot.classList.remove('active','done');
+    if (i < step) { dot.classList.add('done'); dot.innerHTML = '✓'; }
+    else if (i === step) { dot.classList.add('active'); dot.textContent = i; }
+    else dot.textContent = i;
+    if (line) line.classList.toggle('done', i < step);
+  });
+}
+
+function setAuthBtnLoading(on) {
+  const btn = $('#authBtn'), arrow = btn?.querySelector('.a-arrow');
+  if (!btn) return;
+  if (on) { btn.disabled = true; if (arrow) arrow.innerHTML = '<span class="spin"></span>'; }
+  else { updateAuthBtn(); if (arrow) arrow.innerHTML = `<span id="authBtnLabel">${getBtnLabel()}</span><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg>`; }
+}
+
+function getBtnLabel() {
+  if (!reg) return 'Войти';
+  return authStep === 1 ? 'Продолжить' : authStep === 2 ? 'Подтвердить' : '🎉 Войти';
 }
 
 function authUI() {
   const isReg = reg;
-  $('#fN').hidden = $('#fH').hidden = !isReg;
-  $('#el').textContent = isReg ? 'Email' : 'Email или @юзернейм';
-  $('#aT').textContent = isReg ? 'Регистрация' : 'Вход';
-  $('#aS').textContent = isReg ? 'Создайте аккаунт SAIMON' : 'Введите email или юзернейм и пароль';
-  const lbl = document.getElementById('authBtnLabel');
-  if (lbl) lbl.textContent = isReg ? 'Создать аккаунт' : 'Войти';
-  $('#authBtn').setAttribute('aria-label', isReg ? 'Зарегистрироваться' : 'Войти');
-  $('#tgl').textContent = isReg ? 'Войти' : 'Регистрация';
-  $('#aerr').textContent = '';
-  $('#ap').autocomplete = isReg ? 'new-password' : 'current-password';
-  const tw = $('#tosWrap'); if (tw) tw.classList.toggle('visible', isReg);
+  authStep = isReg ? authStep : 1;
+
+  // Заголовки
+  const titles = isReg
+    ? ['Создать аккаунт', 'Подтвердите email', '🎉 Готово!']
+    : ['С возвращением', '', ''];
+  const subs = isReg
+    ? ['Заполните данные ниже', 'Введите код из письма', 'Аккаунт создан, заходим…']
+    : ['Войдите в свой аккаунт SAIMON', '', ''];
+  $('#aT').textContent = titles[isReg ? authStep-1 : 0];
+  $('#aS').textContent = subs[isReg ? authStep-1 : 0];
+
+  // Прогресс
+  const prog = document.getElementById('regProgress');
+  if (prog) prog.style.display = isReg ? '' : 'none';
+  if (isReg) setRspStep(authStep);
+
+  // Поля
+  const fields = document.getElementById('authFields');
+  const codeStep = document.getElementById('codeStep');
+  if (fields) fields.style.display = !isReg || authStep === 1 ? '' : 'none';
+  if (codeStep) codeStep.style.display = isReg && authStep === 2 ? '' : 'none';
+
+  if ($('#fN')) $('#fN').hidden = !isReg || authStep !== 1;
+  if ($('#fH')) $('#fH').hidden = !isReg || authStep !== 1;
+  const emailInput = $('#ae');
+  if (emailInput) {
+    emailInput.closest('.af').hidden = isReg && authStep === 2;
+  }
+  const passWrap = $('#ap')?.closest('.af');
+  if (passWrap) passWrap.hidden = isReg && authStep === 2;
+
+  // Email label
+  if ($('#el')) $('#el').textContent = isReg ? 'Email' : 'Email или @юзернейм';
+  // Autocomplete
+  if ($('#ap')) $('#ap').autocomplete = isReg ? 'new-password' : 'current-password';
+  // ToS
+  const tw = $('#tosWrap'); if (tw) tw.classList.toggle('visible', isReg && authStep === 1);
   const tc = $('#tosCheck'); if (tc && !isReg) tc.checked = false;
-  updateAuthBtn();
-  setTimeout(staggerFields, 30);
+  // Переключатель
+  if ($('#tgl')) $('#tgl').textContent = isReg ? 'Войти' : 'Зарегистрироваться';
+  // Кнопка
+  setAuthBtnLoading(false);
+  if ($('#aerr')) $('#aerr').textContent = '';
+  setTimeout(staggerFields, 20);
 }
 
 function updateAuthBtn() {
   const btn = $('#authBtn'); if (!btn) return;
   const tc = $('#tosCheck');
-  btn.disabled = reg && tc && !tc.checked;
+  const needTos = reg && authStep === 1 && tc && !tc.checked;
+  btn.disabled = needTos;
+  const lbl = document.getElementById('authBtnLabel');
+  if (lbl) lbl.textContent = getBtnLabel();
 }
 
-$('#tgl').onclick = () => { reg = !reg; authUI(); };
+// Переключение режима
+$('#tgl').onclick = () => { reg = !reg; authStep = 1; authUI(); };
 
 // Показать/скрыть пароль
-$('#eyeBtn') && ($('#eyeBtn').onclick = () => {
-  const inp = $('#ap'); inp.type = inp.type==='password' ? 'text' : 'password';
-  $('#eyeBtn').textContent = inp.type==='password' ? '👁' : '🙈';
+const eyeBtn = document.getElementById('eyeBtn');
+if (eyeBtn) eyeBtn.onclick = () => {
+  const inp = $('#ap');
+  const isPass = inp.type === 'password';
+  inp.type = isPass ? 'text' : 'password';
+  const ico = document.getElementById('eyeIcon');
+  if (ico) ico.innerHTML = isPass
+    ? '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>'
+    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+};
+
+// Автоформат юзернейма + показ @
+const ahInp = $('#ah');
+if (ahInp) {
+  ahInp.oninput = () => {
+    ahInp.value = ahInp.value.toLowerCase().replace(/[^a-z0-9_]/g,'');
+  };
+}
+
+// Только цифры для кода
+document.getElementById('aCode') && (document.getElementById('aCode').oninput = function() {
+  this.value = this.value.replace(/\D/g,'');
 });
 
-// Автоформат юзернейма
-$('#ah') && ($('#ah').oninput = () => { $('#ah').value = $('#ah').value.toLowerCase().replace(/[^a-z0-9_]/g,''); });
+// Повторная отправка
+let resendCooldown = false;
+const resendBtn = document.getElementById('resendBtn');
+if (resendBtn) resendBtn.onclick = async () => {
+  if (resendCooldown) return;
+  resendCooldown = true;
+  const lbl = document.getElementById('resendLabel');
+  resendBtn.disabled = true;
+  if (lbl) lbl.textContent = 'Отправляем…';
+  try {
+    await api('/api/register/send-code', 'POST', {
+      username: $('#an').value, handle: $('#ah').value,
+      email: $('#ae').value, password: $('#ap').value
+    });
+    toast('📬 Код отправлен повторно');
+    let sec = 30;
+    const t = setInterval(() => {
+      if (lbl) lbl.textContent = `Повторно через ${--sec}с`;
+      if (sec <= 0) { clearInterval(t); resendCooldown = false; resendBtn.disabled = false; if(lbl) lbl.textContent = 'Отправить повторно'; }
+    }, 1000);
+  } catch(x) {
+    toast(x.message);
+    resendBtn.disabled = false; resendCooldown = false;
+    if (lbl) lbl.textContent = 'Отправить повторно';
+  }
+};
 
 // ToS modal
 document.addEventListener('DOMContentLoaded', () => {
@@ -1601,34 +1830,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
 fetch('/api/config').then(r => r.json()).then(c => { cfg = c; authUI(); initPush(); }).catch(() => {});
 
+// ── Отправка формы ──
 $('#authForm').onsubmit = async e => {
   e.preventDefault();
-  const errEl = $('#aerr');
-  errEl.textContent = '';
+  const errEl = $('#aerr'); errEl.textContent = '';
   setAuthBtnLoading(true);
-
   try {
     if (!reg) {
+      // ВХОД
       const d = await api('/api/login', 'POST', {email: $('#ae').value, password: $('#ap').value});
       me = normMe({...d.user, token: d.token}); save(); saveCreds($('#ae').value, $('#ap').value); boot();
-    } else {
+      return;
+    }
+    if (reg) {
+      // РЕГИСТРАЦИЯ: сразу без кода
       const d = await api('/api/register', 'POST', {
-        username: $('#an').value, handle: $('#ah').value,
-        email: $('#ae').value, password: $('#ap').value
+        username: $('#an').value.trim(),
+        handle: $('#ah').value.trim(),
+        email: $('#ae').value.trim(),
+        password: $('#ap').value
       });
       me = normMe({...d.user, token: d.token}); save(); saveCreds($('#ae').value, $('#ap').value);
-      const arrow = $('#authBtn').querySelector('.a-arrow');
-      if (arrow) arrow.innerHTML = '<span>🎉 Добро пожаловать!</span>';
-      $('#aT').textContent = 'Готово!'; $('#aS').textContent = 'Аккаунт создан, заходим…';
+      // Анимация успеха
+      authStep = 3; authUI();
+      document.querySelector('.a-logo')?.classList.add('pop');
       setTimeout(() => boot(), 900);
       return;
     }
-  } catch (x) {
+  } catch(x) {
     errEl.textContent = x.message;
     errEl.classList.remove('shake');
     requestAnimationFrame(() => requestAnimationFrame(() => errEl.classList.add('shake')));
-    setAuthBtnLoading(false);
-    return;
   }
   setAuthBtnLoading(false);
 };
@@ -1638,6 +1870,8 @@ function boot() {
   $('#app').hidden = false;
   paintMe(); setMars(me.mars || 0, me.unlimited); renderList(); connect(); loadContacts();
   if (swReg && Notification.permission === 'granted') syncPush(); else paintBell();
+  // Применить сохранённые обои и акцент
+  try { applyWallpaper(); } catch(e) {}
 }
 /* ---------- Уведомления (Web Push) ---------- */
 const pushOK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -2588,7 +2822,7 @@ function picker(box, exclude) {
 $('#meBtn').onclick = () => myProfile('hub');
 
 // Настройки профиля: разделы в стиле мессенджера (группы строк с цветными иконками)
-const PROF_TITLES = { hub: 'Настройки', account: 'Аккаунт', premium: 'SAIMONPREMIYM', market: 'Магазин и рынок' };
+const PROF_TITLES = { hub: 'Настройки', account: 'Аккаунт', premium: 'SAIMONPREMIYM', market: 'Магазин и рынок', customization: 'Кастомизация' };
 const profRow = (ic, bg, t, sub, attr) => `<button type="button" class="tgs-row" ${attr}><span class="tgs-ic" style="background:${bg}">${ic}</span><span class="tgs-tx"><b>${t}</b><small>${sub}</small></span><span class="tgs-go">›</span></button>`;
 function myProfile(view = 'hub') {
   const binders = [];
@@ -2609,6 +2843,9 @@ ${profRow('👤', '#3390ec', 'Аккаунт', 'Имя, юзернейм, «О �
 ${profRow('💎', '#8e44ff', 'SAIMONPREMIYM', me.premium ? (me.premium === 'forever' ? 'Подписка навсегда' : 'Активна до ' + new Date(me.premium).toLocaleDateString('ru-RU')) : 'Подписки нет', 'data-go="premium"')}
 </div>
 <div class="tgp-card">
+</div>
+<div class="tgp-card">
+${profRow('🎨', '#ff6b35', 'Кастомизация', 'Обои, темы, цвета', 'data-go="customization"')}
 </div>
 <div class="tgp-card">
 ${profRow('🎁', '#ff9500', 'Магазин и рынок', 'Подарки и юзернеймы', 'data-go="market"')}
@@ -2645,6 +2882,35 @@ ${me.premium ? `<button type="button" class="tgp-item ${me.rainbowBorder ? 'tgp-
     body = `<div class="tgp-card">
 ${profRow('🎁', '#ff9500', 'Магазин подарков', 'Купить и отправить подарки', 'id="pshop"')}
 ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка и продажа юзернеймов', 'id="punm"')}
+</div>`;
+  } else if (view === 'customization') {
+    const curAccent = localStorage.getItem('accent_theme') || 'blue';
+    const curWall = localStorage.getItem('wallpaper') || 'default';
+    const themes = [
+      {id:'blue', label:'Синяя', colors:['#3390ec','#1a6cc5']},
+      {id:'purple', label:'Фиолет', colors:['#8e44ff','#7030e0']},
+      {id:'green', label:'Зелёная', colors:['#27ae60','#1e8449']},
+      {id:'orange', label:'Оранжевая', colors:['#e67e22','#d35400']},
+    ];
+    const walls = [
+      {id:'default', label:'По умолчанию', light:'linear-gradient(135deg,#dce8f8,#eef4fc,#f5f0fa)', dark:'linear-gradient(135deg,#0d1b2a,#0e1f30,#111827)'},
+      {id:'bubbles', label:'Пузырьки', light:'radial-gradient(circle at 20% 30%,#d0e8ff 0%,#f0f8ff 50%,#e8d5ff 100%)', dark:'radial-gradient(circle at 20% 30%,#0a1520 0%,#111827 50%,#1a0d2e 100%)'},
+      {id:'sunset', label:'Закат', light:'linear-gradient(135deg,#ffecd2,#fcb69f,#ffecd2)', dark:'linear-gradient(135deg,#2c1505,#3d1a08,#1f0d00)'},
+      {id:'forest', label:'Лес', light:'linear-gradient(135deg,#d4edda,#a8d5b5,#e8f5e9)', dark:'linear-gradient(135deg,#071a0c,#0d2414,#071a0c)'},
+    ];
+    body = `<div class="tgp-sec">Цветовая тема</div>
+<div class="tgp-card" style="overflow:visible">
+<div class="theme-grid">${themes.map(t => `<button type="button" class="theme-btn${curAccent===t.id?' active':''}" data-accent="${t.id}">
+<div class="theme-preview" style="background:linear-gradient(135deg,${t.colors[0]},${t.colors[1]})"></div>
+<span class="theme-label">${t.label}</span></button>`).join('')}</div>
+</div>
+<div class="tgp-sec">Обои чата</div>
+<div class="tgp-card" style="overflow:visible">
+<div class="wall-grid">${walls.map(w => `<button type="button" class="wall-btn${curWall===w.id?' active':''}" data-wall="${w.id}" data-light="${encodeURIComponent(w.light)}" data-dark="${encodeURIComponent(w.dark)}">
+<div class="wall-preview" style="background:${document.documentElement.dataset.theme==='dark'?w.dark:w.light}"></div>
+<div class="theme-label" style="text-align:center;padding:4px 0 2px">${w.label}</div></button>`).join('')}</div>
+<button type="button" class="cust-up" id="custWallUp">📷 Своя картинка</button>
+<input type="file" id="custWallFile" accept="image/*" hidden>
 </div>`;
   }
   profileModal(`<div class="tgp">${top}${body}</div>`);
@@ -2688,6 +2954,46 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
   if ($('#lo')) $('#lo').onclick = () => logout();
   if ($('#pshop')) $('#pshop').onclick = () => shop();
   if ($('#punm')) $('#punm').onclick = () => usernameMarket();
+  // Кастомизация — темы
+  $('#card').querySelectorAll('[data-accent]').forEach(b => b.onclick = () => {
+    const ac = b.dataset.accent;
+    localStorage.setItem('accent_theme', ac);
+    if (ac === 'blue') { document.documentElement.removeAttribute('data-accent'); }
+    else document.documentElement.dataset.accent = ac;
+    // обновить CSS переменные акцента
+    applyAccent(ac);
+    // подсветить активную
+    $('#card').querySelectorAll('[data-accent]').forEach(x => x.classList.toggle('active', x.dataset.accent === ac));
+    toast('Тема применена');
+  });
+  // Кастомизация — обои
+  $('#card').querySelectorAll('[data-wall]').forEach(b => b.onclick = () => {
+    const wid = b.dataset.wall;
+    localStorage.setItem('wallpaper', wid);
+    const light = decodeURIComponent(b.dataset.light);
+    const dark = decodeURIComponent(b.dataset.dark);
+    localStorage.setItem('wallpaper_light', light);
+    localStorage.setItem('wallpaper_dark', dark);
+    document.documentElement.removeAttribute('data-wallpaper-custom');
+    applyWallpaper();
+    $('#card').querySelectorAll('[data-wall]').forEach(x => x.classList.toggle('active', x.dataset.wall === wid));
+    toast('Обои применены');
+  });
+  if ($('#custWallUp')) $('#custWallUp').onclick = () => $('#custWallFile').click();
+  if ($('#custWallFile')) $('#custWallFile').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      const url = ev.target.result;
+      localStorage.setItem('wallpaper', 'custom');
+      localStorage.setItem('wallpaper_custom', url);
+      document.documentElement.dataset.wallpaperCustom = '1';
+      const chatEl = document.getElementById('chat');
+      if (chatEl) { chatEl.style.backgroundImage = `url(${url})`; chatEl.style.backgroundSize = 'cover'; chatEl.style.backgroundPosition = 'center'; }
+      toast('Обои установлены');
+    };
+    r.readAsDataURL(f);
+  };
   if ($('#pbl')) $('#pbl').onclick = blockedList;
   if ($('#padm')) $('#padm').onclick = adminPanel;
   if ($('#pprem')) $('#pprem').onclick = () => premiumShop(null);
@@ -4042,8 +4348,69 @@ if (window.visualViewport) {
   vv.addEventListener('scroll', fitVV);
 }
 
+/* ---------- Кастомизация: применение темы и обоев ---------- */
+function applyAccent(ac) {
+  const map = {
+    blue:   {p:'#3390ec', pd:'#2b7fd1', pl:'#e7f3ff'},
+    purple: {p:'#8e44ff', pd:'#7030e0', pl:'#f3edff'},
+    green:  {p:'#27ae60', pd:'#1e8449', pl:'#e9f7ef'},
+    orange: {p:'#e67e22', pd:'#d35400', pl:'#fef3e9'},
+  };
+  const t = map[ac] || map.blue;
+  const r = document.documentElement.style;
+  r.setProperty('--p', t.p);
+  r.setProperty('--pd', t.pd);
+  r.setProperty('--pl', t.pl);
+  r.setProperty('--tg-blue', t.p);
+  if (ac === 'blue') document.documentElement.removeAttribute('data-accent');
+  else document.documentElement.dataset.accent = ac;
+}
+function applyWallpaper() {
+  const wid = localStorage.getItem('wallpaper') || 'default';
+  const chat = document.getElementById('chat');
+  if (!chat) return;
+  if (wid === 'custom') {
+    const url = localStorage.getItem('wallpaper_custom');
+    if (url) {
+      chat.style.backgroundImage = `url(${url})`;
+      chat.style.backgroundSize = 'cover';
+      chat.style.backgroundPosition = 'center';
+      document.documentElement.dataset.wallpaperCustom = '1';
+    }
+    return;
+  }
+  chat.style.backgroundImage = '';
+  chat.style.backgroundSize = '';
+  chat.style.backgroundPosition = '';
+  document.documentElement.removeAttribute('data-wallpaper-custom');
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const key = isDark ? 'wallpaper_dark' : 'wallpaper_light';
+  const grad = localStorage.getItem(key);
+  if (grad && wid !== 'default') {
+    chat.style.background = grad;
+  } else {
+    chat.style.background = '';
+  }
+}
+// При смене темы — переприменить обои
+const _origThemeKey = 'theme_v2';
+function setThemeAndWall(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem(_origThemeKey, t); } catch {}
+  const m = document.querySelector('meta[name=theme-color]');
+  if (m) m.content = t === 'dark' ? '#17212b' : '#ffffff';
+  applyWallpaper();
+}
+
 /* ---------- Запуск ---------- */
 (async () => {
+  // Применить сохранённые настройки кастомизации при старте
+  try {
+    const savedAccent = localStorage.getItem('accent_theme');
+    if (savedAccent && savedAccent !== 'blue') applyAccent(savedAccent);
+    // Обои применяем после загрузки DOM чата (в boot)
+  } catch(e) {}
+
   try { me = JSON.parse(localStorage.getItem('ovk_user')); } catch { me = null; }
   me = normMe(me);
   if (me && await checkSession()) {
