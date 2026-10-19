@@ -353,9 +353,9 @@ const pub = u => ({
     // юзернеймы, если локальный кэш в браузере когда-то сохранился без них, и их станет не продать.
     handles: u.handles && u.handles.length ? u.handles : [u.handle],
     ...((u.handles || [u.handle]).length > 1 ? { others: u.handles.filter(h => h !== u.handle) } : {}),
-    avatar: u.avatar || '', createdAt: u.createdAt, ...(u.handleBuys && Object.keys(u.handleBuys).length ? { buys: u.handleBuys } : {}), online: sockets.has(u.id), ...(u.bot && { bot: true }), ...(u.acc && { acc: u.acc }), ...(u.banned && { banned: true }), ...(u.rainbowBorder && premiumOn(u) && { rainbowBorder: true }), ...(u.rbColors && u.rainbowBorder ? { rbColors: u.rbColors } : {}), ...(u.pinnedChannel && { pinnedChannel: u.pinnedChannel, pinnedChannelData: (() => { const _ch = read(F.chats).find(c => c.id === u.pinnedChannel && c.type === 'channel'); return _ch ? { id: _ch.id, name: _ch.name, handle: _ch.handle || '', avatar: _ch.avatar || '', subscribers: _ch.members ? _ch.members.length : 0 } : null; })() }), ...(premiumOn(u) && { premium: u.premium, ...(u.nickGrad && { ng: u.nickGrad }) })
+    avatar: u.avatar || '', createdAt: u.createdAt, ...(u.handleBuys && Object.keys(u.handleBuys).length ? { buys: u.handleBuys } : {}), online: sockets.has(u.id), ...(!sockets.has(u.id) && u.lastSeen && u.lastSeenMode !== 'nobody' ? { lastSeen: u.lastSeen } : {}), ...(u.bot && { bot: true }), ...(u.acc && { acc: u.acc }), ...(u.banned && { banned: true }), ...(u.rainbowBorder && premiumOn(u) && { rainbowBorder: true }), ...(u.rbColors && u.rainbowBorder ? { rbColors: u.rbColors } : {}), ...(u.pinnedChannel && { pinnedChannel: u.pinnedChannel, pinnedChannelData: (() => { const _ch = read(F.chats).find(c => c.id === u.pinnedChannel && c.type === 'channel'); return _ch ? { id: _ch.id, name: _ch.name, handle: _ch.handle || '', avatar: _ch.avatar || '', subscribers: _ch.members ? _ch.members.length : 0 } : null; })() }), ...(premiumOn(u) && { premium: u.premium, ...(u.nickGrad && { ng: u.nickGrad }) })
 });
-const self = u => ({ ...pub(u), email: u.email, ...walletOf(u),
+const self = u => ({ ...pub(u), email: u.email, ...walletOf(u), lastSeenMode: u.lastSeenMode || 'everybody', lastSeen: u.lastSeen || null,
     ...(u.uListings && u.uListings.length ? { uListings: u.uListings, uListing: u.uListings.find(l => l.handle === u.handle) } : {}),
     ...(u.handles && u.handles.length > 1 ? { handles: u.handles } : {}),
     ...(u.pinnedChannel ? { pinnedChannel: u.pinnedChannel } : {}), ...(u.rbColors ? { rbColors: u.rbColors } : {}) });
@@ -734,7 +734,11 @@ app.put('/api/profile/:id', (req, res) => {
     const u = users.find(x => x.id === Number(req.params.id));
     if (!u) return res.status(404).json({ error: 'Пользователь не найден' });
 
-    const { username, handle, bio, avatar } = req.body;
+    const { username, handle, bio, avatar, lastSeenMode } = req.body;
+    if (lastSeenMode !== undefined) {
+        const allowed = ['everybody', 'nobody'];
+        if (allowed.includes(lastSeenMode)) u.lastSeenMode = lastSeenMode;
+    }
     if (username !== undefined) {
         const n = String(username).trim().slice(0, 40);
         if (!n) return res.status(400).json({ error: 'Имя не может быть пустым' });
@@ -2281,7 +2285,11 @@ wss.on('connection', ws => {
         sockets.get(uid).delete(ws);
         if (!sockets.get(uid).size) {
             sockets.delete(uid);
-            broadcast({ type: 'presence', data: { userId: uid, online: false } });
+            // Сохраняем время последнего выхода
+            const users = read(F.users);
+            const offU = users.find(x => x.id === uid);
+            if (offU) { offU.lastSeen = Date.now(); write(F.users, users); }
+            broadcast({ type: 'presence', data: { userId: uid, online: false, lastSeen: offU ? offU.lastSeen : null } });
         }
     });
 });

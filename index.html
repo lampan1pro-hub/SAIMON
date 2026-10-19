@@ -1060,6 +1060,56 @@ html[data-theme=dark] .tgp-row input,html[data-theme=dark] .tgp-row textarea{col
 .tgs-go{color:var(--t2,#7d8790);font-size:22px;line-height:1}
 html[data-theme=dark] .tgs-row{background:#17212b;color:var(--t);border-color:#0e1621}
 .prem-desc{color:var(--t2,#7d8790);font-size:14px;margin-bottom:8px}
+/* ===== Last-seen toggle ===== */
+.ls-toggle{display:flex;gap:6px;margin-top:6px}
+.ls-opt{padding:6px 18px;border-radius:20px;font-size:14px;font-weight:500;background:var(--bg);color:var(--t2);border:1.5px solid var(--b);transition:background .2s,color .2s,border-color .2s,transform .15s}
+.ls-opt:active{transform:scale(.95)}
+.ls-opt.ls-active{background:var(--p);color:#fff;border-color:var(--p)}
+html[data-theme=dark] .ls-opt{background:#1e2c3a;border-color:#263648}
+
+/* ===== Global smoothness & roundness overhaul ===== */
+/* Message bubbles — rounder & smoother */
+.m{border-radius:18px 18px 18px 5px!important;transition:opacity .22s ease,transform .22s ease,box-shadow .2s}
+.m.me{border-radius:18px 18px 5px 18px!important}
+.m.new{animation:msgPop .28s cubic-bezier(.16,1,.3,1) both}
+@keyframes msgPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
+/* Send button pulse on send */
+#send{border-radius:50%!important;transition:background .18s,transform .15s,box-shadow .2s!important}
+#send:active{transform:scale(.88)!important;box-shadow:0 0 0 6px rgba(51,144,236,.18)}
+/* Input area */
+#inp{border-radius:22px!important;transition:border-color .2s,background .2s,box-shadow .25s!important}
+#inp:focus{box-shadow:0 0 0 3px rgba(51,144,236,.13)!important}
+/* Chat list rows */
+.it{transition:background .18s ease,transform .12s!important;border-radius:0}
+.it:active{transform:scale(.985) translateX(2px)!important}
+/* Avatars hover */
+.av{transition:transform .2s cubic-bezier(.16,1,.3,1),box-shadow .2s!important}
+.it:hover .av,.it.on .av{transform:scale(1.06)!important;box-shadow:0 2px 10px rgba(51,144,236,.22)}
+/* Buttons global */
+button:not(.tgp-item):not(.ls-opt):not(.theme-btn):not(.wall-btn){transition:background .18s,color .18s,transform .14s,box-shadow .18s,opacity .18s!important}
+.btn{border-radius:14px!important}
+.ib{border-radius:50%!important;transition:background .18s,transform .15s!important}
+.ib:active{transform:scale(.88)!important}
+/* Chat room card rounder */
+#room{border-radius:24px!important}
+/* Modal cards */
+.modal .card,.card{border-radius:22px!important;overflow:hidden}
+/* Reply/edit bars */
+#replybar,#editbar{border-radius:0;transition:all .22s cubic-bezier(.16,1,.3,1)}
+/* Day separators */
+.day{border-radius:14px!important;padding:3px 12px}
+/* Tgp profile cards */
+.tgp-card{border-radius:20px!important;overflow:hidden;transition:box-shadow .2s}
+/* Search bar */
+#q{border-radius:22px!important}
+/* Profile modal rows */
+.tgs-row{transition:background .18s!important}
+.tgs-row:active{background:var(--bg)!important}
+/* Smooth scroll everything */
+#msgs,#list{scroll-behavior:smooth}
+/* Presence dot */
+.av i{width:13px;height:13px;border-radius:50%;border:2.5px solid #fff;transition:background .3s,transform .3s}
+
 /* ===== Кастомизация ===== */
 .theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 16px}
 .theme-btn{border:2px solid transparent;border-radius:14px;padding:0;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:5px;background:none;transition:transform .15s,border-color .15s}
@@ -2045,8 +2095,11 @@ async function onWs(m) {
     renderList();
   } else if (m.type === 'presence') {
     chats.forEach(c => {
-      if (c.peer && c.peer.id === d.userId) c.peer.online = d.online;
-      if (c.members) c.members.forEach(u => { if (u.id === d.userId) u.online = d.online; });
+      if (c.peer && c.peer.id === d.userId) {
+        c.peer.online = d.online;
+        if (!d.online && d.lastSeen) c.peer.lastSeen = d.lastSeen;
+      }
+      if (c.members) c.members.forEach(u => { if (u.id === d.userId) { u.online = d.online; if (!d.online && d.lastSeen) u.lastSeen = d.lastSeen; } });
     });
     renderList(); renderHead();
   } else if (m.type === 'typing') {
@@ -2239,11 +2292,30 @@ async function openUser(uid) {
 }
 $('#back').onclick = () => { cur = null; pend = null; $('#app').classList.remove('open'); $('#room').hidden = true; $('#empty').hidden = false; renderList(); };
 
+function fmtLastSeen(peer) {
+  if (!peer) return 'не в сети';
+  if (!peer.lastSeen) return 'не в сети';
+  const diff = Date.now() - peer.lastSeen;
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  const d = new Date(peer.lastSeen);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  if (mins < 1) return 'был(а) только что';
+  if (mins < 60) return `был(а) ${mins} мин. назад`;
+  if (hrs < 24) return `был(а) сегодня в ${hh}:${mm}`;
+  if (days === 1) return `был(а) вчера в ${hh}:${mm}`;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  return `был(а) ${dd}.${mo} в ${hh}:${mm}`;
+}
+
 function renderHead() {
   const c = chats.get(cur);
   if (!c) return;
   const t = typing.has(cur), on = c.peer && c.peer.online;
-  const sub = t ? 'печатает…' : c.type === 'group' ? c.members.length + ' участн.' : c.type === 'channel' ? subs(c.subscribers) : (c.peer && c.peer.bot ? 'бот' : on ? 'в сети' : 'не в сети');
+  const sub = t ? 'печатает…' : c.type === 'group' ? c.members.length + ' участн.' : c.type === 'channel' ? subs(c.subscribers) : (c.peer && c.peer.bot ? 'бот' : on ? 'в сети' : fmtLastSeen(c.peer));
   const isBot = c.type === 'direct' && c.peer && c.peer.bot;
   const iBlock = c.type === 'direct' && c.peer && blocked.has(c.peer.id);
   const canWrite = !iBlock && !isBot && (c.type !== 'channel' || c.creator === me.id || c.open); // в канал пишет только автор
@@ -2863,6 +2935,14 @@ ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-п�
 </div>
 <div class="err" id="perr"></div>
 <div class="tgp-card"><button type="submit" class="tgp-item tgp-accent">Сохранить</button></div></form>
+<div class="tgp-sec">Конфиденциальность</div>
+<div class="tgp-card">
+<div class="tgp-row"><small>Кто видит время последнего визита</small>
+<div class="ls-toggle" id="lsToggle">
+  <button type="button" class="ls-opt${(me.lastSeenMode||'everybody')==='everybody'?' ls-active':''}" data-lsm="everybody">Все</button>
+  <button type="button" class="ls-opt${(me.lastSeenMode||'everybody')==='nobody'?' ls-active':''}" data-lsm="nobody">Никто</button>
+</div>
+</div></div>
 <div class="tgp-sec">Смена пароля</div>
 <form id="pwf"><div class="tgp-card">
 <div class="tgp-row"><small>Текущий пароль</small><input id="pw0" type="password" autocomplete="current-password"></div>
@@ -2952,6 +3032,16 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
   $('#card').querySelectorAll('[data-go]').forEach(b => b.onclick = () => myProfile(b.dataset.go));
   $('#card').querySelectorAll('[data-back]').forEach(b => b.onclick = () => myProfile('hub'));
   if ($('#lo')) $('#lo').onclick = () => logout();
+  // Last seen mode toggle
+  $('#card').querySelectorAll('.ls-opt').forEach(b => b.onclick = async () => {
+    const lsm = b.dataset.lsm;
+    try {
+      await api('/api/profile/' + me.id, 'PUT', { lastSeenMode: lsm });
+      me = { ...me, lastSeenMode: lsm }; save();
+      $('#card').querySelectorAll('.ls-opt').forEach(x => x.classList.toggle('ls-active', x.dataset.lsm === lsm));
+      toast('Настройка сохранена');
+    } catch(x) { toast(x.message); }
+  });
   if ($('#pshop')) $('#pshop').onclick = () => shop();
   if ($('#punm')) $('#punm').onclick = () => usernameMarket();
   // Кастомизация — темы
