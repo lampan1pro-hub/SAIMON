@@ -1060,6 +1060,41 @@ html[data-theme=dark] .tgp-row input,html[data-theme=dark] .tgp-row textarea{col
 .tgs-go{color:var(--t2,#7d8790);font-size:22px;line-height:1}
 html[data-theme=dark] .tgs-row{background:#17212b;color:var(--t);border-color:#0e1621}
 .prem-desc{color:var(--t2,#7d8790);font-size:14px;margin-bottom:8px}
+/* ===== Multi-account switcher ===== */
+.accs-list{display:flex;flex-direction:column;gap:0}
+.acc-row{display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;transition:background .18s;border-radius:0;background:none;border:0;width:100%;text-align:left;-webkit-tap-highlight-color:transparent;user-select:none}
+.acc-row:hover{background:rgba(51,144,236,.06)}
+.acc-row:active{background:rgba(51,144,236,.12)}
+.acc-row .av-w{position:relative;flex-shrink:0}
+.acc-row .av-w .av{width:46px;height:46px;border-radius:50%;object-fit:cover;font-size:20px;display:flex;align-items:center;justify-content:center;background:var(--p)}
+.acc-row .acc-info{flex:1;min-width:0}
+.acc-row .acc-name{font-weight:600;font-size:15px;color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acc-row .acc-handle{font-size:13px;color:var(--t2)}
+.acc-row .acc-check{color:var(--p);font-size:20px;font-weight:700;opacity:0;transition:opacity .2s}
+.acc-row.acc-active .acc-check{opacity:1}
+.acc-row .acc-del{width:28px;height:28px;border-radius:50%;border:0;background:rgba(200,0,0,.08);color:#e53935;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .18s,transform .15s}
+.acc-row .acc-del:active{transform:scale(.85);background:rgba(200,0,0,.18)}
+.acc-add-btn{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;color:var(--p);font-size:15px;font-weight:500;background:none;border:0;width:100%;transition:background .18s;border-top:1px solid var(--b)}
+.acc-add-btn:active{background:rgba(51,144,236,.07)}
+.acc-add-btn .acc-add-ic{width:46px;height:46px;border-radius:50%;background:rgba(51,144,236,.12);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+/* Add account overlay */
+#addAccOverlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;transition:opacity .25s}
+#addAccOverlay.hidden{display:none}
+.add-acc-sheet{background:var(--bg);border-radius:24px 24px 0 0;width:100%;max-width:480px;padding:24px 0 32px;animation:sheetUp .28s cubic-bezier(.16,1,.3,1) both}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
+.add-acc-sheet h3{text-align:center;font-size:17px;font-weight:700;padding:0 24px 16px;color:var(--t)}
+.add-acc-sheet .aaForm{padding:0 20px;display:flex;flex-direction:column;gap:10px}
+.add-acc-sheet input{border-radius:14px!important;padding:12px 16px;font-size:15px;border:1.5px solid var(--b);background:var(--bg);color:var(--t);width:100%;box-sizing:border-box;transition:border-color .2s}
+.add-acc-sheet input:focus{border-color:var(--p);outline:none}
+.add-acc-sheet .aa-btn{border-radius:14px;padding:13px;font-size:15px;font-weight:600;border:0;cursor:pointer;transition:background .18s,transform .15s}
+.add-acc-sheet .aa-btn:active{transform:scale(.97)}
+.add-acc-sheet .aa-ok{background:var(--p);color:#fff;width:100%}
+.add-acc-sheet .aa-cancel{background:var(--bg2,#f2f2f7);color:var(--t);width:100%}
+html[data-theme=dark] .add-acc-sheet .aa-cancel{background:#1e2c3a}
+.add-acc-sheet .aa-err{color:#e53935;font-size:13px;min-height:18px;text-align:center}
+/* Счётчик аккаунтов */
+.accs-count{font-size:13px;color:var(--t2);padding:8px 16px 0;text-align:right}
+
 /* ===== Last-seen toggle ===== */
 .ls-toggle{display:flex;gap:6px;margin-top:6px}
 .ls-opt{padding:6px 18px;border-radius:20px;font-size:14px;font-weight:500;background:var(--bg);color:var(--t2);border:1.5px solid var(--b);transition:background .2s,color .2s,border-color .2s,transform .15s}
@@ -1469,7 +1504,7 @@ async function silentReauth() {
   })();
   return _reauthProm;
 }
-const save = () => localStorage.setItem('ovk_user', JSON.stringify(me));
+const save = () => { localStorage.setItem('ovk_user', JSON.stringify(me)); try { saveCurrentToAccounts(); } catch {} };
 // Сохраняем email+pw для авто-реавторизации после перезапуска сервера (Render Free стирает сессии при пробуждении)
 const saveCreds = (email, pw) => { try { localStorage.setItem('ovk_creds', btoa(unescape(encodeURIComponent(JSON.stringify({email, pw}))))); } catch {} };
 const loadCreds = () => { try { const r = localStorage.getItem('ovk_creds'); return r ? JSON.parse(decodeURIComponent(escape(atob(r)))) : null; } catch { return null; } };
@@ -1922,6 +1957,8 @@ function boot() {
   if (swReg && Notification.permission === 'granted') syncPush(); else paintBell();
   // Применить сохранённые обои и акцент
   try { applyWallpaper(); } catch(e) {}
+  // Зарегистрировать текущий аккаунт в мульти-аккаунт списке
+  try { saveCurrentToAccounts(); } catch(e) {}
 }
 /* ---------- Уведомления (Web Push) ---------- */
 const pushOK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -1978,12 +2015,134 @@ $('#pushBtn').onclick = togglePush;
 applyTheme(curTheme());
 const paintMe = () => { $('#meBtn').innerHTML = uav(me, 'xs') + '<span>Профиль</span>'; };
 
+/* ========== Мульти-аккаунт ========== */
+const MAX_ACCOUNTS = 3;
+const ACCOUNTS_KEY = 'saimon_accounts'; // [{user, token, creds_b64}]
+
+function getAccounts() {
+  try { return JSON.parse(localStorage.getItem(ACCOUNTS_KEY)) || []; } catch { return []; }
+}
+function saveAccounts(list) {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
+}
+function saveCurrentToAccounts() {
+  if (!me || !me.token) return;
+  const list = getAccounts();
+  const idx = list.findIndex(a => a.user.id === me.id);
+  const entry = { user: { id: me.id, username: me.username, handle: me.handle, avatar: me.avatar || '', verified: me.verified, premium: me.premium || 0, ng: me.ng || null }, token: me.token, creds: localStorage.getItem('ovk_creds') || '' };
+  if (idx >= 0) list[idx] = entry; else list.push(entry);
+  saveAccounts(list);
+}
+function removeFromAccounts(uid) {
+  saveAccounts(getAccounts().filter(a => a.user.id !== uid));
+}
+
+function renderAccountSwitcher() {
+  const list = getAccounts();
+  if (!list.length) {
+    return `<div class="tgp-sec">Аккаунты</div>
+<div class="tgp-card" style="padding:0;overflow:hidden">
+<button type="button" class="acc-add-btn" id="accAddBtn"><div class="acc-add-ic">＋</div><span>Добавить аккаунт</span></button></div>`;
+  }
+  const rows = list.map(a => {
+    const isCur = me && a.user.id === me.id;
+    const av = a.user.avatar ? `<img class="av" src="${esc(a.user.avatar)}" alt="">` : `<div class="av" style="background:var(--p);color:#fff;font-size:20px;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center">${esc((a.user.username||'?')[0].toUpperCase())}</div>`;
+    return `<div class="acc-row${isCur?' acc-active':''}" data-accid="${a.user.id}" role="button" tabindex="0">
+      <div class="av-w">${av}</div>
+      <div class="acc-info"><div class="acc-name">${esc(a.user.username)}${a.user.verified?` <span style="color:#3390ec">✓</span>`:''}</div><div class="acc-handle">@${esc(a.user.handle)}</div></div>
+      <span class="acc-check">✓</span>
+      ${isCur ? '<span style="font-size:12px;color:var(--t2);flex-shrink:0">Текущий</span>' : `<button type="button" class="acc-del" data-delacc="${a.user.id}" title="Удалить аккаунт">✕</button>`}
+    </div>`;
+  }).join('');
+  const canAdd = list.length < MAX_ACCOUNTS;
+  const addBtn = canAdd ? `<button type="button" class="acc-add-btn" id="accAddBtn"><div class="acc-add-ic">＋</div><span>Добавить аккаунт</span></button>` : '';
+  return `<div class="tgp-sec">Аккаунты <span style="color:var(--t2);font-size:13px">${list.length}/${MAX_ACCOUNTS}</span></div>
+<div class="tgp-card" style="padding:0;overflow:hidden">
+<div class="accs-list">${rows}</div>${addBtn}</div>`;
+}
+
+async function switchAccount(uid) {
+  const list = getAccounts();
+  const target = list.find(a => a.user.id === uid);
+  if (!target || (me && target.user.id === me.id)) return;
+  // сохраняем текущий
+  saveCurrentToAccounts();
+  // отключаем ws
+  if (ws) { ws.onclose = null; ws.close(); ws = null; }
+  // загружаем целевой
+  me = normMe({ ...target.user, token: target.token });
+  if (target.creds) localStorage.setItem('ovk_creds', target.creds);
+  else localStorage.removeItem('ovk_creds');
+  save();
+  cur = null; query = ''; found = []; pend = null; opened = false;
+  chats = new Map(); msgs = new Map(); catalog = new Map(); foundCh = []; blocked = new Set(); editing = null; cnames = {}; replyTo = null;
+  closeModal();
+  $('#q').value = '';
+  $('#room').hidden = true; $('#empty').hidden = false;
+  toast('Переключение…');
+  boot();
+}
+
+function showAddAccountSheet() {
+  const list = getAccounts();
+  if (list.length >= MAX_ACCOUNTS) { toast(`Максимум ${MAX_ACCOUNTS} аккаунта`); return; }
+  let overlay = document.getElementById('addAccOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'addAccOverlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.className = '';
+  overlay.innerHTML = `<div class="add-acc-sheet">
+    <h3>Войти в другой аккаунт</h3>
+    <div class="aaForm">
+      <input id="aaEmail" type="email" placeholder="Email" autocomplete="email">
+      <input id="aaPw" type="password" placeholder="Пароль" autocomplete="current-password">
+      <div class="aa-err" id="aaErr"></div>
+      <button type="button" class="aa-btn aa-ok" id="aaOk">Войти</button>
+      <button type="button" class="aa-btn aa-cancel" id="aaCancel">Отмена</button>
+    </div>
+  </div>`;
+  overlay.onclick = e => { if (e.target === overlay) closeAddSheet(); };
+  document.getElementById('aaCancel').onclick = closeAddSheet;
+  document.getElementById('aaOk').onclick = async () => {
+    const email = document.getElementById('aaEmail').value.trim();
+    const pw = document.getElementById('aaPw').value;
+    const errEl = document.getElementById('aaErr');
+    if (!email || !pw) { errEl.textContent = 'Заполните все поля'; return; }
+    const btn = document.getElementById('aaOk');
+    btn.disabled = true; btn.textContent = 'Вхожу…';
+    try {
+      const d = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email, password: pw }) }).then(r => r.json());
+      if (d.error) { errEl.textContent = d.error; btn.disabled = false; btn.textContent = 'Войти'; return; }
+      // проверяем что это не текущий аккаунт
+      if (me && d.user.id === me.id) { errEl.textContent = 'Вы уже вошли в этот аккаунт'; btn.disabled = false; btn.textContent = 'Войти'; return; }
+      // сохраняем текущий
+      saveCurrentToAccounts();
+      // добавляем новый
+      const newEntry = { user: { id: d.user.id, username: d.user.username, handle: d.user.handle, avatar: d.user.avatar || '', verified: d.user.verified || false, premium: d.user.premium || 0, ng: d.user.ng || null }, token: d.token, creds: btoa(unescape(encodeURIComponent(JSON.stringify({email, pw})))) };
+      const cur2 = getAccounts();
+      if (!cur2.find(a => a.user.id === d.user.id)) cur2.push(newEntry);
+      else cur2[cur2.findIndex(a => a.user.id === d.user.id)] = newEntry;
+      saveAccounts(cur2);
+      // переключаемся
+      closeAddSheet();
+      await switchAccount(d.user.id);
+    } catch(ex) { errEl.textContent = 'Ошибка сети'; btn.disabled = false; btn.textContent = 'Войти'; }
+  };
+}
+function closeAddSheet() {
+  const o = document.getElementById('addAccOverlay');
+  if (o) { o.style.opacity = '0'; setTimeout(() => { o.className = 'hidden'; o.style.opacity = ''; }, 220); }
+}
+
 function logout(msg) {
   if (swReg && me && me.token) { // это устройство больше не получает чужие уведомления
     const tk = me.token;
     swReg.pushManager.getSubscription().then(s => { if (s) { fetch('/api/push/unsubscribe', {method: 'POST', headers: {Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json'}, body: JSON.stringify({endpoint: s.endpoint})}).catch(() => {}); s.unsubscribe().catch(() => {}); } paintBell(); }).catch(() => {});
   }
   if (me && me.token) fetch('/api/logout', {method: 'POST', headers: {Authorization: 'Bearer ' + me.token}}).catch(() => {});
+  if (me) removeFromAccounts(me.id);
   localStorage.removeItem('ovk_user'); clearCreds();
   me = null; cur = null; query = ''; found = []; pend = null; opened = false;
   if (ws) { ws.onclose = null; ws.close(); }
@@ -2924,6 +3083,7 @@ ${profRow('🎁', '#ff9500', 'Магазин и рынок', 'Подарки и 
 ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-панель', 'Каналы и пользователи', 'id="padm"') : ''}
 </div>
 <div class="tgp-sec">Мои подарки</div><div class="gg tgp-gifts" id="pgifts"></div>
+${renderAccountSwitcher()}
 <div class="tgp-card"><button type="button" class="tgp-item tgp-danger" id="lo">Выйти из аккаунта</button></div>`;
   } else if (view === 'account') {
     body = `<div class="tgp-head"><div id="pav">${uav(me, 'l')}</div>
@@ -3031,6 +3191,28 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
   };
   $('#card').querySelectorAll('[data-go]').forEach(b => b.onclick = () => myProfile(b.dataset.go));
   $('#card').querySelectorAll('[data-back]').forEach(b => b.onclick = () => myProfile('hub'));
+
+  // Мульти-аккаунт: переключение
+  $('#card').querySelectorAll('[data-accid]').forEach(b => {
+    b.onclick = e => {
+      // не срабатываем если кликнули на кнопку удаления
+      if (e.target.closest('[data-delacc]')) return;
+      const uid = +b.dataset.accid;
+      if (!me || uid === me.id) return;
+      switchAccount(uid);
+    };
+  });
+  // Мульти-аккаунт: удаление
+  $('#card').querySelectorAll('[data-delacc]').forEach(b => {
+    b.onclick = e => {
+      e.stopPropagation();
+      const uid = +b.dataset.delacc;
+      removeFromAccounts(uid);
+      myProfile('hub');
+    };
+  });
+  // Мульти-аккаунт: добавить аккаунт
+  if ($('#accAddBtn')) $('#accAddBtn').onclick = showAddAccountSheet;
   if ($('#lo')) $('#lo').onclick = () => logout();
   // Last seen mode toggle
   $('#card').querySelectorAll('.ls-opt').forEach(b => b.onclick = async () => {
