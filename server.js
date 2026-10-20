@@ -626,6 +626,7 @@ app.post('/api/register', async (req, res) => {
     if (!EMAIL_RE.test(email))            return res.status(400).json({ error: 'Введите корректный email' });
     if (password.length < 6)             return res.status(400).json({ error: 'Пароль — минимум 6 символов' });
     if (!HANDLE_RE.test(handle))         return res.status(400).json({ error: 'Юзернейм: 3–20 символов, латиница, цифры и _' });
+    if (/bot/i.test(username) || /bot/i.test(handle)) return res.status(400).json({ error: 'Имя и юзернейм не могут содержать слово «bot»' });
 
     const users = read(F.users);
     if (users.some(u => u.email === email))   return res.status(400).json({ error: 'Этот email уже зарегистрирован' });
@@ -640,7 +641,7 @@ app.post('/api/register', async (req, res) => {
     write(F.users, users);
     const token = newSession(user.id);
     await persist();
-    loginDeviceNotify(user.id, 'register', req);
+    saimonChatNotify(user.id, req, 'register');
     res.json({ success: true, user: self(user), token });
 });
 
@@ -656,7 +657,7 @@ app.post('/api/login', async (req, res) => {
     if (!isHash(user.password)) { user.password = hashPass(password); write(F.users, users); }
     const token = newSession(user.id);
     await persist();
-    loginDeviceNotify(user.id, 'login', req);
+    saimonChatNotify(user.id, req, 'login');
     res.json({ success: true, user: self(user), token });
 });
 
@@ -1126,6 +1127,136 @@ const SUB_PRICE = Number(process.env.SUB_PRICE) || 3;      // Mars за одно
 const PACKS = [10, 50, 100, 500, 1000];                    // доступные пакеты
 VERIFIED.add(BOT_HANDLE);
 
+// ---------- Бот SAIMON-CHAT: уведомления о входе/регистрации ----------
+const SC_BOT_ID     = 101;
+const SC_BOT_HANDLE = 'saimon_chat';
+const SC_BOT_NAME   = 'SAIMON-CHAT';
+
+function ensureSaimonChatBot() {
+    const users = read(F.users);
+    const old = users.find(u => u.id === SC_BOT_ID);
+    if (old) {
+        let changed = false;
+        if (old.username !== SC_BOT_NAME) { old.username = SC_BOT_NAME; changed = true; }
+        if (changed) write(F.users, users);
+        return;
+    }
+    users.push({
+        id: SC_BOT_ID, username: SC_BOT_NAME, handle: SC_BOT_HANDLE, bot: true,
+        bio: 'Системные уведомления о входах в аккаунт',
+        avatar: '', mars: 0,
+        password: 'x' + crypto.randomBytes(24).toString('hex'),
+        createdAt: new Date().toISOString()
+    });
+    write(F.users, users);
+}
+
+function scBotChat(uid) {
+    const chats = read(F.chats), id = directId(uid, SC_BOT_ID);
+    let chat = chats.find(c => c.id === id);
+    if (!chat) {
+        chat = { id, type: 'direct', members: [uid, SC_BOT_ID], reads: {}, createdAt: new Date().toISOString() };
+        chats.push(chat);
+        write(F.chats, chats);
+        sendTo([uid], { type: 'chat' });
+    }
+    return chat;
+}
+
+function scBotSay(uid, text) {
+    const chat = scBotChat(uid);
+    const msg = { id: crypto.randomUUID(), chatId: chat.id, senderId: SC_BOT_ID, text, timestamp: new Date().toISOString() };
+    const msgs = read(F.messages);
+    msgs.push(msg);
+    write(F.messages, msgs);
+    const chats = read(F.chats), c = chats.find(x => x.id === chat.id);
+    c.reads = c.reads || {};
+    c.reads[SC_BOT_ID] = msg.timestamp;
+    write(F.chats, chats);
+    sendTo([uid], { type: 'message', data: msg });
+    sendTo([uid], { type: 'read', data: { chatId: chat.id, userId: SC_BOT_ID, at: c.reads[SC_BOT_ID] } });
+}
+
+function getClientIP(req) {
+    return (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+        || req.headers['x-real-ip']
+        || req.socket?.remoteAddress
+        || 'неизвестно';
+}
+
+function saimonChatNotify(uid, req, event) {
+    try {
+        const ip  = getClientIP(req);
+        const ua  = req.headers['user-agent'] || 'неизвестно';
+        const now = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', dateStyle: 'short', timeStyle: 'medium' });
+        const ev  = event === 'register' ? '📋 Новая регистрация' : '🔑 Вход в аккаунт';
+        scBotSay(uid,
+`${ev}
+📅 Время: ${now} (МСК)
+🌐 IP-адрес: ${ip}
+📱 Устройство: ${ua}`);
+    } catch (e) {
+        console.error('saimonChatNotify error:', e.message);
+    }
+}
+
+// Удаляет все пользовательские аккаунты, у которых в имени или юзернейме есть слово «bot».
+// Системные боты (u.bot === true) и аккаунты с «saimon» в имени не трогаются.
+function purgeBotAccounts() {
+    const users = read(F.users);
+    const BOT_RE = /bot/i;
+    const SAFE_RE = /saimon/i; // защищаем SAIMON-CHAT и подобные
+    const toDelete = users.filter(u => {
+        if (u.bot || u.fake) return false;  // системные боты — не трогаем
+        const name = (u.username || '').toLowerCase();
+        const handles = (u.handles || [u.handle]).map(h => (h || '').toLowerCase());
+        const hasBot = BOT_RE.test(name) || handles.some(h => BOT_RE.test(h));
+        const isSafe = SAFE_RE.test(name) || handles.some(h => SAFE_RE.test(h));
+        return hasBot && !isSafe;
+    });
+    if (!toDelete.length) return;
+
+    const deleteIds = new Set(toDelete.map(u => u.id));
+    const allChats = read(F.chats);
+    const allMsgs  = read(F.messages);
+
+    // Личные чаты, которые надо полностью удалить
+    const directIds = new Set(
+        allChats.filter(c => c.type === 'direct' && (c.members || []).some(m => deleteIds.has(m))).map(c => c.id)
+    );
+    // ID сообщений удаляемых пользователей
+    const delMsgIds = new Set(
+        allMsgs.filter(m => deleteIds.has(m.senderId)).map(m => m.id)
+    );
+
+    const newChats = allChats
+        .filter(c => !directIds.has(c.id))
+        .map(c => {
+            if (!(c.members || []).some(m => deleteIds.has(m)) && !c.pin && !c.pins) return c;
+            const nc = { ...c };
+            nc.members = (nc.members || []).filter(x => !deleteIds.has(x));
+            if (nc.reads)   { nc.reads   = Object.fromEntries(Object.entries(nc.reads).filter(([k]) => !deleteIds.has(Number(k)))); }
+            if (nc.cleared) { nc.cleared = Object.fromEntries(Object.entries(nc.cleared).filter(([k]) => !deleteIds.has(Number(k)))); }
+            if (nc.pin  && delMsgIds.has(nc.pin.id))  delete nc.pin;
+            if (nc.pins) nc.pins = nc.pins.filter(pid => !delMsgIds.has(pid));
+            return nc;
+        });
+
+    const newMsgs = allMsgs.filter(m => !directIds.has(m.chatId) && !deleteIds.has(m.senderId));
+
+    // Удаляем сессии
+    const sessions = read(F.sessions);
+    Object.keys(sessions).forEach(t => { if (deleteIds.has(sessions[t].uid)) delete sessions[t]; });
+
+    write(F.sessions, sessions);
+    write(F.chats,    newChats);
+    write(F.messages, newMsgs);
+    write(F.gifts,    read(F.gifts).filter(g => !deleteIds.has(g.ownerId) && !deleteIds.has(g.senderId)));
+    write(F.users,    users.filter(u => !deleteIds.has(u.id)));
+
+    console.log(`🤖 purgeBotAccounts: удалено ${toDelete.length} бот-аккаунт(ов): ${toDelete.map(u => u.handle).join(', ')}`);
+}
+
 function ensureBot() {
     const users = read(F.users);
     const old = users.find(u => u.id === BOT_ID);
@@ -1141,80 +1272,6 @@ function ensureBot() {
         avatar: BOT_AVATAR, mars: 0, password: 'x' + crypto.randomBytes(24).toString('hex'), createdAt: new Date().toISOString()
     });
     write(F.users, users);
-}
-
-// ---------- Бот уведомлений о входах (saimon-chat) ----------
-// При регистрации и каждом входе в аккаунт присылает пользователю сообщение
-// с моделью устройства, IP-адресом и временем входа/регистрации.
-const SAIMON_BOT_ID = 101;
-const SAIMON_BOT_HANDLE = 'saimon-chat';
-
-function ensureSaimonBot() {
-    const users = read(F.users);
-    if (users.some(u => u.bot && u.id === SAIMON_BOT_ID)) return;
-    // юзернейм не должен конфликтовать с живым аккаунтом пользователя
-    if (handleTaken(users, SAIMON_BOT_HANDLE)) return;
-    users.push({
-        id: SAIMON_BOT_ID, bot: true,
-        username: 'saimon-chat', handle: SAIMON_BOT_HANDLE,
-        bio: '🔐 Уведомления о входах в ваш аккаунт: устройство, IP и время.',
-        avatar: '', mars: 0, password: 'x' + crypto.randomBytes(24).toString('hex'),
-        createdAt: new Date().toISOString()
-    });
-    write(F.users, users);
-}
-
-// Реальный IP клиента (если сервер за прокси/хостингом — из X-Forwarded-For)
-function clientIp(req) {
-    const xf = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-    if (xf) return xf;
-    return (req.socket && req.socket.remoteAddress) || 'неизвестен';
-}
-
-// Определяем модель устройства, ОС и браузер из User-Agent запроса
-function deviceFromUA(uaRaw) {
-    const ua = String(uaRaw || '');
-    let device = 'Неизвестное устройство', os = '';
-    if (/iPhone/.test(ua))            { device = 'iPhone';            os = 'iOS'; }
-    else if (/iPad/.test(ua))         { device = 'iPad';              os = 'iPadOS'; }
-    else if (/Android/.test(ua)) {
-        const v = ua.match(/Android\s*([\d.]+)/i);
-        os = v ? 'Android ' + v[1] : 'Android';
-        // модель телефона из сегмента «Android x.x; Модель» в User-Agent
-        const m = ua.match(/Android[^)]*?;\s*([^;)]+)/i);
-        device = (m && m[1] && !/build/i.test(m[1])) ? m[1].trim() : 'Android-устройство';
-    }
-    else if (/Windows NT/.test(ua))   { device = 'Компьютер (Windows)'; os = 'Windows'; }
-    else if (/Macintosh/.test(ua))    { device = 'Компьютер (Mac)';     os = 'macOS'; }
-    else if (/CrOS/.test(ua))         { device = 'Chromebook';          os = 'ChromeOS'; }
-    else if (/Linux/.test(ua))        { device = 'Компьютер (Linux)';   os = 'Linux'; }
-    let browser = 'браузер';
-    if (/Edg\//.test(ua))              browser = 'Edge';
-    else if (/YaBrowser/.test(ua))    browser = 'Яндекс Браузер';
-    else if (/Opera|OPR\//.test(ua))  browser = 'Opera';
-    else if (/Chrome\//.test(ua))     browser = 'Chrome';
-    else if (/Firefox\//.test(ua))    browser = 'Firefox';
-    else if (/Safari\//.test(ua))     browser = 'Safari';
-    return { device, os, browser };
-}
-
-// Уведомление о входе/регистрации. Любая ошибка не должна ломать сам вход.
-function loginDeviceNotify(uid, kind, req) {
-    try {
-        ensureSaimonBot();
-        const { device, os, browser } = deviceFromUA(req.headers['user-agent']);
-        const ip = clientIp(req);
-        const when = new Date().toLocaleString('ru-RU', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        });
-        const title = kind === 'register' ? '🎉 Регистрация аккаунта' : '🔐 Новый вход в аккаунт';
-        say(uid,
-            `${title}\n` +
-            `📱 Устройство: ${device} (${os} · ${browser})\n` +
-            `🌐 IP: ${ip}\n` +
-            `🕒 Время: ${when}`);
-    } catch (e) { console.error('login-notify:', e.message); }
 }
 
 // Случайные ники для «подписчиков»
@@ -2446,8 +2503,9 @@ async function init() {
         try { meta = JSON.parse(fs.readFileSync(mf, 'utf8')); } catch { fs.writeFileSync(mf, JSON.stringify(meta)); }
     }
     migrate();
+    purgeBotAccounts();
     ensureBot();
-    ensureSaimonBot();
+    ensureSaimonChatBot();
     await ensureVapid();
     await persist();
 
