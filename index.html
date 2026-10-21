@@ -1041,6 +1041,28 @@ html[data-theme=dark] #form{background:#17212b}
 .tgp-item.tgp-accent{color:var(--tg-blue,#3390ec);font-weight:500;text-align:center}
 .tgp-sec{padding:14px 20px 6px;color:var(--t2,#7d8790);font-size:13px}
 .tgp-gifts{margin:0 12px}
+/* ===== Сторисы в профиле (стиль Telegram) ===== */
+.stories-bar{display:flex;gap:10px;overflow-x:auto;padding:10px 14px 6px;scrollbar-width:none}
+.stories-bar::-webkit-scrollbar{display:none}
+.story-item{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer}
+.story-ring{width:64px;height:64px;border-radius:50%;padding:2.5px;background:linear-gradient(135deg,#f7b733,#fc4a1a,#c471ed,#12c2e9);position:relative;flex-shrink:0}
+.story-ring.seen{background:var(--b,#e5e5ea)}
+.story-ring img,.story-ring video{width:100%;height:100%;border-radius:50%;object-fit:cover;border:2.5px solid #fff;display:block}
+html[data-theme=dark] .story-ring img,html[data-theme=dark] .story-ring video{border-color:#17212b}
+.story-ring .story-add-btn{width:100%;height:100%;border-radius:50%;background:var(--pl,#e7f3ff);border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--tg-blue,#3390ec)}
+html[data-theme=dark] .story-ring .story-add-btn{border-color:#17212b;background:#1e2c3a}
+.story-name{font-size:11px;color:var(--t2,#707579);max-width:64px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Просмотрщик сторис (фулскрин) */
+#storyViewer{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column;touch-action:none}
+#storyViewer[hidden]{display:none!important}
+#storyViewerMedia{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+#storyViewerMedia img,#storyViewerMedia video{max-width:100%;max-height:100%;object-fit:contain;border-radius:0}
+#storyViewerBar{position:absolute;top:0;left:0;right:0;height:3px;background:rgba(255,255,255,.3);z-index:2}
+#storyViewerBar i{display:block;height:100%;background:#fff;width:0;transition:width linear}
+#storyViewerClose{position:absolute;top:env(safe-area-inset-top,0);right:10px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:0;z-index:3}
+#storyViewerDel{position:absolute;top:env(safe-area-inset-top,0);left:10px;width:40px;height:40px;border-radius:50%;background:rgba(220,30,30,.55);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:0;z-index:3}
+#storyViewerDel[hidden]{display:none!important}
+#storyViewerTime{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:rgba(255,255,255,.6);font-size:12px;z-index:3}
 html[data-theme=dark] .modal.tg-prof,html[data-theme=dark] .modal.tg-prof .card{background:#17212b}
 html[data-theme=dark] .tgp-top,html[data-theme=dark] .tgp-head{background:#17212b;color:var(--t)}html[data-theme=dark] .tgp-card,html[data-theme=dark] .tgp-item{background:#1e2c3a;color:var(--t)}html[data-theme=dark] .tgp-act{background:#223344;color:#5bb8f5;border:1px solid #2e4560;border-radius:16px}
 html[data-theme=dark] .tgp-row,html[data-theme=dark] .tgp-item{border-color:#1f3040}
@@ -1129,7 +1151,7 @@ button:not(.tgp-item):not(.ls-opt):not(.theme-btn):not(.wall-btn){transition:bac
 #room{border-radius:24px!important}
 /* Modal cards */
 .modal .card,.card{border-radius:22px!important}
-.modal:not(.tg-prof) .card{overflow:hidden}
+.modal:not(.tg-prof) .card{overflow-y:auto;overflow-x:hidden}
 .modal.tg-prof .card{overflow-y:auto!important;overflow-x:hidden!important}
 /* Reply/edit bars */
 #replybar,#editbar{border-radius:0;transition:all .22s cubic-bezier(.16,1,.3,1)}
@@ -1738,6 +1760,12 @@ function cropAvatar(file) {
     img.src = url;
     wrap.hidden = false;
   });
+}
+
+// Загрузка файла без обрезки (для сторисов)
+async function uploadFile(file) {
+  const r = await upload(file, 'media');
+  return r.url;
 }
 
 async function uploadAvatar(file) {
@@ -3088,6 +3116,7 @@ ${profRow('🎨', '#ff6b35', 'Кастомизация', 'Обои, темы, ц
 ${profRow('🎁', '#ff9500', 'Магазин и рынок', 'Подарки и юзернеймы', 'data-go="market"')}
 ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-панель', 'Каналы и пользователи', 'id="padm"') : ''}
 </div>
+<div class="tgp-sec">Сторисы</div><div class="stories-bar" id="pstories"></div>
 <div class="tgp-sec">Мои подарки</div><div class="gg tgp-gifts" id="pgifts"></div>
 ${renderAccountSwitcher()}
 <div class="tgp-card"><button type="button" class="tgp-item tgp-danger" id="lo">Выйти из аккаунта</button></div>
@@ -3294,6 +3323,7 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
   if ($('#ngs')) $('#ngs').onclick = () => nickColor({c1: $('#ng1').value, c2: $('#ng2').value});
   if ($('#ngr')) $('#ngr').onclick = () => nickColor({reset: true});
   if ($('#pgifts')) loadGifts(me.id, $('#pgifts'), true);
+  if ($('#pstories')) loadStories(me.id, $('#pstories'), true);
 }
 
 const ADMIN_HANDLES = ['saimon', 'admin'];
@@ -3416,6 +3446,7 @@ ${isMe || isSC ? '' : `<div class="tgp-card">
 ${cnames[u.id] ? '<button type="button" class="tgp-item tgp-danger" id="cnr">Убрать имя</button>' : ''}
 </div>`}
 ${isMe || isSC ? '' : '<div class="tgp-card"><button type="button" class="tgp-item" id="gpr">💎 Подарить подписку SAIMONPREMIYM</button></div>'}
+${isSC ? '' : '<div class="tgp-sec">Сторисы</div><div class="stories-bar" id="pstories"></div>'}
 ${isSC ? '' : '<div class="tgp-sec">Подарки</div><div class="gg tgp-gifts" id="pgifts"></div>'}
 </div>`);
   if ($('#myrb')) $('#myrb').onclick = async () => { await toggleRainbow(); userProfile(me); };
@@ -3443,6 +3474,7 @@ ${isSC ? '' : '<div class="tgp-sec">Подарки</div><div class="gg tgp-gifts
     } catch (x) { toast(x.message); }
   };
   loadGifts(u.id, $('#pgifts'), false);
+  if ($('#pstories')) loadStories(u.id, $('#pstories'), false);
 }
 
 /* ---------- Группы ---------- */
@@ -4089,6 +4121,62 @@ function revealGift(g, k, to, done) {
   })();
 }
 
+// ===== Сторисы =====
+async function loadStories(uid, box, isMine) {
+  try {
+    const stories = await api('/api/stories/' + uid);
+    if (!document.body.contains(box)) return;
+    renderStoriesBox(box, stories, uid, isMine);
+    window.renderProfileStories = () => loadStories(uid, box, isMine);
+  } catch {}
+}
+
+function renderStoriesBox(box, stories, uid, isMine) {
+  const sorted = stories.slice().sort((a, b) => b.at.localeCompare(a.at));
+  let html = '';
+  if (isMine) {
+    html += `<div class="story-item" id="story-add-btn">
+      <div class="story-ring"><div class="story-add-btn">＋</div></div>
+      <div class="story-name">Добавить</div>
+    </div>`;
+  }
+  sorted.forEach((s, i) => {
+    const isVideo = /\.(mp4|webm|mov)$/.test(s.url);
+    const preview = isVideo
+      ? `<video src="${esc(s.url)}" muted preload="metadata" style="width:100%;height:100%;border-radius:50%;object-fit:cover;border:2.5px solid #fff"></video>`
+      : `<img src="${esc(s.url)}" alt="Сторис">`;
+    html += `<div class="story-item" data-si="${i}">
+      <div class="story-ring">${preview}</div>
+      <div class="story-name">Сторис ${sorted.length - i}</div>
+    </div>`;
+  });
+  box.innerHTML = html;
+  box.querySelectorAll('[data-si]').forEach(el => {
+    el.onclick = () => openStoryViewer(sorted, uid, +el.dataset.si);
+  });
+  if (isMine) {
+    const addBtn = box.querySelector('#story-add-btn');
+    if (addBtn) addBtn.onclick = () => addStory(box, stories, uid);
+  }
+}
+
+async function addStory(box, existingStories, uid) {
+  if (existingStories.length >= 20) { toast('Максимум 20 сторисов. Удалите старые.'); return; }
+  const f = await pickFile('image/*,video/mp4,video/webm,video/quicktime');
+  if (!f) return;
+  const isImg = f.type.startsWith('image/');
+  const toastId = toast('Загрузка…');
+  try {
+    const url = await uploadFile(f);
+    if (!url) return;
+    const r = await api('/api/stories', 'POST', { url });
+    if (!document.body.contains(box)) return;
+    renderStoriesBox(box, r.stories, uid, true);
+    window.renderProfileStories = () => loadStories(uid, box, true);
+    toast('Сторис добавлен!');
+  } catch(x) { toast(x.message); }
+}
+
 // Витрина подарков в профиле
 async function loadGifts(uid, box, mine) {
   try {
@@ -4710,6 +4798,117 @@ function setThemeAndWall(t) {
     $('#auth').hidden = false;
   }
 })();
+
+/* ===== Сторисы ===== */
+// storyViewer — глобальный фулскрин просмотрщик
+(function(){
+const SV = document.getElementById('storyViewer');
+const SVM = document.getElementById('storyViewerMedia');
+const SVB = document.getElementById('storyViewerBar');
+const SVBi = SVB.querySelector('i');
+const SVClose = document.getElementById('storyViewerClose');
+const SVDel = document.getElementById('storyViewerDel');
+const SVTime = document.getElementById('storyViewerTime');
+let svStories = [], svIdx = 0, svOwner = null, svTimer = null, svProgress = null;
+const STORY_DURATION = 5000;
+
+function fmtAgo(iso) {
+  const d = Date.now() - new Date(iso).getTime(), m = Math.floor(d / 60000), h = Math.floor(d / 3600000);
+  if (m < 1) return 'только что';
+  if (m < 60) return m + ' мин. назад';
+  if (h < 24) return h + ' ч. назад';
+  return new Date(iso).toLocaleDateString('ru-RU');
+}
+
+function stopStory() {
+  clearTimeout(svTimer); clearInterval(svProgress);
+  SVM.querySelectorAll('video').forEach(v => v.pause());
+}
+
+function showStory(idx) {
+  stopStory();
+  if (!svStories.length) return;
+  idx = Math.max(0, Math.min(idx, svStories.length - 1));
+  svIdx = idx;
+  const s = svStories[idx];
+  const isVideo = /\.(mp4|webm|mov)$/.test(s.url);
+  SVM.innerHTML = '';
+  SVBi.style.transition = 'none'; SVBi.style.width = '0';
+  SVTime.textContent = fmtAgo(s.at);
+  if (isVideo) {
+    const v = document.createElement('video');
+    v.src = s.url; v.autoplay = true; v.playsInline = true;
+    v.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
+    v.addEventListener('loadedmetadata', () => {
+      const dur = Math.min(v.duration * 1000, 15000) || STORY_DURATION;
+      startProgress(dur); svTimer = setTimeout(() => nextStory(), dur);
+    });
+    v.addEventListener('error', () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); });
+    SVM.appendChild(v);
+  } else {
+    const img = document.createElement('img');
+    img.src = s.url; img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
+    img.onload = () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); };
+    img.onerror = () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); };
+    SVM.appendChild(img);
+  }
+  SVDel.hidden = !(svOwner && me && svOwner === me.id);
+}
+
+function startProgress(dur) {
+  const start = Date.now();
+  clearInterval(svProgress);
+  requestAnimationFrame(() => { SVBi.style.transition = `width ${dur}ms linear`; SVBi.style.width = '100%'; });
+  svProgress = setInterval(() => {
+    const pct = Math.min(100, ((Date.now() - start) / dur) * 100);
+    if (pct >= 100) clearInterval(svProgress);
+  }, 100);
+}
+
+function nextStory() { if (svIdx + 1 < svStories.length) showStory(svIdx + 1); else closeStoryViewer(); }
+function prevStory() { if (svIdx > 0) showStory(svIdx - 1); else showStory(0); }
+
+function closeStoryViewer() {
+  stopStory(); SV.hidden = true; SVM.innerHTML = ''; svStories = []; svOwner = null;
+}
+
+SVClose.onclick = closeStoryViewer;
+SVDel.onclick = async () => {
+  const s = svStories[svIdx];
+  if (!s || !confirm('Удалить этот сторис?')) return;
+  try {
+    const r = await api('/api/stories/' + s.id, 'DELETE');
+    svStories = r.stories.sort((a, b) => b.at.localeCompare(a.at));
+    if (!svStories.length) { closeStoryViewer(); return; }
+    showStory(Math.min(svIdx, svStories.length - 1));
+    renderProfileStories();
+    toast('Сторис удалён');
+  } catch(x) { toast(x.message); }
+};
+
+// Тап: левая треть — назад, правая — вперёд
+SVM.addEventListener('click', e => {
+  const x = e.clientX, w = SVM.offsetWidth;
+  if (x < w / 3) prevStory(); else nextStory();
+});
+
+window.openStoryViewer = function(stories, ownerUid, startIdx) {
+  svStories = stories.slice().sort((a, b) => b.at.localeCompare(a.at));
+  svOwner = ownerUid;
+  SV.hidden = false;
+  showStory(startIdx || 0);
+};
+window.renderProfileStories = function() {}; // переопределяется ниже
+})();
 </script>
+
+<!-- Story viewer (fullscreen) -->
+<div id="storyViewer" hidden>
+  <div id="storyViewerBar"><i></i></div>
+  <button id="storyViewerClose">✕</button>
+  <button id="storyViewerDel" hidden>🗑</button>
+  <div id="storyViewerMedia"></div>
+  <div id="storyViewerTime"></div>
+</div>
 
 </body>

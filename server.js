@@ -1693,6 +1693,50 @@ app.get('/api/gifts/:userId', (req, res) => {
         .sort((a, b) => b.at.localeCompare(a.at)).slice(0, 200).map(g => giftOut(g, users)));
 });
 
+// ---------- Сторисы ----------
+const MAX_STORIES = 20;
+
+// Получить сторисы пользователя (видны всем)
+app.get('/api/stories/:userId', (req, res) => {
+    const uid = Number(req.params.userId);
+    const users = read(F.users);
+    const u = users.find(x => x.id === uid);
+    if (!u) return res.status(404).json({ error: 'Пользователь не найден' });
+    res.json((u.stories || []).sort((a, b) => b.at.localeCompare(a.at)));
+});
+
+// Добавить сторис (только своё фото/видео)
+app.post('/api/stories', async (req, res) => {
+    const me = req.uid;
+    const users = read(F.users);
+    const u = users.find(x => x.id === me);
+    if (!u) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    const url = String(req.body.url || '');
+    if (!URL_RE.test(url)) return res.status(400).json({ error: 'Некорректный файл' });
+    if (!fs.existsSync(path.join(UP, path.basename(url)))) return res.status(404).json({ error: 'Файл не найден' });
+    u.stories = u.stories || [];
+    if (u.stories.length >= MAX_STORIES) return res.status(400).json({ error: `Максимум ${MAX_STORIES} сторисов` });
+    const story = { id: crypto.randomUUID(), url, at: new Date().toISOString() };
+    u.stories.push(story);
+    write(F.users, users);
+    await persist();
+    res.json({ success: true, story, stories: u.stories });
+});
+
+// Удалить свой сторис
+app.delete('/api/stories/:storyId', async (req, res) => {
+    const me = req.uid;
+    const users = read(F.users);
+    const u = users.find(x => x.id === me);
+    if (!u) return res.status(401).json({ error: 'Не найден' });
+    const before = (u.stories || []).length;
+    u.stories = (u.stories || []).filter(s => s.id !== req.params.storyId);
+    if (u.stories.length === before) return res.status(404).json({ error: 'Сторис не найден' });
+    write(F.users, users);
+    await persist();
+    res.json({ success: true, stories: u.stories });
+});
+
 // Купить подарок: себе (toId не указан) или другому пользователю
 app.post('/api/gifts/buy', async (req, res) => {
     const me = req.uid, item = CATALOG.find(c => c.kind === req.body.kind);
