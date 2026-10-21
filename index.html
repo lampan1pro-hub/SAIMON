@@ -649,10 +649,10 @@ html[data-theme=dark] #side{background:#17212b}
 .sh h1{font-size:20px;font-weight:500;letter-spacing:.1px}
 #q{margin:4px 10px 6px;border-radius:20px;padding:8px 14px;font-size:16px}
 
-/* Строки чатов — полноширинные, как в Telegram */
-.it{margin:0;border-radius:0;padding:8px 10px 8px 12px;gap:12px}
+/* Строки чатов — со скруглёнными углами */
+.it{margin:2px 8px;border-radius:12px;padding:8px 10px 8px 12px;gap:12px}
 .it:hover{background:#f4f4f5}
-.it.on{background:var(--tg-blue);color:#fff;border-radius:0}
+.it.on{background:var(--tg-blue);color:#fff;border-radius:12px}
 html[data-theme=dark] .it:hover{background:#202b36}
 html[data-theme=dark] .it.on{background:#2b5278}
 .av{width:52px;height:52px}
@@ -1115,7 +1115,7 @@ html[data-theme=dark] .ls-opt{background:#1e2c3a;border-color:#263648}
 #inp{border-radius:22px!important;transition:border-color .2s,background .2s,box-shadow .25s!important}
 #inp:focus{box-shadow:0 0 0 3px rgba(51,144,236,.13)!important}
 /* Chat list rows */
-.it{transition:background .18s ease,transform .12s!important;border-radius:0}
+.it{transition:background .18s ease,transform .12s!important;border-radius:12px}
 .it:active{transform:scale(.985) translateX(2px)!important}
 /* Avatars hover */
 .av{transition:transform .2s cubic-bezier(.16,1,.3,1),box-shadow .2s!important}
@@ -1128,7 +1128,9 @@ button:not(.tgp-item):not(.ls-opt):not(.theme-btn):not(.wall-btn){transition:bac
 /* Chat room card rounder */
 #room{border-radius:24px!important}
 /* Modal cards */
-.modal .card,.card{border-radius:22px!important;overflow:hidden}
+.modal .card,.card{border-radius:22px!important}
+.modal:not(.tg-prof) .card{overflow:hidden}
+.modal.tg-prof .card{overflow-y:auto!important;overflow-x:hidden!important}
 /* Reply/edit bars */
 #replybar,#editbar{border-radius:0;transition:all .22s cubic-bezier(.16,1,.3,1)}
 /* Day separators */
@@ -1974,7 +1976,10 @@ async function initPush() {
   if (!pushOK || swReg) return paintBell();
   try { swReg = await navigator.serviceWorker.register('/sw.js'); } catch { return; }
   navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'openChat' && e.data.chatId && me) goChat(e.data.chatId); });
-  if (me && Notification.permission === 'granted') syncPush(); else paintBell();
+  if (me && Notification.permission === 'granted') { syncPush(); }
+  else if (me && Notification.permission === 'default') {
+    Notification.requestPermission().then(p => { if (p === 'granted') syncPush(); else paintBell(); });
+  } else { paintBell(); }
 }
 async function syncPush() { // подписываем это устройство на текущий аккаунт
   if (!swReg || !cfg.vapidKey || !me) return;
@@ -2476,10 +2481,11 @@ function renderHead() {
   const t = typing.has(cur), on = c.peer && c.peer.online;
   const sub = t ? 'печатает…' : c.type === 'group' ? c.members.length + ' участн.' : c.type === 'channel' ? subs(c.subscribers) : (c.peer && c.peer.bot ? 'бот' : on ? 'в сети' : fmtLastSeen(c.peer));
   const isBot = c.type === 'direct' && c.peer && c.peer.bot;
+  const isSaimonChat = c.type === 'direct' && c.peer && c.peer.handle === 'saimon_chat';
   const iBlock = c.type === 'direct' && c.peer && blocked.has(c.peer.id);
   const canWrite = !iBlock && !isBot && (c.type !== 'channel' || c.creator === me.id || c.open); // в канал пишет только автор
   $('#form').hidden = !canWrite; $('#rdonly').hidden = canWrite;
-  if (!canWrite) setHtml($('#rdonly'), isBot ? '<button type="button" class="btn" id="botstart">▶️ Старт</button>' : iBlock ? 'Вы заблокировали этого пользователя · <button class="lnk" id="unb">Разблокировать</button>' : 'Писать в канал может только его автор');
+  if (!canWrite) setHtml($('#rdonly'), isSaimonChat ? '🔒 Системные уведомления' : isBot ? '<button type="button" class="btn" id="botstart">▶️ Старт</button>' : iBlock ? 'Вы заблокировали этого пользователя · <button class="lnk" id="unb">Разблокировать</button>' : 'Писать в канал может только его автор');
   setHtml($('#hd'), cav(c, 's') +
     `<div class="im">${titleH(c)}<small class="${t || on ? 'ty' : ''}">${sub}</small></div>`);
   renderPins();
@@ -3084,7 +3090,18 @@ ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-п�
 </div>
 <div class="tgp-sec">Мои подарки</div><div class="gg tgp-gifts" id="pgifts"></div>
 ${renderAccountSwitcher()}
-<div class="tgp-card"><button type="button" class="tgp-item tgp-danger" id="lo">Выйти из аккаунта</button></div>`;
+<div class="tgp-card"><button type="button" class="tgp-item tgp-danger" id="lo">Выйти из аккаунта</button></div>
+<div class="tgp-sec">Разработчики</div>
+<div class="tgp-card" style="padding:14px 16px">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#3390ec,#8e44ff);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">👨‍💻</div>
+    <div>
+      <div style="font-weight:600;font-size:15px">Семён Овчарук Михайлович</div>
+      <div style="font-size:13px;color:var(--t2)">13 лет · Основатель и разработчик</div>
+    </div>
+  </div>
+</div>
+<div style="text-align:center;font-size:12px;color:var(--t2);padding:10px 0 4px">SAIMON v1.0 · © 2026</div>`;
   } else if (view === 'account') {
     body = `<div class="tgp-head"><div id="pav">${uav(me, 'l')}</div>
 <div class="tgp-photo"><button type="button" class="lnk" id="pph">Сменить фото</button><button type="button" class="lnk" id="prm" ${me.avatar ? '' : 'hidden'}>Убрать</button></div></div>
@@ -3376,29 +3393,30 @@ async function nickColor(body) {
 }
 function userProfile(u) {
   const isMe = u.id === me.id, isBl = blocked.has(u.id);
+  const isSC = u.handle === 'saimon_chat'; // SAIMON-CHAT — только уведомления, без лишних кнопок
   profileModal(`<div class="tgp">
 <div class="tgp-top"><button type="button" class="tgp-back" data-x aria-label="Назад">‹</button><span class="tgp-title">Профиль</span><span class="tgp-sp"></span></div>
 <div class="tgp-head">${uav(u, 'l', true)}
 <h2>${ngName(u)}${u.verified ? BADGE : ''}${u.premium ? PREM_IC : ''}${accH(u.acc)}</h2>
-<div class="tgp-sub">${u.online ? 'в сети' : 'был(а) недавно'}</div>${u.premium ? '<div class="tgp-sub tgp-prem">💎 Премиум пользователь</div>' : ''}
-${u.banned ? '<div class="frozen-note">❄️ Аккаунт заморожен</div>' : ''}${!u.banned && u.pinnedChannel && (chats.get(u.pinnedChannel) || u.pinnedChannelData) ? (() => {const _c=chats.get(u.pinnedChannel)||u.pinnedChannelData;const _av=_c.avatar?'<img src="'+esc(_c.avatar)+'" alt="">':'📢';const _sub=(_c.subscribers||(Array.isArray(_c.members)?_c.members.length:_c.members)||0)+' подп.';const _last=esc((_c.last||'').slice(0,55));const _time=_c.lastAt?fmtTime(_c.lastAt):'';return '<div class="tgp-pin-wrap"><div class="tgp-pin-label">Канал <em>'+_sub+'</em></div><button type="button" class="tgp-pin" data-openchat="'+esc(u.pinnedChannel)+'"><div class="tgp-pin-av">'+_av+'</div><div class="tgp-pin-body"><div class="tgp-pin-row"><span class="tgp-pin-name">'+esc(_c.name)+'</span><span class="tgp-pin-time">'+_time+'</span></div><div class="tgp-pin-msg">'+_last+'</div></div></button></div>';})() : ''}
-${isMe && me.premium ? `<div class="tgp-acts"><button type="button" class="tgp-act" id="myrb"><span>${me.rainbowBorder ? '🌈' : '⭕'}</span>${me.rainbowBorder ? 'Убрать рамку' : 'Рамка'}</button></div>` : ''}${isMe ? '' : `<div class="tgp-acts">
+<div class="tgp-sub">${isSC ? 'Системный бот' : u.online ? 'в сети' : 'был(а) недавно'}</div>${u.premium ? '<div class="tgp-sub tgp-prem">💎 Премиум пользователь</div>' : ''}
+${u.banned ? '<div class="frozen-note">❄️ Аккаунт заморожен</div>' : ''}${!isSC && !u.banned && u.pinnedChannel && (chats.get(u.pinnedChannel) || u.pinnedChannelData) ? (() => {const _c=chats.get(u.pinnedChannel)||u.pinnedChannelData;const _av=_c.avatar?'<img src="'+esc(_c.avatar)+'" alt="">':'📢';const _sub=(_c.subscribers||(Array.isArray(_c.members)?_c.members.length:_c.members)||0)+' подп.';const _last=esc((_c.last||'').slice(0,55));const _time=_c.lastAt?fmtTime(_c.lastAt):'';return '<div class="tgp-pin-wrap"><div class="tgp-pin-label">Канал <em>'+_sub+'</em></div><button type="button" class="tgp-pin" data-openchat="'+esc(u.pinnedChannel)+'"><div class="tgp-pin-av">'+_av+'</div><div class="tgp-pin-body"><div class="tgp-pin-row"><span class="tgp-pin-name">'+esc(_c.name)+'</span><span class="tgp-pin-time">'+_time+'</span></div><div class="tgp-pin-msg">'+_last+'</div></div></button></div>';})() : ''}
+${isMe && me.premium ? `<div class="tgp-acts"><button type="button" class="tgp-act" id="myrb"><span>${me.rainbowBorder ? '🌈' : '⭕'}</span>${me.rainbowBorder ? 'Убрать рамку' : 'Рамка'}</button></div>` : ''}${isMe || isSC ? '' : `<div class="tgp-acts">
 <button type="button" class="tgp-act" id="wr"><span>💬</span>Чат</button>
 <button type="button" class="tgp-act" id="wg"><span>🎁</span>Подарить</button>
 <button type="button" class="tgp-act tgp-danger" id="wb"><span>${isBl ? '✅' : '🚫'}</span>${isBl ? 'Разблокировать' : 'Блок'}</button>
 </div>`}
 <div class="tgp-card">
 ${u.handle ? `<div class="tgp-row"><small>Юзернейм</small><span>@${esc(u.handle)}</span></div>` : ''}
-${(u.others && u.others.length) ? `<div style="padding:2px 16px 10px;font-size:14px;color:var(--t2,#7d8790)">а также ${u.others.map(h => `<a class="alt-link" data-oh="${esc(h)}">@${esc(h)}</a>`).join(', ')}</div>` : ''}
+${(!isSC && u.others && u.others.length) ? `<div style="padding:2px 16px 10px;font-size:14px;color:var(--t2,#7d8790)">а также ${u.others.map(h => `<a class="alt-link" data-oh="${esc(h)}">@${esc(h)}</a>`).join(', ')}</div>` : ''}
 ${u.bio ? `<div class="tgp-row"><small>О себе</small><span>${esc(u.bio)}</span></div>` : ''}
 </div>
-${isMe ? '' : `<div class="tgp-card">
+${isMe || isSC ? '' : `<div class="tgp-card">
 <div class="tgp-row"><small>Имя у себя (видите только вы)</small><input id="cni" maxlength="40" value="${esc(cnames[u.id] || '')}" placeholder="${esc(u.username)}"></div>
 <button type="button" class="tgp-item" id="cns">Сохранить имя</button>
 ${cnames[u.id] ? '<button type="button" class="tgp-item tgp-danger" id="cnr">Убрать имя</button>' : ''}
 </div>`}
-${isMe ? '' : '<div class="tgp-card"><button type="button" class="tgp-item" id="gpr">💎 Подарить подписку SAIMONPREMIYM</button></div>'}
-<div class="tgp-sec">Подарки</div><div class="gg tgp-gifts" id="pgifts"></div>
+${isMe || isSC ? '' : '<div class="tgp-card"><button type="button" class="tgp-item" id="gpr">💎 Подарить подписку SAIMONPREMIYM</button></div>'}
+${isSC ? '' : '<div class="tgp-sec">Подарки</div><div class="gg tgp-gifts" id="pgifts"></div>'}
 </div>`);
   if ($('#myrb')) $('#myrb').onclick = async () => { await toggleRainbow(); userProfile(me); };
   if ($('#wb')) $('#wb').onclick = () => toggleBlock(u, true);
