@@ -1041,17 +1041,16 @@ html[data-theme=dark] #form{background:#17212b}
 .tgp-item.tgp-accent{color:var(--tg-blue,#3390ec);font-weight:500;text-align:center}
 .tgp-sec{padding:14px 20px 6px;color:var(--t2,#7d8790);font-size:13px}
 .tgp-gifts{margin:0 12px}
-/* ===== Сторисы в профиле (стиль Telegram) ===== */
-.stories-bar{display:flex;gap:10px;overflow-x:auto;padding:10px 14px 6px;scrollbar-width:none}
+/* ===== Сторисы в профиле — прямоугольные миниатюры ===== */
+.stories-bar{display:flex;gap:8px;overflow-x:auto;padding:4px 12px 10px;scrollbar-width:none}
 .stories-bar::-webkit-scrollbar{display:none}
 .story-item{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer}
-.story-ring{width:64px;height:64px;border-radius:50%;padding:2.5px;background:linear-gradient(135deg,#f7b733,#fc4a1a,#c471ed,#12c2e9);position:relative;flex-shrink:0}
-.story-ring.seen{background:var(--b,#e5e5ea)}
-.story-ring img,.story-ring video{width:100%;height:100%;border-radius:50%;object-fit:cover;border:2.5px solid #fff;display:block}
-html[data-theme=dark] .story-ring img,html[data-theme=dark] .story-ring video{border-color:#17212b}
-.story-ring .story-add-btn{width:100%;height:100%;border-radius:50%;background:var(--pl,#e7f3ff);border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--tg-blue,#3390ec)}
-html[data-theme=dark] .story-ring .story-add-btn{border-color:#17212b;background:#1e2c3a}
-.story-name{font-size:11px;color:var(--t2,#707579);max-width:64px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.story-thumb{width:72px;height:96px;border-radius:10px;overflow:hidden;position:relative;background:#eee;box-shadow:0 1px 4px rgba(0,0,0,.12);border:2px solid var(--tg-blue,#3390ec)}
+.story-thumb img,.story-thumb video{width:100%;height:100%;object-fit:cover;display:block;border-radius:8px}
+.story-thumb .story-add-btn{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--tg-blue,#3390ec);background:var(--pl,#e7f3ff);border-radius:8px}
+html[data-theme=dark] .story-thumb{background:#1e2c3a;border-color:#3390ec}
+html[data-theme=dark] .story-thumb .story-add-btn{background:#1e2c3a}
+.story-name{font-size:11px;color:var(--t2,#707579);max-width:72px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Просмотрщик сторис (фулскрин) */
 #storyViewer{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column;touch-action:none}
 #storyViewer[hidden]{display:none!important}
@@ -4136,17 +4135,17 @@ function renderStoriesBox(box, stories, uid, isMine) {
   let html = '';
   if (isMine) {
     html += `<div class="story-item" id="story-add-btn">
-      <div class="story-ring"><div class="story-add-btn">＋</div></div>
+      <div class="story-thumb"><div class="story-add-btn">＋</div></div>
       <div class="story-name">Добавить</div>
     </div>`;
   }
   sorted.forEach((s, i) => {
     const isVideo = /\.(mp4|webm|mov)$/.test(s.url);
     const preview = isVideo
-      ? `<video src="${esc(s.url)}" muted preload="metadata" style="width:100%;height:100%;border-radius:50%;object-fit:cover;border:2.5px solid #fff"></video>`
+      ? `<video src="${esc(s.url)}" muted preload="metadata"></video>`
       : `<img src="${esc(s.url)}" alt="Сторис">`;
     html += `<div class="story-item" data-si="${i}">
-      <div class="story-ring">${preview}</div>
+      <div class="story-thumb">${preview}</div>
       <div class="story-name">Сторис ${sorted.length - i}</div>
     </div>`;
   });
@@ -4799,110 +4798,10 @@ function setThemeAndWall(t) {
   }
 })();
 
-/* ===== Сторисы ===== */
-// storyViewer — глобальный фулскрин просмотрщик
-(function(){
-const SV = document.getElementById('storyViewer');
-const SVM = document.getElementById('storyViewerMedia');
-const SVB = document.getElementById('storyViewerBar');
-const SVBi = SVB.querySelector('i');
-const SVClose = document.getElementById('storyViewerClose');
-const SVDel = document.getElementById('storyViewerDel');
-const SVTime = document.getElementById('storyViewerTime');
-let svStories = [], svIdx = 0, svOwner = null, svTimer = null, svProgress = null;
-const STORY_DURATION = 5000;
-
-function fmtAgo(iso) {
-  const d = Date.now() - new Date(iso).getTime(), m = Math.floor(d / 60000), h = Math.floor(d / 3600000);
-  if (m < 1) return 'только что';
-  if (m < 60) return m + ' мин. назад';
-  if (h < 24) return h + ' ч. назад';
-  return new Date(iso).toLocaleDateString('ru-RU');
-}
-
-function stopStory() {
-  clearTimeout(svTimer); clearInterval(svProgress);
-  SVM.querySelectorAll('video').forEach(v => v.pause());
-}
-
-function showStory(idx) {
-  stopStory();
-  if (!svStories.length) return;
-  idx = Math.max(0, Math.min(idx, svStories.length - 1));
-  svIdx = idx;
-  const s = svStories[idx];
-  const isVideo = /\.(mp4|webm|mov)$/.test(s.url);
-  SVM.innerHTML = '';
-  SVBi.style.transition = 'none'; SVBi.style.width = '0';
-  SVTime.textContent = fmtAgo(s.at);
-  if (isVideo) {
-    const v = document.createElement('video');
-    v.src = s.url; v.autoplay = true; v.playsInline = true;
-    v.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
-    v.addEventListener('loadedmetadata', () => {
-      const dur = Math.min(v.duration * 1000, 15000) || STORY_DURATION;
-      startProgress(dur); svTimer = setTimeout(() => nextStory(), dur);
-    });
-    v.addEventListener('error', () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); });
-    SVM.appendChild(v);
-  } else {
-    const img = document.createElement('img');
-    img.src = s.url; img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
-    img.onload = () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); };
-    img.onerror = () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); };
-    SVM.appendChild(img);
-  }
-  SVDel.hidden = !(svOwner && me && svOwner === me.id);
-}
-
-function startProgress(dur) {
-  const start = Date.now();
-  clearInterval(svProgress);
-  requestAnimationFrame(() => { SVBi.style.transition = `width ${dur}ms linear`; SVBi.style.width = '100%'; });
-  svProgress = setInterval(() => {
-    const pct = Math.min(100, ((Date.now() - start) / dur) * 100);
-    if (pct >= 100) clearInterval(svProgress);
-  }, 100);
-}
-
-function nextStory() { if (svIdx + 1 < svStories.length) showStory(svIdx + 1); else closeStoryViewer(); }
-function prevStory() { if (svIdx > 0) showStory(svIdx - 1); else showStory(0); }
-
-function closeStoryViewer() {
-  stopStory(); SV.hidden = true; SVM.innerHTML = ''; svStories = []; svOwner = null;
-}
-
-SVClose.onclick = closeStoryViewer;
-SVDel.onclick = async () => {
-  const s = svStories[svIdx];
-  if (!s || !confirm('Удалить этот сторис?')) return;
-  try {
-    const r = await api('/api/stories/' + s.id, 'DELETE');
-    svStories = r.stories.sort((a, b) => b.at.localeCompare(a.at));
-    if (!svStories.length) { closeStoryViewer(); return; }
-    showStory(Math.min(svIdx, svStories.length - 1));
-    renderProfileStories();
-    toast('Сторис удалён');
-  } catch(x) { toast(x.message); }
-};
-
-// Тап: левая треть — назад, правая — вперёд
-SVM.addEventListener('click', e => {
-  const x = e.clientX, w = SVM.offsetWidth;
-  if (x < w / 3) prevStory(); else nextStory();
-});
-
-window.openStoryViewer = function(stories, ownerUid, startIdx) {
-  svStories = stories.slice().sort((a, b) => b.at.localeCompare(a.at));
-  svOwner = ownerUid;
-  SV.hidden = false;
-  showStory(startIdx || 0);
-};
-window.renderProfileStories = function() {}; // переопределяется ниже
-})();
+window.renderProfileStories = function() {};
 </script>
 
-<!-- Story viewer (fullscreen) -->
+<!-- Story viewer (fullscreen) — должен быть в DOM ДО инициализации JS -->
 <div id="storyViewer" hidden>
   <div id="storyViewerBar"><i></i></div>
   <button id="storyViewerClose">✕</button>
@@ -4910,5 +4809,103 @@ window.renderProfileStories = function() {}; // переопределяется
   <div id="storyViewerMedia"></div>
   <div id="storyViewerTime"></div>
 </div>
+
+<script>
+/* ===== Сторисы: просмотрщик ===== */
+(function(){
+  const SV = document.getElementById('storyViewer');
+  const SVM = document.getElementById('storyViewerMedia');
+  const SVB = document.getElementById('storyViewerBar');
+  const SVBi = SVB ? SVB.querySelector('i') : null;
+  const SVClose = document.getElementById('storyViewerClose');
+  const SVDel = document.getElementById('storyViewerDel');
+  const SVTime = document.getElementById('storyViewerTime');
+  if (!SV || !SVM || !SVBi || !SVClose || !SVDel) return;
+
+  let svStories = [], svIdx = 0, svOwner = null, svTimer = null, svProgress = null;
+  const STORY_DURATION = 5000;
+
+  function fmtAgo(iso) {
+    const d = Date.now() - new Date(iso).getTime(), m = Math.floor(d / 60000), h = Math.floor(d / 3600000);
+    if (m < 1) return 'только что';
+    if (m < 60) return m + ' мин. назад';
+    if (h < 24) return h + ' ч. назад';
+    return new Date(iso).toLocaleDateString('ru-RU');
+  }
+
+  function stopStory() {
+    clearTimeout(svTimer); clearInterval(svProgress);
+    SVM.querySelectorAll('video').forEach(v => v.pause());
+  }
+
+  function showStory(idx) {
+    stopStory();
+    if (!svStories.length) return;
+    idx = Math.max(0, Math.min(idx, svStories.length - 1));
+    svIdx = idx;
+    const s = svStories[idx];
+    const isVideo = /\.(mp4|webm|mov)$/.test(s.url);
+    SVM.innerHTML = '';
+    SVBi.style.transition = 'none'; SVBi.style.width = '0';
+    if (SVTime) SVTime.textContent = fmtAgo(s.at);
+    if (isVideo) {
+      const v = document.createElement('video');
+      v.src = s.url; v.autoplay = true; v.playsInline = true;
+      v.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
+      v.addEventListener('loadedmetadata', () => {
+        const dur = Math.min(v.duration * 1000, 15000) || STORY_DURATION;
+        startProgress(dur); svTimer = setTimeout(() => nextStory(), dur);
+      });
+      v.addEventListener('error', () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); });
+      SVM.appendChild(v);
+    } else {
+      const img = document.createElement('img');
+      img.src = s.url; img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
+      img.onload = () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); };
+      img.onerror = () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); };
+      SVM.appendChild(img);
+    }
+    SVDel.hidden = !(svOwner != null && typeof me !== 'undefined' && svOwner === me.id);
+  }
+
+  function startProgress(dur) {
+    clearInterval(svProgress);
+    requestAnimationFrame(() => { SVBi.style.transition = `width ${dur}ms linear`; SVBi.style.width = '100%'; });
+  }
+
+  function nextStory() { if (svIdx + 1 < svStories.length) showStory(svIdx + 1); else closeStoryViewer(); }
+  function prevStory() { if (svIdx > 0) showStory(svIdx - 1); else showStory(0); }
+
+  function closeStoryViewer() {
+    stopStory(); SV.hidden = true; SVM.innerHTML = ''; svStories = []; svOwner = null;
+  }
+
+  SVClose.onclick = closeStoryViewer;
+  SVDel.onclick = async () => {
+    const s = svStories[svIdx];
+    if (!s || !confirm('Удалить этот сторис?')) return;
+    try {
+      const r = await api('/api/stories/' + s.id, 'DELETE');
+      svStories = (r.stories || []).sort((a, b) => b.at.localeCompare(a.at));
+      if (!svStories.length) { closeStoryViewer(); window.renderProfileStories(); return; }
+      showStory(Math.min(svIdx, svStories.length - 1));
+      window.renderProfileStories();
+      toast('Сторис удалён');
+    } catch(x) { toast(x.message); }
+  };
+
+  SVM.addEventListener('click', e => {
+    const x = e.clientX, w = SVM.offsetWidth;
+    if (x < w / 3) prevStory(); else nextStory();
+  });
+
+  window.openStoryViewer = function(stories, ownerUid, startIdx) {
+    svStories = stories.slice().sort((a, b) => b.at.localeCompare(a.at));
+    svOwner = ownerUid;
+    SV.hidden = false;
+    showStory(startIdx || 0);
+  };
+})();
+</script>
 
 </body>
