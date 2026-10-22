@@ -41,7 +41,8 @@ const F = {
     chats: path.join(DIR, 'chats.json'),
     gifts: path.join(DIR, 'gifts.json'),
     sessions: path.join(DIR, 'sessions.json'),
-    blocks: path.join(DIR, 'blocks.json')
+    blocks: path.join(DIR, 'blocks.json'),
+    stickerPacks: path.join(DIR, 'sticker_packs.json')
 };
 
 // ---- Хранение ----
@@ -455,6 +456,111 @@ function shape(chat, me, users, list) {
 }
 const one = (chat, me) => shape(chat, me, read(F.users), read(F.messages).filter(m => m.chatId === chat.id));
 
+// ---------- Стикер-паки ----------
+
+// Получить все публичные паки + свои
+app.get('/api/sticker-packs', (req, res) => {
+    const uid = req.uid;
+    const packs = read(F.stickerPacks);
+    // Паки: авторские (созданные мной) + те, что я добавил в коллекцию
+    const users = read(F.users);
+    const result = packs.map(p => {
+        const author = users.find(u => u.id === p.authorId);
+        return {
+            id: p.id,
+            name: p.name,
+            emoji: p.emoji || '🎭',
+            authorId: p.authorId,
+            authorName: author ? author.username : 'Удалён',
+            stickers: p.stickers || [],
+            collectors: p.collectors || [],
+            isMine: p.authorId === uid,
+            isCollected: (p.collectors || []).includes(uid)
+        };
+    }).filter(p => p.isMine || p.isCollected || true); // все пубичные паки видны всем
+    res.json(result);
+});
+
+// Создать новый пак
+app.post('/api/sticker-packs', (req, res) => {
+    const uid = req.uid;
+    const name = String(req.body.name || '').trim().slice(0, 48);
+    const emoji = String(req.body.emoji || '🎭').slice(0, 8);
+    if (!name) return res.status(400).json({ error: 'Укажите название пака' });
+    const packs = read(F.stickerPacks);
+    const pack = {
+        id: crypto.randomUUID(),
+        name,
+        emoji,
+        authorId: uid,
+        stickers: [],
+        collectors: [],
+        createdAt: new Date().toISOString()
+    };
+    packs.push(pack);
+    write(F.stickerPacks, packs);
+    res.json({ id: pack.id, name: pack.name, emoji: pack.emoji });
+});
+
+// Добавить стикер в пак
+app.post('/api/sticker-packs/:id/stickers', (req, res) => {
+    const uid = req.uid;
+    const packs = read(F.stickerPacks);
+    const pack = packs.find(p => p.id === req.params.id);
+    if (!pack) return res.status(404).json({ error: 'Пак не найден' });
+    if (pack.authorId !== uid) return res.status(403).json({ error: 'Только автор может добавлять стикеры' });
+    const url = String(req.body.url || '');
+    if (!fileOk(url)) return res.status(400).json({ error: 'Неверный файл' });
+    if ((pack.stickers || []).length >= 100) return res.status(400).json({ error: 'Максимум 100 стикеров в паке' });
+    pack.stickers = pack.stickers || [];
+    pack.stickers.push({ url, id: crypto.randomUUID() });
+    write(F.stickerPacks, packs);
+    res.json({ ok: true });
+});
+
+// Удалить стикер из пака
+app.delete('/api/sticker-packs/:id/stickers/:sid', (req, res) => {
+    const uid = req.uid;
+    const packs = read(F.stickerPacks);
+    const pack = packs.find(p => p.id === req.params.id);
+    if (!pack) return res.status(404).json({ error: 'Пак не найден' });
+    if (pack.authorId !== uid) return res.status(403).json({ error: 'Только автор может удалять стикеры' });
+    pack.stickers = (pack.stickers || []).filter(s => s.id !== req.params.sid);
+    write(F.stickerPacks, packs);
+    res.json({ ok: true });
+});
+
+// Добавить пак в коллекцию / убрать
+app.post('/api/sticker-packs/:id/collect', (req, res) => {
+    const uid = req.uid;
+    const packs = read(F.stickerPacks);
+    const pack = packs.find(p => p.id === req.params.id);
+    if (!pack) return res.status(404).json({ error: 'Пак не найден' });
+    if (pack.authorId === uid) return res.status(400).json({ error: 'Это ваш пак' });
+    pack.collectors = pack.collectors || [];
+    const idx = pack.collectors.indexOf(uid);
+    if (idx >= 0) {
+        pack.collectors.splice(idx, 1);
+        write(F.stickerPacks, packs);
+        return res.json({ collected: false });
+    }
+    pack.collectors.push(uid);
+    write(F.stickerPacks, packs);
+    res.json({ collected: true });
+});
+
+// Удалить пак (только автор)
+app.delete('/api/sticker-packs/:id', (req, res) => {
+    const uid = req.uid;
+    const packs = read(F.stickerPacks);
+    const idx = packs.findIndex(p => p.id === req.params.id);
+    if (idx < 0) return res.status(404).json({ error: 'Пак не найден' });
+    if (packs[idx].authorId !== uid) return res.status(403).json({ error: 'Только автор может удалить пак' });
+    packs.splice(idx, 1);
+    write(F.stickerPacks, packs);
+    res.json({ ok: true });
+});
+
 // ---------- Загрузка файлов ----------
 app.post('/api/upload', express.raw({ type: () => true, limit: '50mb' }), async (req, res) => {
     const uid = Number(req.query.userId);
@@ -751,7 +857,20 @@ app.put('/api/profile/:id', (req, res) => {
         const h = String(handle).trim().replace(/^@/, '').toLowerCase();
         if (!HANDLE_RE.test(h)) return res.status(400).json({ error: 'Юзернейм: 3–20 символов, латиница, цифры и _' });
         if (handleTaken(users, h, u.id)) return res.status(400).json({ error: 'Этот юзернейм уже занят' });
+        // Обновляем массив handles: новый handle становится основным (первым),
+        // старый остаётся в массиве только если он уже там был (куплен ранее)
+        const oldHandle = u.handle;
         u.handle = h;
+        syncHandles(u);
+        // Новый handle в начало списка
+        u.handles = u.handles.filter(x => x !== h);
+        u.handles.unshift(h);
+        // Старый handle убираем из списка если это был просто «активный», а не купленный отдельно
+        // (купленные хранятся в handleBuys). Если он не в handleBuys и не был куплен — не дублируем.
+        const boughtHandles = Object.keys(u.handleBuys || {});
+        if (!boughtHandles.includes(oldHandle) && oldHandle !== h) {
+            u.handles = u.handles.filter(x => x !== oldHandle);
+        }
     }
     if (bio !== undefined) u.bio = String(bio).slice(0, 200);
     if (avatar !== undefined) {
@@ -2397,7 +2516,17 @@ wss.on('connection', ws => {
                 }
                 const text = String(m.text || '').trim().slice(0, 4000);
                 let media;
-                if (m.media && fileOk(m.media.url)) {
+                // Альбом (несколько фото/видео)
+                if (m.album && Array.isArray(m.album) && m.album.length > 1) {
+                    const items = m.album.slice(0, 10).filter(a => a && fileOk(a.url)).map(a => {
+                        const item = { kind: kindOf(a.url), url: a.url };
+                        const w = Number(a.w), h = Number(a.h);
+                        if (w > 0 && h > 0 && w < 20000 && h < 20000) { item.w = Math.round(w); item.h = Math.round(h); }
+                        return item;
+                    });
+                    if (items.length > 1) media = { kind: 'album', urls: items };
+                    else if (items.length === 1) media = { kind: items[0].kind, url: items[0].url, w: items[0].w, h: items[0].h };
+                } else if (m.media && fileOk(m.media.url)) {
                     const isSticker = m.media.sticker === true || m.media.kind === 'sticker';
                     media = { kind: isSticker ? 'sticker' : kindOf(m.media.url), url: m.media.url };
                     if (isSticker) media.sticker = true;
@@ -2533,7 +2662,7 @@ async function init() {
         });
     }
     // Чего нет в базе (первый запуск) — берём из локальных файлов, иначе пустой список
-    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks']) {
+    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks', 'stickerPacks']) {
         if (mem[k] === undefined) {
             const d = loadFile(F[k]);
             mem[k] = JSON.stringify((k === 'sessions' || k === 'blocks') && Array.isArray(d) ? {} : d); // объекты {токен: …}, {кто: [кого]}

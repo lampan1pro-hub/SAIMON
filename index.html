@@ -372,6 +372,10 @@ h2 .acc,.cmn .acc{margin-left:6px}
 a.hndl{color:var(--p);font-weight:600;cursor:pointer;text-decoration:none}
 a.hndl:hover{text-decoration:underline}
 .m.me a.hndl{color:inherit;text-decoration:underline}
+a.msg-link{color:var(--p);text-decoration:none;word-break:break-all}
+a.msg-link:hover{text-decoration:underline}
+.m.me a.msg-link{color:#b6e8ff}
+.m.me a.msg-link:hover{text-decoration:underline}
 h2 .acc{width:26px;height:26px;font-size:16px}
 #acctip{position:fixed;z-index:80;padding:7px 14px;border-radius:18px;background:rgba(60,60,64,.92);color:#fff;font-size:14px;font-weight:600;pointer-events:none;animation:popIn .15s ease-out;white-space:nowrap}
 .gc .gworn{position:absolute;top:6px;left:8px;font-size:13px}
@@ -564,8 +568,8 @@ html[data-theme=dark] #recbar{background:#242f3d}
 .stk-pack-new{font-size:22px;opacity:.6}
 .stk-pack-new:hover{opacity:1}
 /* Модалка создания пака */
-#stkModal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;justify-content:center}
-#stkModal[hidden]{display:none!important}
+#stkModal,#stkEditModal,#stkViewModal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+#stkModal[hidden],#stkEditModal[hidden],#stkViewModal[hidden]{display:none!important}
 .stk-sheet{background:var(--bg,#fff);border-radius:18px 18px 0 0;padding:20px 20px 32px;width:100%;max-width:480px;max-height:80dvh;display:flex;flex-direction:column;gap:12px;animation:slideUp .3s var(--ease-out)}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
 .stk-grid-edit{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;overflow-y:auto;max-height:200px}
@@ -577,6 +581,18 @@ html[data-theme=dark] .stk-sheet{background:var(--bg,#17212b)}
 .m.stk img.ph{width:130px!important;height:130px!important;border-radius:0!important;object-fit:contain;background:transparent!important}
 .m.stk time{color:rgba(255,255,255,.7);text-shadow:0 1px 3px rgba(0,0,0,.5);position:absolute;bottom:4px;right:6px}
 .m.stk{position:relative}
+/* ===== Альбом (несколько фото/видео) ===== */
+.album{display:grid;gap:3px;border-radius:14px;overflow:hidden;cursor:pointer;max-width:340px;position:relative}
+.album.a1{grid-template-columns:1fr}
+.album.a2{grid-template-columns:1fr 1fr}
+.album.a3{grid-template-columns:1fr 1fr;grid-template-rows:auto auto}
+.album.a4{grid-template-columns:1fr 1fr}
+.album img,.album video{width:100%;height:140px;object-fit:cover;display:block}
+.album.a1 img,.album.a1 video{height:auto;max-height:400px;object-fit:contain;background:#000}
+.album.a2 img,.album.a2 video{height:160px}
+.album .alb-first{grid-column:1/-1}
+.album .alb-first img,.album .alb-first video{height:220px}
+.album .alb-more{position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,.6);color:#fff;border-radius:10px;padding:2px 8px;font-size:13px;font-weight:600;pointer-events:none}
 html[data-theme=dark] #emobar,html[data-theme=dark] .emo-tabs{background:var(--bg,#17212b);border-color:#2a3a4a}
 
 /* ===== Обои чатов: темная/светлая тема ===== */
@@ -1353,7 +1369,60 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
 <div id="replybar" hidden><span id="replytxt"></span><button type="button" class="ib" id="rcancel" aria-label="Отменить ответ">✕</button></div>
       <div id="pend" hidden></div>
       <div id="recbar" hidden>🔴 <b class="rt">0:00</b><span>Тапни 🎤 ещё раз — отправить</span><button type="button" class="ib" id="recx" aria-label="Отменить запись">✕</button></div>
-      <div id="emobar" hidden><div class="emo-tabs"><button type="button" class="emo-tab on" data-tab="emoji">😊 Эмодзи</button><button type="button" class="emo-tab" data-tab="stickers">🎭 Стикеры</button></div><div class="emo-body" id="emoEmoji"></div><div class="stk-body" id="emoStickers" hidden></div></div>
+      <div id="emobar" hidden><div class="emo-tabs"><button type="button" class="emo-tab on" data-tab="emoji">😊 Эмодзи</button><button type="button" class="emo-tab" data-tab="stickers">🎭 Стикеры</button></div><div class="emo-body" id="emoEmoji"></div><div id="stkPanel" hidden><div class="stk-packs" id="stkPackTabs"></div><div class="stk-body" id="emoStickers"></div></div></div>
+
+<!-- Модальное окно стикер-паков -->
+<div id="stkModal" hidden>
+  <div class="stk-sheet">
+    <div style="display:flex;align-items:center;gap:10px">
+      <b id="stkModalTitle" style="flex:1;font-size:17px">Мои стикер-паки</b>
+      <button type="button" class="ib" id="stkModalClose">✕</button>
+    </div>
+    <!-- Список моих паков + кнопка создать -->
+    <div id="stkMyPacks" style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:50dvh"></div>
+    <button type="button" class="btn" id="stkCreateBtn">+ Создать новый пак</button>
+
+    <!-- Форма создания пака (скрыта по умолчанию) -->
+    <div id="stkCreateForm" hidden style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--b);padding-top:12px">
+      <b style="font-size:15px">Новый стикер-пак</b>
+      <div class="f" style="margin:0"><label>Название</label><input id="stkPackName" type="text" placeholder="Мои стикеры" maxlength="48"></div>
+      <div class="f" style="margin:0"><label>Иконка (эмодзи)</label><input id="stkPackEmoji" type="text" placeholder="🎭" maxlength="8" style="width:80px"></div>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn g" id="stkCreateCancel">Отмена</button>
+        <button type="button" class="btn" id="stkCreateSave">Создать</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно редактирования пака -->
+<div id="stkEditModal" hidden>
+  <div class="stk-sheet">
+    <div style="display:flex;align-items:center;gap:10px">
+      <b id="stkEditTitle" style="flex:1;font-size:17px">Редактировать пак</b>
+      <button type="button" class="ib" id="stkEditClose">✕</button>
+    </div>
+    <div class="stk-grid-edit" id="stkEditGrid"></div>
+    <label class="btn" style="text-align:center;cursor:pointer">
+      ➕ Добавить стикер
+      <input type="file" id="stkAddFile" accept="image/*" hidden>
+    </label>
+    <button type="button" class="btn r" id="stkDeletePack">🗑 Удалить пак</button>
+  </div>
+</div>
+
+<!-- Модальное окно просмотра чужого пака -->
+<div id="stkViewModal" hidden>
+  <div class="stk-sheet">
+    <div style="display:flex;align-items:center;gap:10px">
+      <b id="stkViewTitle" style="flex:1;font-size:17px"></b>
+      <button type="button" class="ib" id="stkViewClose">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--t2)" id="stkViewAuthor"></div>
+    <div class="stk-grid-edit" id="stkViewGrid" style="max-height:260px"></div>
+    <button type="button" class="btn" id="stkCollectBtn">➕ Добавить в мои паки</button>
+  </div>
+</div>
       <form id="form">
         <button type="button" class="ib" id="emojiBtn" aria-label="Эмодзи" title="Эмодзи"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 13s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
         <textarea id="inp" rows="1" placeholder="Сообщение" enterkeyhint="send"></textarea>
@@ -1380,7 +1449,7 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
           </mask>
         </defs>
         <rect width="100" height="100" fill="rgba(0,0,0,.6)" mask="url(#cropMask)"/>
-        <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".5"/>
+        <circle id="cropCircleBorder" cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".5"/>
       </svg>
     </div>
     <div id="cropHint">Двигайте и масштабируйте фото</div>
@@ -2376,7 +2445,7 @@ function updateTicks() {
 }
 
 /* ---------- Список чатов и поиск ---------- */
-const mlabel = m => m.fwd ? '↪️ Пересланное сообщение' : m.gift ? '🎁 Подарок' : m.prem ? '💎 Подписка' : m.media ? (m.media.kind === 'video' ? '🎥 Видео' : m.media.kind === 'voice' ? '🎤 Голосовое' : m.media.kind === 'sticker' ? '🎭 Стикер' : '📷 Фото') : '';
+const mlabel = m => m.fwd ? '↪️ Пересланное сообщение' : m.gift ? '🎁 Подарок' : m.prem ? '💎 Подписка' : m.media ? (m.media.kind === 'video' ? '🎥 Видео' : m.media.kind === 'voice' ? '🎤 Голосовое' : m.media.kind === 'sticker' ? '🎭 Стикер' : m.media.kind === 'album' ? `🖼 Альбом (${(m.media.urls||[]).length})` : '📷 Фото') : '';
 function preview(c) {
   const l = c.last;
   if (!l) return c.type === 'group' ? c.members.length + ' участн.' : c.type === 'channel' ? subs(c.subscribers) : 'Нет сообщений';
@@ -2536,6 +2605,26 @@ const mediaHtml = md => {
   if (md.kind === 'voice') // голосовое: круглая кнопка, полоса прогресса, таймер
     return `<div class="vc" data-u="${esc(md.url)}"><button type="button" class="vcb" aria-label="Прослушать">▶</button><div class="vcb2"><div class="vctr"><div class="vcbar"><i></i></div></div><span class="vct" data-d="${md.dur || 0}">${fmtDur(md.dur)}</span></div></div>`;
   if (md.sticker) return `<img class="ph" src="${esc(md.url)}" alt="стикер" loading="lazy" decoding="async" style="width:130px;height:130px;object-fit:contain;background:transparent">`;
+  if (md.kind === 'album' && md.urls && md.urls.length > 1) {
+    const items = md.urls;
+    const n = items.length;
+    const shown = Math.min(n, 4); // показываем до 4, остальные скрываем
+    const cls = `album a${Math.min(n, 4)}`;
+    const urlsJson = esc(JSON.stringify(items.map(i => i.url)));
+    let html = `<div class="${cls}" data-album="${urlsJson}">`;
+    items.slice(0, shown).forEach((item, idx) => {
+      const isFirst = n === 3 && idx === 0;
+      const isV = item.kind === 'video';
+      html += `<div class="${isFirst ? 'alb-first' : ''}">`;
+      html += isV
+        ? `<video src="${esc(item.url)}" muted playsinline preload="metadata" loading="lazy"></video>`
+        : `<img src="${esc(item.url)}" alt="Фото ${idx+1}" loading="lazy" decoding="async">`;
+      html += '</div>';
+    });
+    if (n > 4) html += `<div class="alb-more">+${n - 4}</div>`;
+    html += '</div>';
+    return html;
+  }
   const ar = md.w && md.h ? `aspect-ratio:${md.w}/${md.h};` : '';
   return md.kind === 'video'
     ? `<video src="${esc(md.url)}" controls playsinline preload="metadata" style="${ar}"></video>`
@@ -2632,7 +2721,15 @@ function bubbleHtml(c, l, i) {
 }
 // @юзернеймы в тексте — кликабельные (ищут и «второстепенные» handles)
 const HNDL_RE = /(^|[^a-zA-Z0-9_])@([a-z0-9_]{3,20})/g;
-const linkify = t => esc(t).replace(HNDL_RE, (m, p, h) => `${p}<a class="hndl" data-h="${h}">@${h}</a>`);
+const URL_LINK_RE = /https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?()[\]{}]/g;
+function linkify(t) {
+  // Сначала экранируем HTML, затем делаем ссылки кликабельными
+  const escaped = esc(t);
+  // Заменяем URL → <a href>
+  const withLinks = escaped.replace(URL_LINK_RE, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="msg-link">${url}</a>`);
+  // Заменяем @mention → кликабельный хэндл
+  return withLinks.replace(HNDL_RE, (m, p, h) => `${p}<a class="hndl" data-h="${h}">@${h}</a>`);
+}
 async function openByHandle(h) {
   try { userProfile(await api('/api/users/by-handle?h=' + encodeURIComponent(h))); }
   catch (x) { toast(x.message); }
@@ -2834,18 +2931,240 @@ const STICKERS = [
 ];
 // Заполняем эмодзи
 $('#emoEmoji').innerHTML = EMOJIS.map(x => `<button type="button">${x}</button>`).join('');
-// Заполняем стикеры
-$('#emoStickers').innerHTML = STICKERS.map((_,i) => `<button type="button" data-stk="${i}"><img data-si="${i}" alt="стикер"></button>`).join('');
-// Назначаем src отдельно чтобы data:URI не экранировался
-$('#emoStickers').querySelectorAll('img[data-si]').forEach(img => {
-  img.src = 'data:image/png;base64,' + STICKERS[+img.dataset.si];
-});
-// Вкладки
+
+// ===== Стикер-паки =====
+let stkPacks = []; // [{id, name, emoji, authorId, authorName, stickers:[{id,url}], isMine, isCollected}]
+let stkActivePack = null; // id активного пака
+
+async function loadStickerPacks() {
+  try {
+    const r = await fetch('/api/sticker-packs', {headers:{Authorization:'Bearer '+tok}});
+    stkPacks = await r.json();
+    renderStkPackTabs();
+    if (stkActivePack) showStkPack(stkActivePack);
+    else if (stkPacks.length) showStkPack(stkPacks[0].id);
+  } catch(e) { console.error('loadStickerPacks', e); }
+}
+
+function renderStkPackTabs() {
+  const tabs = $('#stkPackTabs');
+  // Мои паки + добавленные в коллекцию
+  const myPacks = stkPacks.filter(p => p.isMine || p.isCollected);
+  tabs.innerHTML = myPacks.map(p =>
+    `<button type="button" class="stk-pack-btn${stkActivePack===p.id?' on':''}" data-pid="${p.id}" title="${p.name}">${p.emoji}</button>`
+  ).join('') +
+  // Кнопка управления паками
+  `<button type="button" class="stk-pack-btn stk-pack-new" id="stkMgrBtn" title="Управление паками">⚙️</button>`;
+}
+
+function showStkPack(packId) {
+  stkActivePack = packId;
+  const pack = stkPacks.find(p => p.id === packId);
+  const grid = $('#emoStickers');
+  if (!pack) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--t2);font-size:13px;padding:20px">Нет стикеров</div>'; return; }
+  grid.innerHTML = pack.stickers.map(s =>
+    `<button type="button" data-surl="${s.url}"><img src="${s.url}" alt="стикер" loading="lazy"></button>`
+  ).join('') + (pack.stickers.length === 0 ? `<div style="grid-column:1/-1;text-align:center;color:var(--t2);font-size:13px;padding:20px">${pack.isMine ? 'Добавьте стикеры ➕' : 'Пак пустой'}</div>` : '');
+  // Обновить подсветку таба
+  $('#stkPackTabs').querySelectorAll('.stk-pack-btn').forEach(b => b.classList.toggle('on', b.dataset.pid === packId));
+}
+
+// Клик по табу пака
+$('#stkPackTabs').onclick = e => {
+  const btn = e.target.closest('[data-pid]');
+  if (btn) { showStkPack(btn.dataset.pid); return; }
+  if (e.target.closest('#stkMgrBtn')) { openStkManager(); }
+};
+
+// Отправка стикера из пака
+$('#emoStickers').onclick = async e => {
+  const btn = e.target.closest('[data-surl]'); if (!btn) return;
+  if (!cur) return;
+  $('#emobar').hidden = true;
+  const url = btn.dataset.surl;
+  try {
+    let sw = 160, sh = 160;
+    try {
+      const res = await fetch(url); const blob = await res.blob();
+      const bm = await createImageBitmap(blob); sw = bm.width; sh = bm.height; bm.close();
+    } catch {}
+    sendNow('', {kind:'sticker', url, w:sw, h:sh, sticker:true});
+  } catch(x) { toast('Ошибка: '+x.message); }
+};
+
+// ---- Менеджер паков ----
+function openStkManager() {
+  renderMyPacks();
+  $('#stkModal').hidden = false;
+  $('#stkCreateForm').hidden = true;
+}
+$('#stkModalClose').onclick = () => { $('#stkModal').hidden = true; };
+$('#stkModal').onclick = e => { if (e.target === $('#stkModal')) $('#stkModal').hidden = true; };
+
+function renderMyPacks() {
+  const myPacks = stkPacks.filter(p => p.isMine || p.isCollected);
+  const allOthers = stkPacks.filter(p => !p.isMine && !p.isCollected);
+  const cont = $('#stkMyPacks');
+  cont.innerHTML = '';
+
+  if (myPacks.length === 0 && allOthers.length === 0) {
+    cont.innerHTML = '<div style="color:var(--t2);font-size:14px;text-align:center;padding:12px">У вас пока нет стикер-паков</div>';
+  }
+
+  myPacks.forEach(p => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:14px;cursor:pointer';
+    div.innerHTML = `<span style="font-size:24px">${p.emoji}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:15px">${esc(p.name)}</div>
+        <div style="font-size:12px;color:var(--t2)">${p.stickers.length} стикер(ов)${p.isMine ? ' · Мой пак' : ' · Добавлен'}</div>
+      </div>
+      ${p.isMine ? `<button type="button" class="ib" data-edit="${p.id}" title="Редактировать">✏️</button>` : `<button type="button" class="ib" data-uncollect="${p.id}" title="Убрать">✕</button>`}`;
+    div.querySelector('[data-edit]')?.addEventListener('click', e => { e.stopPropagation(); openStkEdit(p.id); });
+    div.querySelector('[data-uncollect]')?.addEventListener('click', async e => {
+      e.stopPropagation();
+      await fetch('/api/sticker-packs/'+p.id+'/collect', {method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:'{}'});
+      await loadStickerPacks(); renderMyPacks();
+    });
+    div.addEventListener('click', () => { showStkPack(p.id); $('#stkModal').hidden = true; });
+    cont.appendChild(div);
+  });
+
+  if (allOthers.length) {
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:13px;color:var(--t2);font-weight:600;padding:4px 2px';
+    lbl.textContent = 'Паки других пользователей';
+    cont.appendChild(lbl);
+    allOthers.forEach(p => {
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:14px;cursor:pointer';
+      div.innerHTML = `<span style="font-size:24px">${p.emoji}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:15px">${esc(p.name)}</div>
+          <div style="font-size:12px;color:var(--t2)">${p.stickers.length} стикер(ов) · от ${esc(p.authorName)}</div>
+        </div>
+        <button type="button" class="btn" style="width:auto;padding:6px 12px;font-size:13px" data-view="${p.id}">Смотреть</button>`;
+      div.querySelector('[data-view]').addEventListener('click', e => { e.stopPropagation(); openStkView(p.id); });
+      cont.appendChild(div);
+    });
+  }
+}
+
+// Создание нового пака
+$('#stkCreateBtn').onclick = () => { $('#stkCreateForm').hidden = false; $('#stkPackName').focus(); };
+$('#stkCreateCancel').onclick = () => { $('#stkCreateForm').hidden = true; };
+$('#stkCreateSave').onclick = async () => {
+  const name = $('#stkPackName').value.trim();
+  const emoji = $('#stkPackEmoji').value.trim() || '🎭';
+  if (!name) { toast('Введите название'); return; }
+  try {
+    const r = await fetch('/api/sticker-packs', {method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify({name,emoji})});
+    const d = await r.json();
+    if (!r.ok) { toast(d.error||'Ошибка'); return; }
+    $('#stkPackName').value = ''; $('#stkPackEmoji').value = '';
+    $('#stkCreateForm').hidden = true;
+    await loadStickerPacks();
+    renderMyPacks();
+    toast('Пак создан! Добавьте стикеры ✏️');
+    openStkEdit(d.id);
+  } catch(e) { toast('Ошибка'); }
+};
+
+// ---- Редактор пака ----
+let stkEditId = null;
+function openStkEdit(packId) {
+  stkEditId = packId;
+  const pack = stkPacks.find(p => p.id === packId);
+  if (!pack) return;
+  $('#stkEditTitle').textContent = pack.emoji + ' ' + pack.name;
+  renderStkEditGrid(pack);
+  $('#stkEditModal').hidden = false;
+  $('#stkModal').hidden = true;
+}
+$('#stkEditClose').onclick = () => { $('#stkEditModal').hidden = true; openStkManager(); };
+$('#stkEditModal').onclick = e => { if (e.target === $('#stkEditModal')) { $('#stkEditModal').hidden = true; openStkManager(); } };
+
+function renderStkEditGrid(pack) {
+  const grid = $('#stkEditGrid');
+  grid.innerHTML = pack.stickers.map(s =>
+    `<button type="button" data-sid="${s.id}" style="position:relative">
+      <img src="${s.url}" alt="стикер">
+      <span class="stk-del" title="Удалить">✕</span>
+    </button>`
+  ).join('');
+  grid.onclick = async e => {
+    const btn = e.target.closest('[data-sid]'); if (!btn) return;
+    const sid = btn.dataset.sid;
+    if (!confirm('Удалить стикер?')) return;
+    await fetch('/api/sticker-packs/'+stkEditId+'/stickers/'+sid, {method:'DELETE',headers:{Authorization:'Bearer '+tok}});
+    await loadStickerPacks();
+    const p = stkPacks.find(x => x.id === stkEditId);
+    if (p) renderStkEditGrid(p);
+  };
+}
+
+// Добавление стикера в пак через загрузку файла
+$('#stkAddFile').onchange = async e => {
+  const file = e.target.files[0]; if (!file) return;
+  e.target.value = '';
+  if (!file.type.startsWith('image/')) { toast('Только изображения'); return; }
+  if (file.size > 5*1024*1024) { toast('Максимум 5 МБ'); return; }
+  try {
+    toast('Загружаю…');
+    const up = await upload(file, 'media');
+    const r = await fetch('/api/sticker-packs/'+stkEditId+'/stickers', {
+      method:'POST', headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},
+      body:JSON.stringify({url:up.url})
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error||'Ошибка'); return; }
+    await loadStickerPacks();
+    const p = stkPacks.find(x => x.id === stkEditId);
+    if (p) renderStkEditGrid(p);
+    toast('Стикер добавлен!');
+  } catch(e) { toast('Ошибка загрузки'); }
+};
+
+// Удалить пак
+$('#stkDeletePack').onclick = async () => {
+  if (!confirm('Удалить пак и все стикеры в нём?')) return;
+  await fetch('/api/sticker-packs/'+stkEditId, {method:'DELETE',headers:{Authorization:'Bearer '+tok}});
+  await loadStickerPacks();
+  $('#stkEditModal').hidden = true;
+  openStkManager();
+  toast('Пак удалён');
+};
+
+// ---- Просмотр чужого пака ----
+let stkViewId = null;
+function openStkView(packId) {
+  stkViewId = packId;
+  const pack = stkPacks.find(p => p.id === packId);
+  if (!pack) return;
+  $('#stkViewTitle').textContent = pack.emoji + ' ' + pack.name;
+  $('#stkViewAuthor').textContent = 'Автор: ' + pack.authorName + ' · ' + pack.stickers.length + ' стикер(ов)';
+  $('#stkViewGrid').innerHTML = pack.stickers.map(s => `<button type="button" style="pointer-events:none"><img src="${s.url}" alt="стикер"></button>`).join('');
+  const btn = $('#stkCollectBtn');
+  btn.textContent = pack.isCollected ? '✓ Уже в коллекции' : '➕ Добавить в мои паки';
+  btn.disabled = pack.isCollected;
+  $('#stkViewModal').hidden = false;
+  $('#stkModal').hidden = true;
+}
+$('#stkViewClose').onclick = () => { $('#stkViewModal').hidden = true; openStkManager(); };
+$('#stkViewModal').onclick = e => { if (e.target === $('#stkViewModal')) { $('#stkViewModal').hidden = true; openStkManager(); } };
+$('#stkCollectBtn').onclick = async () => {
+  const r = await fetch('/api/sticker-packs/'+stkViewId+'/collect', {method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:'{}'});
+  const d = await r.json();
+  if (d.collected) { toast('Пак добавлен в коллекцию!'); await loadStickerPacks(); $('#stkViewModal').hidden = true; openStkManager(); }
+};
+
+// Вкладки эмодзи/стикеры
 $('.emo-tabs').onclick = e => {
   const tab = e.target.closest('[data-tab]'); if (!tab) return;
   document.querySelectorAll('.emo-tab').forEach(t => t.classList.toggle('on', t === tab));
   $('#emoEmoji').hidden = tab.dataset.tab !== 'emoji';
-  $('#emoStickers').hidden = tab.dataset.tab !== 'stickers';
+  $('#stkPanel').hidden = tab.dataset.tab !== 'stickers';
+  if (tab.dataset.tab === 'stickers') loadStickerPacks();
 };
 // Вставка эмодзи в поле ввода
 $('#emoEmoji').onclick = e => {
@@ -2854,25 +3173,6 @@ $('#emoEmoji').onclick = e => {
   inp.value = inp.value.slice(0, s) + b.textContent + inp.value.slice(e2);
   inp.selectionStart = inp.selectionEnd = s + b.textContent.length;
   inp.focus(); inp.oninput();
-};
-// Отправка стикера как изображения
-$('#emoStickers').onclick = async e => {
-  const btn = e.target.closest('[data-stk]'); if (!btn) return;
-  if (!cur) return;
-  $('#emobar').hidden = true;
-  try {
-    // Конвертируем base64 → Blob без fetch (работает везде)
-    const b64 = STICKERS[+btn.dataset.stk];
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
-    const sBlob = new Blob([bytes], {type:'image/png'});
-    // Получаем размеры через createImageBitmap
-    let sw = 160, sh = 160;
-    try { const bm = await createImageBitmap(sBlob); sw = bm.width; sh = bm.height; bm.close(); } catch {}
-    const up2 = await upload(sBlob, 'media');
-    sendNow('', {kind:'sticker', url:up2.url, w:sw, h:sh, sticker:true});
-  } catch(x) { toast('Ошибка: '+x.message); console.error(x); }
 };
 $('#emojiBtn').onclick = e => { e.stopPropagation(); const p = $('#emobar'); p.hidden = !p.hidden; };
 document.addEventListener('pointerdown', e => {
