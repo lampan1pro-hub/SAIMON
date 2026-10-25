@@ -372,10 +372,6 @@ h2 .acc,.cmn .acc{margin-left:6px}
 a.hndl{color:var(--p);font-weight:600;cursor:pointer;text-decoration:none}
 a.hndl:hover{text-decoration:underline}
 .m.me a.hndl{color:inherit;text-decoration:underline}
-a.msg-link{color:var(--p);text-decoration:none;word-break:break-all}
-a.msg-link:hover{text-decoration:underline}
-.m.me a.msg-link{color:#b6e8ff}
-.m.me a.msg-link:hover{text-decoration:underline}
 h2 .acc{width:26px;height:26px;font-size:16px}
 #acctip{position:fixed;z-index:80;padding:7px 14px;border-radius:18px;background:rgba(60,60,64,.92);color:#fff;font-size:14px;font-weight:600;pointer-events:none;animation:popIn .15s ease-out;white-space:nowrap}
 .gc .gworn{position:absolute;top:6px;left:8px;font-size:13px}
@@ -567,32 +563,39 @@ html[data-theme=dark] #recbar{background:#242f3d}
 .stk-pack-btn img{width:28px;height:28px;object-fit:contain;border-radius:6px}
 .stk-pack-new{font-size:22px;opacity:.6}
 .stk-pack-new:hover{opacity:1}
-/* Модалка создания пака */
-#stkModal,#stkEditModal,#stkViewModal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;justify-content:center}
-#stkModal[hidden],#stkEditModal[hidden],#stkViewModal[hidden]{display:none!important}
-.stk-sheet{background:var(--bg,#fff);border-radius:18px 18px 0 0;padding:20px 20px 32px;width:100%;max-width:480px;max-height:80dvh;display:flex;flex-direction:column;gap:12px;animation:slideUp .3s var(--ease-out)}
+/* Пустой пак */
+.stk-empty{grid-column:1/-1;text-align:center;color:var(--t2,#707579);font-size:13px;padding:20px 0}
+/* Модалка создания/управления паком */
+#stkModal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+#stkModal[hidden]{display:none!important}
+.stk-sheet{background:var(--bg,#fff);border-radius:18px 18px 0 0;padding:20px 20px 32px;width:100%;max-width:480px;max-height:82dvh;display:flex;flex-direction:column;gap:10px;overflow:hidden;animation:slideUp .3s var(--ease-out)}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
-.stk-grid-edit{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;overflow-y:auto;max-height:200px}
+.stk-sheet-head{display:flex;align-items:center;gap:8px}
+.stk-sheet-head h3{flex:1;margin:0;font-size:16px}
+.stk-sheet-head input{flex:1;border:1px solid var(--b2,#ddd);border-radius:8px;padding:6px 10px;font-size:14px;background:transparent;color:inherit;outline:none}
+.stk-grid-edit{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;overflow-y:auto;max-height:210px}
 .stk-grid-edit button{border:0;background:rgba(51,144,236,.08);border-radius:10px;aspect-ratio:1;display:grid;place-items:center;cursor:pointer;font-size:24px;position:relative;overflow:hidden;transition:background .15s}
 .stk-grid-edit img{width:100%;height:100%;object-fit:contain;border-radius:8px}
-.stk-del{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(220,53,69,.8);color:#fff;font-size:11px;display:grid;place-items:center;opacity:0;transition:opacity .15s}
+.stk-del{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(220,53,69,.8);color:#fff;font-size:11px;display:grid;place-items:center;opacity:0;transition:opacity .15s;pointer-events:none}
 .stk-grid-edit button:hover .stk-del{opacity:1}
+/* Список паков в менеджере */
+.stk-packs-list{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px}
+.stk-pack-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:var(--bg2,#f0f2f5);cursor:pointer;transition:background .15s}
+.stk-pack-row:hover{background:rgba(51,144,236,.1)}
+.stk-pack-row-cover{width:40px;height:40px;border-radius:8px;object-fit:contain;background:rgba(51,144,236,.08)}
+.stk-pack-row-cover-empty{width:40px;height:40px;border-radius:8px;background:rgba(51,144,236,.1);display:grid;place-items:center;font-size:22px;flex-shrink:0}
+.stk-pack-row-info{flex:1;min-width:0}
+.stk-pack-row-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stk-pack-row-meta{font-size:12px;color:var(--t2,#707579)}
+.stk-pack-row-actions{display:flex;gap:4px}
+.stk-pack-row-actions button{border:0;background:transparent;cursor:pointer;font-size:18px;padding:4px;border-radius:8px;transition:background .15s;color:var(--t,#000)}
+.stk-pack-row-actions button:hover{background:rgba(51,144,236,.15)}
 html[data-theme=dark] .stk-sheet{background:var(--bg,#17212b)}
+html[data-theme=dark] .stk-pack-row{background:var(--bg2,#232e3c)}
+html[data-theme=dark] .stk-sheet-head input{border-color:#2a3a4a}
 .m.stk img.ph{width:130px!important;height:130px!important;border-radius:0!important;object-fit:contain;background:transparent!important}
 .m.stk time{color:rgba(255,255,255,.7);text-shadow:0 1px 3px rgba(0,0,0,.5);position:absolute;bottom:4px;right:6px}
 .m.stk{position:relative}
-/* ===== Альбом (несколько фото/видео) ===== */
-.album{display:grid;gap:3px;border-radius:14px;overflow:hidden;cursor:pointer;max-width:340px;position:relative}
-.album.a1{grid-template-columns:1fr}
-.album.a2{grid-template-columns:1fr 1fr}
-.album.a3{grid-template-columns:1fr 1fr;grid-template-rows:auto auto}
-.album.a4{grid-template-columns:1fr 1fr}
-.album img,.album video{width:100%;height:140px;object-fit:cover;display:block}
-.album.a1 img,.album.a1 video{height:auto;max-height:400px;object-fit:contain;background:#000}
-.album.a2 img,.album.a2 video{height:160px}
-.album .alb-first{grid-column:1/-1}
-.album .alb-first img,.album .alb-first video{height:220px}
-.album .alb-more{position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,.6);color:#fff;border-radius:10px;padding:2px 8px;font-size:13px;font-weight:600;pointer-events:none}
 html[data-theme=dark] #emobar,html[data-theme=dark] .emo-tabs{background:var(--bg,#17212b);border-color:#2a3a4a}
 
 /* ===== Обои чатов: темная/светлая тема ===== */
@@ -1057,27 +1060,6 @@ html[data-theme=dark] #form{background:#17212b}
 .tgp-item.tgp-accent{color:var(--tg-blue,#3390ec);font-weight:500;text-align:center}
 .tgp-sec{padding:14px 20px 6px;color:var(--t2,#7d8790);font-size:13px}
 .tgp-gifts{margin:0 12px}
-/* ===== Сторисы в профиле — прямоугольные миниатюры ===== */
-.stories-bar{display:flex;gap:8px;overflow-x:auto;padding:4px 12px 10px;scrollbar-width:none}
-.stories-bar::-webkit-scrollbar{display:none}
-.story-item{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;cursor:pointer}
-.story-thumb{width:72px;height:96px;border-radius:10px;overflow:hidden;position:relative;background:#eee;box-shadow:0 1px 4px rgba(0,0,0,.12);border:2px solid var(--tg-blue,#3390ec)}
-.story-thumb img,.story-thumb video{width:100%;height:100%;object-fit:cover;display:block;border-radius:8px}
-.story-thumb .story-add-btn{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--tg-blue,#3390ec);background:var(--pl,#e7f3ff);border-radius:8px}
-html[data-theme=dark] .story-thumb{background:#1e2c3a;border-color:#3390ec}
-html[data-theme=dark] .story-thumb .story-add-btn{background:#1e2c3a}
-.story-name{font-size:11px;color:var(--t2,#707579);max-width:72px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* Просмотрщик сторис (фулскрин) */
-#storyViewer{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column;touch-action:none}
-#storyViewer[hidden]{display:none!important}
-#storyViewerMedia{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-#storyViewerMedia img,#storyViewerMedia video{max-width:100%;max-height:100%;object-fit:contain;border-radius:0}
-#storyViewerBar{position:absolute;top:0;left:0;right:0;height:3px;background:rgba(255,255,255,.3);z-index:2}
-#storyViewerBar i{display:block;height:100%;background:#fff;width:0;transition:width linear}
-#storyViewerClose{position:absolute;top:env(safe-area-inset-top,0);right:10px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:0;z-index:3}
-#storyViewerDel{position:absolute;top:env(safe-area-inset-top,0);left:10px;width:40px;height:40px;border-radius:50%;background:rgba(220,30,30,.55);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:0;z-index:3}
-#storyViewerDel[hidden]{display:none!important}
-#storyViewerTime{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:rgba(255,255,255,.6);font-size:12px;z-index:3}
 html[data-theme=dark] .modal.tg-prof,html[data-theme=dark] .modal.tg-prof .card{background:#17212b}
 html[data-theme=dark] .tgp-top,html[data-theme=dark] .tgp-head{background:#17212b;color:var(--t)}html[data-theme=dark] .tgp-card,html[data-theme=dark] .tgp-item{background:#1e2c3a;color:var(--t)}html[data-theme=dark] .tgp-act{background:#223344;color:#5bb8f5;border:1px solid #2e4560;border-radius:16px}
 html[data-theme=dark] .tgp-row,html[data-theme=dark] .tgp-item{border-color:#1f3040}
@@ -1369,60 +1351,19 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
 <div id="replybar" hidden><span id="replytxt"></span><button type="button" class="ib" id="rcancel" aria-label="Отменить ответ">✕</button></div>
       <div id="pend" hidden></div>
       <div id="recbar" hidden>🔴 <b class="rt">0:00</b><span>Тапни 🎤 ещё раз — отправить</span><button type="button" class="ib" id="recx" aria-label="Отменить запись">✕</button></div>
-      <div id="emobar" hidden><div class="emo-tabs"><button type="button" class="emo-tab on" data-tab="emoji">😊 Эмодзи</button><button type="button" class="emo-tab" data-tab="stickers">🎭 Стикеры</button></div><div class="emo-body" id="emoEmoji"></div><div id="stkPanel" hidden><div class="stk-packs" id="stkPackTabs"></div><div class="stk-body" id="emoStickers"></div></div></div>
-
-<!-- Модальное окно стикер-паков -->
-<div id="stkModal" hidden>
-  <div class="stk-sheet">
-    <div style="display:flex;align-items:center;gap:10px">
-      <b id="stkModalTitle" style="flex:1;font-size:17px">Мои стикер-паки</b>
-      <button type="button" class="ib" id="stkModalClose">✕</button>
-    </div>
-    <!-- Список моих паков + кнопка создать -->
-    <div id="stkMyPacks" style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:50dvh"></div>
-    <button type="button" class="btn" id="stkCreateBtn">+ Создать новый пак</button>
-
-    <!-- Форма создания пака (скрыта по умолчанию) -->
-    <div id="stkCreateForm" hidden style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--b);padding-top:12px">
-      <b style="font-size:15px">Новый стикер-пак</b>
-      <div class="f" style="margin:0"><label>Название</label><input id="stkPackName" type="text" placeholder="Мои стикеры" maxlength="48"></div>
-      <div class="f" style="margin:0"><label>Иконка (эмодзи)</label><input id="stkPackEmoji" type="text" placeholder="🎭" maxlength="8" style="width:80px"></div>
-      <div style="display:flex;gap:8px">
-        <button type="button" class="btn g" id="stkCreateCancel">Отмена</button>
-        <button type="button" class="btn" id="stkCreateSave">Создать</button>
+      <div id="emobar" hidden>
+        <div class="emo-tabs">
+          <button type="button" class="emo-tab on" data-tab="emoji">😊 Эмодзи</button>
+          <button type="button" class="emo-tab" data-tab="stickers">🎭 Стикеры</button>
+        </div>
+        <div class="emo-body" id="emoEmoji"></div>
+        <div id="emoStickers" hidden style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden">
+          <div class="stk-packs" id="stkPacksBar">
+            <button type="button" class="stk-pack-btn stk-pack-new" id="stkMgrBtn" title="Управление паками">⚙️</button>
+          </div>
+          <div class="stk-body" id="stkGrid"></div>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- Модальное окно редактирования пака -->
-<div id="stkEditModal" hidden>
-  <div class="stk-sheet">
-    <div style="display:flex;align-items:center;gap:10px">
-      <b id="stkEditTitle" style="flex:1;font-size:17px">Редактировать пак</b>
-      <button type="button" class="ib" id="stkEditClose">✕</button>
-    </div>
-    <div class="stk-grid-edit" id="stkEditGrid"></div>
-    <label class="btn" style="text-align:center;cursor:pointer">
-      ➕ Добавить стикер
-      <input type="file" id="stkAddFile" accept="image/*" hidden>
-    </label>
-    <button type="button" class="btn r" id="stkDeletePack">🗑 Удалить пак</button>
-  </div>
-</div>
-
-<!-- Модальное окно просмотра чужого пака -->
-<div id="stkViewModal" hidden>
-  <div class="stk-sheet">
-    <div style="display:flex;align-items:center;gap:10px">
-      <b id="stkViewTitle" style="flex:1;font-size:17px"></b>
-      <button type="button" class="ib" id="stkViewClose">✕</button>
-    </div>
-    <div style="font-size:13px;color:var(--t2)" id="stkViewAuthor"></div>
-    <div class="stk-grid-edit" id="stkViewGrid" style="max-height:260px"></div>
-    <button type="button" class="btn" id="stkCollectBtn">➕ Добавить в мои паки</button>
-  </div>
-</div>
       <form id="form">
         <button type="button" class="ib" id="emojiBtn" aria-label="Эмодзи" title="Эмодзи"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 13s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
         <textarea id="inp" rows="1" placeholder="Сообщение" enterkeyhint="send"></textarea>
@@ -1449,7 +1390,7 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
           </mask>
         </defs>
         <rect width="100" height="100" fill="rgba(0,0,0,.6)" mask="url(#cropMask)"/>
-        <circle id="cropCircleBorder" cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".5"/>
+        <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".5"/>
       </svg>
     </div>
     <div id="cropHint">Двигайте и масштабируйте фото</div>
@@ -1830,7 +1771,7 @@ function cropAvatar(file) {
   });
 }
 
-// Загрузка файла без обрезки (для сторисов)
+// Простая загрузка файла без кадрирования (для стикеров, сторисов)
 async function uploadFile(file) {
   const r = await upload(file, 'media');
   return r.url;
@@ -2057,6 +1998,8 @@ function boot() {
   try { applyWallpaper(); } catch(e) {}
   // Зарегистрировать текущий аккаунт в мульти-аккаунт списке
   try { saveCurrentToAccounts(); } catch(e) {}
+  // Загрузить стикер-паки
+  loadStkPacks();
 }
 /* ---------- Уведомления (Web Push) ---------- */
 const pushOK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -2445,7 +2388,7 @@ function updateTicks() {
 }
 
 /* ---------- Список чатов и поиск ---------- */
-const mlabel = m => m.fwd ? '↪️ Пересланное сообщение' : m.gift ? '🎁 Подарок' : m.prem ? '💎 Подписка' : m.media ? (m.media.kind === 'video' ? '🎥 Видео' : m.media.kind === 'voice' ? '🎤 Голосовое' : m.media.kind === 'sticker' ? '🎭 Стикер' : m.media.kind === 'album' ? `🖼 Альбом (${(m.media.urls||[]).length})` : '📷 Фото') : '';
+const mlabel = m => m.fwd ? '↪️ Пересланное сообщение' : m.gift ? '🎁 Подарок' : m.prem ? '💎 Подписка' : m.media ? (m.media.kind === 'video' ? '🎥 Видео' : m.media.kind === 'voice' ? '🎤 Голосовое' : m.media.kind === 'sticker' ? '🎭 Стикер' : '📷 Фото') : '';
 function preview(c) {
   const l = c.last;
   if (!l) return c.type === 'group' ? c.members.length + ' участн.' : c.type === 'channel' ? subs(c.subscribers) : 'Нет сообщений';
@@ -2605,26 +2548,6 @@ const mediaHtml = md => {
   if (md.kind === 'voice') // голосовое: круглая кнопка, полоса прогресса, таймер
     return `<div class="vc" data-u="${esc(md.url)}"><button type="button" class="vcb" aria-label="Прослушать">▶</button><div class="vcb2"><div class="vctr"><div class="vcbar"><i></i></div></div><span class="vct" data-d="${md.dur || 0}">${fmtDur(md.dur)}</span></div></div>`;
   if (md.sticker) return `<img class="ph" src="${esc(md.url)}" alt="стикер" loading="lazy" decoding="async" style="width:130px;height:130px;object-fit:contain;background:transparent">`;
-  if (md.kind === 'album' && md.urls && md.urls.length > 1) {
-    const items = md.urls;
-    const n = items.length;
-    const shown = Math.min(n, 4); // показываем до 4, остальные скрываем
-    const cls = `album a${Math.min(n, 4)}`;
-    const urlsJson = esc(JSON.stringify(items.map(i => i.url)));
-    let html = `<div class="${cls}" data-album="${urlsJson}">`;
-    items.slice(0, shown).forEach((item, idx) => {
-      const isFirst = n === 3 && idx === 0;
-      const isV = item.kind === 'video';
-      html += `<div class="${isFirst ? 'alb-first' : ''}">`;
-      html += isV
-        ? `<video src="${esc(item.url)}" muted playsinline preload="metadata" loading="lazy"></video>`
-        : `<img src="${esc(item.url)}" alt="Фото ${idx+1}" loading="lazy" decoding="async">`;
-      html += '</div>';
-    });
-    if (n > 4) html += `<div class="alb-more">+${n - 4}</div>`;
-    html += '</div>';
-    return html;
-  }
   const ar = md.w && md.h ? `aspect-ratio:${md.w}/${md.h};` : '';
   return md.kind === 'video'
     ? `<video src="${esc(md.url)}" controls playsinline preload="metadata" style="${ar}"></video>`
@@ -2721,15 +2644,7 @@ function bubbleHtml(c, l, i) {
 }
 // @юзернеймы в тексте — кликабельные (ищут и «второстепенные» handles)
 const HNDL_RE = /(^|[^a-zA-Z0-9_])@([a-z0-9_]{3,20})/g;
-const URL_LINK_RE = /https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?()[\]{}]/g;
-function linkify(t) {
-  // Сначала экранируем HTML, затем делаем ссылки кликабельными
-  const escaped = esc(t);
-  // Заменяем URL → <a href>
-  const withLinks = escaped.replace(URL_LINK_RE, url => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="msg-link">${url}</a>`);
-  // Заменяем @mention → кликабельный хэндл
-  return withLinks.replace(HNDL_RE, (m, p, h) => `${p}<a class="hndl" data-h="${h}">@${h}</a>`);
-}
+const linkify = t => esc(t).replace(HNDL_RE, (m, p, h) => `${p}<a class="hndl" data-h="${h}">@${h}</a>`);
 async function openByHandle(h) {
   try { userProfile(await api('/api/users/by-handle?h=' + encodeURIComponent(h))); }
   catch (x) { toast(x.message); }
@@ -2931,242 +2846,272 @@ const STICKERS = [
 ];
 // Заполняем эмодзи
 $('#emoEmoji').innerHTML = EMOJIS.map(x => `<button type="button">${x}</button>`).join('');
-
 // ===== Стикер-паки =====
-let stkPacks = []; // [{id, name, emoji, authorId, authorName, stickers:[{id,url}], isMine, isCollected}]
+let stkPacks = [];    // [{id,name,ownerId,stickers:[{id,url,emoji}],addedBy:[]}]
 let stkActivePack = null; // id активного пака
 
-async function loadStickerPacks() {
+async function loadStkPacks() {
   try {
-    const r = await fetch('/api/sticker-packs', {headers:{Authorization:'Bearer '+tok}});
-    stkPacks = await r.json();
-    renderStkPackTabs();
-    if (stkActivePack) showStkPack(stkActivePack);
-    else if (stkPacks.length) showStkPack(stkPacks[0].id);
-  } catch(e) { console.error('loadStickerPacks', e); }
+    stkPacks = await api('/api/stickerpacks');
+    renderStkBar();
+  } catch(x) { console.error('loadStkPacks:', x); }
 }
 
-function renderStkPackTabs() {
-  const tabs = $('#stkPackTabs');
-  // Мои паки + добавленные в коллекцию
-  const myPacks = stkPacks.filter(p => p.isMine || p.isCollected);
-  tabs.innerHTML = myPacks.map(p =>
-    `<button type="button" class="stk-pack-btn${stkActivePack===p.id?' on':''}" data-pid="${p.id}" title="${p.name}">${p.emoji}</button>`
-  ).join('') +
-  // Кнопка управления паками
-  `<button type="button" class="stk-pack-btn stk-pack-new" id="stkMgrBtn" title="Управление паками">⚙️</button>`;
+function renderStkBar() {
+  const bar = $('#stkPacksBar');
+  // Мои паки + паки, которые я добавил
+  const myPacks = stkPacks.filter(p => p.addedBy && p.addedBy.includes(me.id));
+  let html = `<button type="button" class="stk-pack-btn stk-pack-new${!stkActivePack ? ' on' : ''}" id="stkMgrBtn" title="Управление паками">⚙️</button>`;
+  // Встроенные стикеры (всегда первый «пак»)
+  html += `<button type="button" class="stk-pack-btn${stkActivePack === '__builtin__' ? ' on' : ''}" data-stkpack="__builtin__" title="Стандартные">🐱</button>`;
+  myPacks.forEach(p => {
+    const cover = p.stickers && p.stickers.length ? `<img src="${esc(p.stickers[0].url)}" alt="">` : `<span>${p.stickers && p.stickers.length === 0 ? '📦' : '⭐'}</span>`;
+    html += `<button type="button" class="stk-pack-btn${stkActivePack === p.id ? ' on' : ''}" data-stkpack="${esc(p.id)}" title="${esc(p.name)}">${cover}</button>`;
+  });
+  bar.innerHTML = html;
+  $('#stkMgrBtn').onclick = openStkManager;
+  bar.querySelectorAll('[data-stkpack]').forEach(btn => {
+    btn.onclick = () => { stkActivePack = btn.dataset.stkpack; renderStkBar(); renderStkGrid(); };
+  });
+  renderStkGrid();
 }
 
-function showStkPack(packId) {
-  stkActivePack = packId;
-  const pack = stkPacks.find(p => p.id === packId);
-  const grid = $('#emoStickers');
-  if (!pack) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--t2);font-size:13px;padding:20px">Нет стикеров</div>'; return; }
-  grid.innerHTML = pack.stickers.map(s =>
-    `<button type="button" data-surl="${s.url}"><img src="${s.url}" alt="стикер" loading="lazy"></button>`
-  ).join('') + (pack.stickers.length === 0 ? `<div style="grid-column:1/-1;text-align:center;color:var(--t2);font-size:13px;padding:20px">${pack.isMine ? 'Добавьте стикеры ➕' : 'Пак пустой'}</div>` : '');
-  // Обновить подсветку таба
-  $('#stkPackTabs').querySelectorAll('.stk-pack-btn').forEach(b => b.classList.toggle('on', b.dataset.pid === packId));
+function renderStkGrid() {
+  const grid = $('#stkGrid');
+  if (stkActivePack === '__builtin__' || !stkActivePack) {
+    grid.innerHTML = STICKERS.map((_,i) => `<button type="button" data-stk="${i}"><img data-si="${i}" alt="стикер"></button>`).join('');
+    grid.querySelectorAll('img[data-si]').forEach(img => { img.src = 'data:image/png;base64,' + STICKERS[+img.dataset.si]; });
+    return;
+  }
+  const pack = stkPacks.find(p => p.id === stkActivePack);
+  if (!pack || !pack.stickers || !pack.stickers.length) {
+    grid.innerHTML = '<div class="stk-empty">Пак пуст<br>Добавьте стикеры через ⚙️</div>';
+    return;
+  }
+  grid.innerHTML = pack.stickers.map(s => `<button type="button" data-stkurl="${esc(s.url)}"><img src="${esc(s.url)}" alt="${esc(s.emoji||'⭐')}"></button>`).join('');
 }
 
-// Клик по табу пака
-$('#stkPackTabs').onclick = e => {
-  const btn = e.target.closest('[data-pid]');
-  if (btn) { showStkPack(btn.dataset.pid); return; }
-  if (e.target.closest('#stkMgrBtn')) { openStkManager(); }
-};
-
-// Отправка стикера из пака
-$('#emoStickers').onclick = async e => {
-  const btn = e.target.closest('[data-surl]'); if (!btn) return;
+// Клик по стандартному стикеру
+$('#stkGrid').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-stk],[data-stkurl]'); if (!btn) return;
   if (!cur) return;
   $('#emobar').hidden = true;
-  const url = btn.dataset.surl;
   try {
-    let sw = 160, sh = 160;
-    try {
-      const res = await fetch(url); const blob = await res.blob();
-      const bm = await createImageBitmap(blob); sw = bm.width; sh = bm.height; bm.close();
-    } catch {}
-    sendNow('', {kind:'sticker', url, w:sw, h:sh, sticker:true});
+    if (btn.dataset.stk !== undefined) {
+      // Встроенный — старый путь через base64
+      const b64 = STICKERS[+btn.dataset.stk];
+      const bin = atob(b64), bytes = new Uint8Array(bin.length);
+      for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+      const sBlob = new Blob([bytes], {type:'image/png'});
+      let sw = 160, sh = 160;
+      try { const bm = await createImageBitmap(sBlob); sw = bm.width; sh = bm.height; bm.close(); } catch {}
+      const up2 = await upload(sBlob, 'media');
+      sendNow('', {kind:'sticker', url:up2.url, w:sw, h:sh, sticker:true});
+    } else {
+      // Из пака — url уже на сервере
+      sendNow('', {kind:'sticker', url:btn.dataset.stkurl, w:160, h:160, sticker:true});
+    }
   } catch(x) { toast('Ошибка: '+x.message); }
-};
+});
 
-// ---- Менеджер паков ----
+// ===== Менеджер паков =====
 function openStkManager() {
-  renderMyPacks();
-  $('#stkModal').hidden = false;
-  $('#stkCreateForm').hidden = true;
-}
-$('#stkModalClose').onclick = () => { $('#stkModal').hidden = true; };
-$('#stkModal').onclick = e => { if (e.target === $('#stkModal')) $('#stkModal').hidden = true; };
-
-function renderMyPacks() {
-  const myPacks = stkPacks.filter(p => p.isMine || p.isCollected);
-  const allOthers = stkPacks.filter(p => !p.isMine && !p.isCollected);
-  const cont = $('#stkMyPacks');
-  cont.innerHTML = '';
-
-  if (myPacks.length === 0 && allOthers.length === 0) {
-    cont.innerHTML = '<div style="color:var(--t2);font-size:14px;text-align:center;padding:12px">У вас пока нет стикер-паков</div>';
+  $('#emobar').hidden = true;
+  let sheet = document.getElementById('stkManagerSheet');
+  if (!sheet) {
+    sheet = document.createElement('div');
+    sheet.id = 'stkManagerSheet';
+    // Используем существующий #stkModal
+    document.body.appendChild(sheet);
+    sheet.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;justify-content:center';
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.hidden = true; });
   }
+  sheet.hidden = false;
+  renderStkManagerContent(sheet);
+}
 
-  myPacks.forEach(p => {
-    const div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:14px;cursor:pointer';
-    div.innerHTML = `<span style="font-size:24px">${p.emoji}</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:15px">${esc(p.name)}</div>
-        <div style="font-size:12px;color:var(--t2)">${p.stickers.length} стикер(ов)${p.isMine ? ' · Мой пак' : ' · Добавлен'}</div>
-      </div>
-      ${p.isMine ? `<button type="button" class="ib" data-edit="${p.id}" title="Редактировать">✏️</button>` : `<button type="button" class="ib" data-uncollect="${p.id}" title="Убрать">✕</button>`}`;
-    div.querySelector('[data-edit]')?.addEventListener('click', e => { e.stopPropagation(); openStkEdit(p.id); });
-    div.querySelector('[data-uncollect]')?.addEventListener('click', async e => {
-      e.stopPropagation();
-      await fetch('/api/sticker-packs/'+p.id+'/collect', {method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:'{}'});
-      await loadStickerPacks(); renderMyPacks();
-    });
-    div.addEventListener('click', () => { showStkPack(p.id); $('#stkModal').hidden = true; });
-    cont.appendChild(div);
-  });
+function renderStkManagerContent(sheet) {
+  const myPacks = stkPacks.filter(p => p.ownerId === me.id);
+  const addedPacks = stkPacks.filter(p => p.ownerId !== me.id && p.addedBy && p.addedBy.includes(me.id));
+  const allPublicPacks = stkPacks.filter(p => p.ownerId !== me.id && !(p.addedBy && p.addedBy.includes(me.id)));
 
-  if (allOthers.length) {
-    const lbl = document.createElement('div');
-    lbl.style.cssText = 'font-size:13px;color:var(--t2);font-weight:600;padding:4px 2px';
-    lbl.textContent = 'Паки других пользователей';
-    cont.appendChild(lbl);
-    allOthers.forEach(p => {
-      const div = document.createElement('div');
-      div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:14px;cursor:pointer';
-      div.innerHTML = `<span style="font-size:24px">${p.emoji}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:15px">${esc(p.name)}</div>
-          <div style="font-size:12px;color:var(--t2)">${p.stickers.length} стикер(ов) · от ${esc(p.authorName)}</div>
-        </div>
-        <button type="button" class="btn" style="width:auto;padding:6px 12px;font-size:13px" data-view="${p.id}">Смотреть</button>`;
-      div.querySelector('[data-view]').addEventListener('click', e => { e.stopPropagation(); openStkView(p.id); });
-      cont.appendChild(div);
-    });
+  sheet.innerHTML = `<div class="stk-sheet">
+    <div class="stk-sheet-head">
+      <h3>🎭 Стикер-паки</h3>
+      <button type="button" style="border:0;background:transparent;font-size:20px;cursor:pointer;color:var(--t2,#707579)" id="stkMgrClose">✕</button>
+    </div>
+    <button type="button" class="tgp-btn" id="stkCreatePack" style="background:var(--tg-blue,#3390ec);color:#fff;border:0;border-radius:10px;padding:10px;font-size:14px;cursor:pointer">➕ Создать свой пак</button>
+    ${myPacks.length ? `<div style="font-size:12px;color:var(--t2,#707579);font-weight:600;padding:4px 0 0">МОИ ПАКИ</div>
+    <div class="stk-packs-list">${myPacks.map(p => stkPackRow(p, 'own')).join('')}</div>` : ''}
+    ${addedPacks.length ? `<div style="font-size:12px;color:var(--t2,#707579);font-weight:600;padding:4px 0 0">ДОБАВЛЕННЫЕ</div>
+    <div class="stk-packs-list">${addedPacks.map(p => stkPackRow(p, 'added')).join('')}</div>` : ''}
+    ${allPublicPacks.length ? `<div style="font-size:12px;color:var(--t2,#707579);font-weight:600;padding:4px 0 0">ДОСТУПНЫЕ ПАКИ</div>
+    <div class="stk-packs-list" style="max-height:180px">${allPublicPacks.map(p => stkPackRow(p, 'public')).join('')}</div>` : ''}
+    ${!myPacks.length && !addedPacks.length && !allPublicPacks.length ? '<div class="stk-empty" style="padding:30px 0">Пока нет паков. Создайте первый!</div>' : ''}
+  </div>`;
+
+  sheet.querySelector('#stkMgrClose').onclick = () => { sheet.hidden = true; };
+  sheet.querySelector('#stkCreatePack').onclick = () => openCreatePackDialog(sheet);
+
+  // Кнопки на паках
+  sheet.querySelectorAll('[data-pack-edit]').forEach(btn => { btn.onclick = () => openEditPackDialog(sheet, btn.dataset.packEdit); });
+  sheet.querySelectorAll('[data-pack-delete]').forEach(btn => { btn.onclick = () => deletePack(sheet, btn.dataset.packDelete); });
+  sheet.querySelectorAll('[data-pack-add]').forEach(btn => { btn.onclick = () => addPackToMe(sheet, btn.dataset.packAdd); });
+  sheet.querySelectorAll('[data-pack-remove]').forEach(btn => { btn.onclick = () => removePackFromMe(sheet, btn.dataset.packRemove); });
+  sheet.querySelectorAll('[data-pack-open]').forEach(btn => { btn.onclick = () => openEditPackDialog(sheet, btn.dataset.packOpen); });
+}
+
+function stkPackRow(p, mode) {
+  const cover = p.stickers && p.stickers.length
+    ? `<img class="stk-pack-row-cover" src="${esc(p.stickers[0].url)}" alt="">`
+    : `<div class="stk-pack-row-cover-empty">📦</div>`;
+  let actions = '';
+  if (mode === 'own') {
+    actions = `<button data-pack-edit="${esc(p.id)}" title="Редактировать">✏️</button>
+               <button data-pack-delete="${esc(p.id)}" title="Удалить">🗑</button>`;
+  } else if (mode === 'added') {
+    actions = `<button data-pack-open="${esc(p.id)}" title="Просмотр">👁</button>
+               <button data-pack-remove="${esc(p.id)}" title="Убрать из моих">➖</button>`;
+  } else {
+    actions = `<button data-pack-add="${esc(p.id)}" title="Добавить себе">➕</button>`;
   }
+  const users = p.addedBy ? p.addedBy.length : 0;
+  return `<div class="stk-pack-row">
+    ${cover}
+    <div class="stk-pack-row-info">
+      <div class="stk-pack-row-name">${esc(p.name)}</div>
+      <div class="stk-pack-row-meta">${(p.stickers||[]).length} стикеров · ${users} ${users===1?'пользователь':'пользователей'}</div>
+    </div>
+    <div class="stk-pack-row-actions">${actions}</div>
+  </div>`;
 }
 
-// Создание нового пака
-$('#stkCreateBtn').onclick = () => { $('#stkCreateForm').hidden = false; $('#stkPackName').focus(); };
-$('#stkCreateCancel').onclick = () => { $('#stkCreateForm').hidden = true; };
-$('#stkCreateSave').onclick = async () => {
-  const name = $('#stkPackName').value.trim();
-  const emoji = $('#stkPackEmoji').value.trim() || '🎭';
-  if (!name) { toast('Введите название'); return; }
-  try {
-    const r = await fetch('/api/sticker-packs', {method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify({name,emoji})});
-    const d = await r.json();
-    if (!r.ok) { toast(d.error||'Ошибка'); return; }
-    $('#stkPackName').value = ''; $('#stkPackEmoji').value = '';
-    $('#stkCreateForm').hidden = true;
-    await loadStickerPacks();
-    renderMyPacks();
-    toast('Пак создан! Добавьте стикеры ✏️');
-    openStkEdit(d.id);
-  } catch(e) { toast('Ошибка'); }
-};
-
-// ---- Редактор пака ----
-let stkEditId = null;
-function openStkEdit(packId) {
-  stkEditId = packId;
-  const pack = stkPacks.find(p => p.id === packId);
-  if (!pack) return;
-  $('#stkEditTitle').textContent = pack.emoji + ' ' + pack.name;
-  renderStkEditGrid(pack);
-  $('#stkEditModal').hidden = false;
-  $('#stkModal').hidden = true;
-}
-$('#stkEditClose').onclick = () => { $('#stkEditModal').hidden = true; openStkManager(); };
-$('#stkEditModal').onclick = e => { if (e.target === $('#stkEditModal')) { $('#stkEditModal').hidden = true; openStkManager(); } };
-
-function renderStkEditGrid(pack) {
-  const grid = $('#stkEditGrid');
-  grid.innerHTML = pack.stickers.map(s =>
-    `<button type="button" data-sid="${s.id}" style="position:relative">
-      <img src="${s.url}" alt="стикер">
-      <span class="stk-del" title="Удалить">✕</span>
-    </button>`
-  ).join('');
-  grid.onclick = async e => {
-    const btn = e.target.closest('[data-sid]'); if (!btn) return;
-    const sid = btn.dataset.sid;
-    if (!confirm('Удалить стикер?')) return;
-    await fetch('/api/sticker-packs/'+stkEditId+'/stickers/'+sid, {method:'DELETE',headers:{Authorization:'Bearer '+tok}});
-    await loadStickerPacks();
-    const p = stkPacks.find(x => x.id === stkEditId);
-    if (p) renderStkEditGrid(p);
+function openCreatePackDialog(sheet) {
+  sheet.innerHTML = `<div class="stk-sheet">
+    <div class="stk-sheet-head">
+      <button type="button" style="border:0;background:transparent;font-size:20px;cursor:pointer;color:var(--t2,#707579)" id="stkBack">←</button>
+      <h3>Новый пак</h3>
+    </div>
+    <input id="stkNewName" placeholder="Название пака…" maxlength="40" style="border:1px solid var(--b2,#ddd);border-radius:10px;padding:10px 14px;font-size:15px;background:transparent;color:inherit;outline:none">
+    <button type="button" id="stkCreateBtn" style="background:var(--tg-blue,#3390ec);color:#fff;border:0;border-radius:10px;padding:10px;font-size:14px;cursor:pointer">Создать</button>
+  </div>`;
+  sheet.querySelector('#stkBack').onclick = () => renderStkManagerContent(sheet);
+  const inp2 = sheet.querySelector('#stkNewName');
+  sheet.querySelector('#stkCreateBtn').onclick = async () => {
+    const name = inp2.value.trim();
+    if (!name) { inp2.focus(); return; }
+    try {
+      const r = await api('/api/stickerpacks', 'POST', { name });
+      stkPacks.push(r.pack);
+      renderStkBar();
+      openEditPackDialog(sheet, r.pack.id);
+      toast('Пак создан!');
+    } catch(x) { toast(x.message); }
   };
+  inp2.focus();
 }
 
-// Добавление стикера в пак через загрузку файла
-$('#stkAddFile').onchange = async e => {
-  const file = e.target.files[0]; if (!file) return;
-  e.target.value = '';
-  if (!file.type.startsWith('image/')) { toast('Только изображения'); return; }
-  if (file.size > 5*1024*1024) { toast('Максимум 5 МБ'); return; }
-  try {
-    toast('Загружаю…');
-    const up = await upload(file, 'media');
-    const r = await fetch('/api/sticker-packs/'+stkEditId+'/stickers', {
-      method:'POST', headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},
-      body:JSON.stringify({url:up.url})
-    });
-    const d = await r.json();
-    if (!r.ok) { toast(d.error||'Ошибка'); return; }
-    await loadStickerPacks();
-    const p = stkPacks.find(x => x.id === stkEditId);
-    if (p) renderStkEditGrid(p);
-    toast('Стикер добавлен!');
-  } catch(e) { toast('Ошибка загрузки'); }
-};
-
-// Удалить пак
-$('#stkDeletePack').onclick = async () => {
-  if (!confirm('Удалить пак и все стикеры в нём?')) return;
-  await fetch('/api/sticker-packs/'+stkEditId, {method:'DELETE',headers:{Authorization:'Bearer '+tok}});
-  await loadStickerPacks();
-  $('#stkEditModal').hidden = true;
-  openStkManager();
-  toast('Пак удалён');
-};
-
-// ---- Просмотр чужого пака ----
-let stkViewId = null;
-function openStkView(packId) {
-  stkViewId = packId;
+async function openEditPackDialog(sheet, packId) {
   const pack = stkPacks.find(p => p.id === packId);
   if (!pack) return;
-  $('#stkViewTitle').textContent = pack.emoji + ' ' + pack.name;
-  $('#stkViewAuthor').textContent = 'Автор: ' + pack.authorName + ' · ' + pack.stickers.length + ' стикер(ов)';
-  $('#stkViewGrid').innerHTML = pack.stickers.map(s => `<button type="button" style="pointer-events:none"><img src="${s.url}" alt="стикер"></button>`).join('');
-  const btn = $('#stkCollectBtn');
-  btn.textContent = pack.isCollected ? '✓ Уже в коллекции' : '➕ Добавить в мои паки';
-  btn.disabled = pack.isCollected;
-  $('#stkViewModal').hidden = false;
-  $('#stkModal').hidden = true;
+  const isOwner = pack.ownerId === me.id;
+
+  const renderEdit = () => {
+    const stickers = pack.stickers || [];
+    sheet.innerHTML = `<div class="stk-sheet">
+      <div class="stk-sheet-head">
+        <button type="button" style="border:0;background:transparent;font-size:20px;cursor:pointer;color:var(--t2,#707579)" id="stkBackEdit">←</button>
+        ${isOwner
+          ? `<input id="stkEditName" value="${esc(pack.name)}" maxlength="40" style="border:1px solid var(--b2,#ddd);border-radius:8px;padding:6px 10px;font-size:15px;background:transparent;color:inherit;outline:none;flex:1">`
+          : `<h3 style="flex:1">${esc(pack.name)}</h3>`}
+        ${isOwner ? `<button type="button" id="stkSaveName" style="border:0;background:var(--tg-blue,#3390ec);color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer">Сохранить</button>` : ''}
+      </div>
+      <div style="font-size:13px;color:var(--t2,#707579)">${stickers.length} стикеров${isOwner ? ' · Максимум 120' : ''}</div>
+      <div class="stk-grid-edit" id="stkEditGrid">
+        ${isOwner ? `<button type="button" id="stkAddStickerBtn" style="background:rgba(51,144,236,.12);border-radius:10px;aspect-ratio:1;border:0;font-size:28px;cursor:pointer;color:var(--tg-blue,#3390ec)">＋</button>` : ''}
+        ${stickers.map(s => `<button type="button" data-stk-del="${esc(s.id)}">
+          <img src="${esc(s.url)}" alt="${esc(s.emoji||'')}">
+          ${isOwner ? `<span class="stk-del">✕</span>` : ''}
+        </button>`).join('')}
+      </div>
+    </div>`;
+
+    sheet.querySelector('#stkBackEdit').onclick = () => renderStkManagerContent(sheet);
+
+    if (isOwner) {
+      sheet.querySelector('#stkSaveName').onclick = async () => {
+        const n = sheet.querySelector('#stkEditName').value.trim();
+        if (!n) return;
+        try {
+          await api('/api/stickerpacks/' + packId, 'PATCH', { name: n });
+          pack.name = n; renderStkBar(); toast('Название обновлено');
+        } catch(x) { toast(x.message); }
+      };
+      sheet.querySelector('#stkAddStickerBtn').onclick = async () => {
+        const f = await pickFile('image/png,image/webp,image/gif,image/jpeg');
+        if (!f) return;
+        try {
+          const upRes = await uploadFile(f);
+          const emoji = '⭐';
+          const r = await api('/api/stickerpacks/' + packId + '/stickers', 'POST', { url: upRes, emoji });
+          pack.stickers = r.stickers;
+          renderStkBar(); renderEdit(); toast('Стикер добавлен!');
+        } catch(x) { toast(x.message); }
+      };
+      sheet.querySelectorAll('[data-stk-del]').forEach(btn => {
+        btn.onclick = async () => {
+          if (!confirm('Удалить стикер?')) return;
+          try {
+            const r = await api('/api/stickerpacks/' + packId + '/stickers/' + btn.dataset.stkDel, 'DELETE');
+            pack.stickers = r.stickers;
+            renderStkBar(); renderEdit(); toast('Стикер удалён');
+          } catch(x) { toast(x.message); }
+        };
+      });
+    }
+  };
+  renderEdit();
 }
-$('#stkViewClose').onclick = () => { $('#stkViewModal').hidden = true; openStkManager(); };
-$('#stkViewModal').onclick = e => { if (e.target === $('#stkViewModal')) { $('#stkViewModal').hidden = true; openStkManager(); } };
-$('#stkCollectBtn').onclick = async () => {
-  const r = await fetch('/api/sticker-packs/'+stkViewId+'/collect', {method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:'{}'});
-  const d = await r.json();
-  if (d.collected) { toast('Пак добавлен в коллекцию!'); await loadStickerPacks(); $('#stkViewModal').hidden = true; openStkManager(); }
-};
+
+async function deletePack(sheet, packId) {
+  if (!confirm('Удалить пак со всеми стикерами?')) return;
+  try {
+    await api('/api/stickerpacks/' + packId, 'DELETE');
+    stkPacks = stkPacks.filter(p => p.id !== packId);
+    if (stkActivePack === packId) stkActivePack = null;
+    renderStkBar(); renderStkManagerContent(sheet); toast('Пак удалён');
+  } catch(x) { toast(x.message); }
+}
+
+async function addPackToMe(sheet, packId) {
+  try {
+    await api('/api/stickerpacks/' + packId + '/add', 'POST');
+    const pack = stkPacks.find(p => p.id === packId);
+    if (pack) { pack.addedBy = pack.addedBy || []; if (!pack.addedBy.includes(me.id)) pack.addedBy.push(me.id); }
+    renderStkBar(); renderStkManagerContent(sheet); toast('Пак добавлен!');
+  } catch(x) { toast(x.message); }
+}
+
+async function removePackFromMe(sheet, packId) {
+  if (!confirm('Убрать пак из своего списка?')) return;
+  try {
+    await api('/api/stickerpacks/' + packId + '/remove', 'POST');
+    const pack = stkPacks.find(p => p.id === packId);
+    if (pack) pack.addedBy = (pack.addedBy || []).filter(id => id !== me.id);
+    if (stkActivePack === packId) stkActivePack = null;
+    renderStkBar(); renderStkManagerContent(sheet); toast('Пак убран');
+  } catch(x) { toast(x.message); }
+}
 
 // Вкладки эмодзи/стикеры
 $('.emo-tabs').onclick = e => {
   const tab = e.target.closest('[data-tab]'); if (!tab) return;
   document.querySelectorAll('.emo-tab').forEach(t => t.classList.toggle('on', t === tab));
   $('#emoEmoji').hidden = tab.dataset.tab !== 'emoji';
-  $('#stkPanel').hidden = tab.dataset.tab !== 'stickers';
-  if (tab.dataset.tab === 'stickers') loadStickerPacks();
+  $('#emoStickers').hidden = tab.dataset.tab !== 'stickers';
+  if (tab.dataset.tab === 'stickers' && !stkPacks.length) loadStkPacks();
 };
-// Вставка эмодзи в поле ввода
+// Вставка эмодзи
 $('#emoEmoji').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
   const s = inp.selectionStart ?? inp.value.length, e2 = inp.selectionEnd ?? s;
@@ -3415,7 +3360,6 @@ ${profRow('🎨', '#ff6b35', 'Кастомизация', 'Обои, темы, ц
 ${profRow('🎁', '#ff9500', 'Магазин и рынок', 'Подарки и юзернеймы', 'data-go="market"')}
 ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-панель', 'Каналы и пользователи', 'id="padm"') : ''}
 </div>
-<div class="tgp-sec">Сторисы</div><div class="stories-bar" id="pstories"></div>
 <div class="tgp-sec">Мои подарки</div><div class="gg tgp-gifts" id="pgifts"></div>
 ${renderAccountSwitcher()}
 <div class="tgp-card"><button type="button" class="tgp-item tgp-danger" id="lo">Выйти из аккаунта</button></div>
@@ -3622,7 +3566,6 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
   if ($('#ngs')) $('#ngs').onclick = () => nickColor({c1: $('#ng1').value, c2: $('#ng2').value});
   if ($('#ngr')) $('#ngr').onclick = () => nickColor({reset: true});
   if ($('#pgifts')) loadGifts(me.id, $('#pgifts'), true);
-  if ($('#pstories')) loadStories(me.id, $('#pstories'), true);
 }
 
 const ADMIN_HANDLES = ['saimon', 'admin'];
@@ -3745,7 +3688,6 @@ ${isMe || isSC ? '' : `<div class="tgp-card">
 ${cnames[u.id] ? '<button type="button" class="tgp-item tgp-danger" id="cnr">Убрать имя</button>' : ''}
 </div>`}
 ${isMe || isSC ? '' : '<div class="tgp-card"><button type="button" class="tgp-item" id="gpr">💎 Подарить подписку SAIMONPREMIYM</button></div>'}
-${isSC ? '' : '<div class="tgp-sec">Сторисы</div><div class="stories-bar" id="pstories"></div>'}
 ${isSC ? '' : '<div class="tgp-sec">Подарки</div><div class="gg tgp-gifts" id="pgifts"></div>'}
 </div>`);
   if ($('#myrb')) $('#myrb').onclick = async () => { await toggleRainbow(); userProfile(me); };
@@ -3773,7 +3715,6 @@ ${isSC ? '' : '<div class="tgp-sec">Подарки</div><div class="gg tgp-gifts
     } catch (x) { toast(x.message); }
   };
   loadGifts(u.id, $('#pgifts'), false);
-  if ($('#pstories')) loadStories(u.id, $('#pstories'), false);
 }
 
 /* ---------- Группы ---------- */
@@ -4420,62 +4361,6 @@ function revealGift(g, k, to, done) {
   })();
 }
 
-// ===== Сторисы =====
-async function loadStories(uid, box, isMine) {
-  try {
-    const stories = await api('/api/stories/' + uid);
-    if (!document.body.contains(box)) return;
-    renderStoriesBox(box, stories, uid, isMine);
-    window.renderProfileStories = () => loadStories(uid, box, isMine);
-  } catch {}
-}
-
-function renderStoriesBox(box, stories, uid, isMine) {
-  const sorted = stories.slice().sort((a, b) => b.at.localeCompare(a.at));
-  let html = '';
-  if (isMine) {
-    html += `<div class="story-item" id="story-add-btn">
-      <div class="story-thumb"><div class="story-add-btn">＋</div></div>
-      <div class="story-name">Добавить</div>
-    </div>`;
-  }
-  sorted.forEach((s, i) => {
-    const isVideo = /\.(mp4|webm|mov)$/.test(s.url);
-    const preview = isVideo
-      ? `<video src="${esc(s.url)}" muted preload="metadata"></video>`
-      : `<img src="${esc(s.url)}" alt="Сторис">`;
-    html += `<div class="story-item" data-si="${i}">
-      <div class="story-thumb">${preview}</div>
-      <div class="story-name">Сторис ${sorted.length - i}</div>
-    </div>`;
-  });
-  box.innerHTML = html;
-  box.querySelectorAll('[data-si]').forEach(el => {
-    el.onclick = () => openStoryViewer(sorted, uid, +el.dataset.si);
-  });
-  if (isMine) {
-    const addBtn = box.querySelector('#story-add-btn');
-    if (addBtn) addBtn.onclick = () => addStory(box, stories, uid);
-  }
-}
-
-async function addStory(box, existingStories, uid) {
-  if (existingStories.length >= 20) { toast('Максимум 20 сторисов. Удалите старые.'); return; }
-  const f = await pickFile('image/*,video/mp4,video/webm,video/quicktime');
-  if (!f) return;
-  const isImg = f.type.startsWith('image/');
-  const toastId = toast('Загрузка…');
-  try {
-    const url = await uploadFile(f);
-    if (!url) return;
-    const r = await api('/api/stories', 'POST', { url });
-    if (!document.body.contains(box)) return;
-    renderStoriesBox(box, r.stories, uid, true);
-    window.renderProfileStories = () => loadStories(uid, box, true);
-    toast('Сторис добавлен!');
-  } catch(x) { toast(x.message); }
-}
-
 // Витрина подарков в профиле
 async function loadGifts(uid, box, mine) {
   try {
@@ -5096,115 +4981,6 @@ function setThemeAndWall(t) {
     authUI();
     $('#auth').hidden = false;
   }
-})();
-
-window.renderProfileStories = function() {};
-</script>
-
-<!-- Story viewer (fullscreen) — должен быть в DOM ДО инициализации JS -->
-<div id="storyViewer" hidden>
-  <div id="storyViewerBar"><i></i></div>
-  <button id="storyViewerClose">✕</button>
-  <button id="storyViewerDel" hidden>🗑</button>
-  <div id="storyViewerMedia"></div>
-  <div id="storyViewerTime"></div>
-</div>
-
-<script>
-/* ===== Сторисы: просмотрщик ===== */
-(function(){
-  const SV = document.getElementById('storyViewer');
-  const SVM = document.getElementById('storyViewerMedia');
-  const SVB = document.getElementById('storyViewerBar');
-  const SVBi = SVB ? SVB.querySelector('i') : null;
-  const SVClose = document.getElementById('storyViewerClose');
-  const SVDel = document.getElementById('storyViewerDel');
-  const SVTime = document.getElementById('storyViewerTime');
-  if (!SV || !SVM || !SVBi || !SVClose || !SVDel) return;
-
-  let svStories = [], svIdx = 0, svOwner = null, svTimer = null, svProgress = null;
-  const STORY_DURATION = 5000;
-
-  function fmtAgo(iso) {
-    const d = Date.now() - new Date(iso).getTime(), m = Math.floor(d / 60000), h = Math.floor(d / 3600000);
-    if (m < 1) return 'только что';
-    if (m < 60) return m + ' мин. назад';
-    if (h < 24) return h + ' ч. назад';
-    return new Date(iso).toLocaleDateString('ru-RU');
-  }
-
-  function stopStory() {
-    clearTimeout(svTimer); clearInterval(svProgress);
-    SVM.querySelectorAll('video').forEach(v => v.pause());
-  }
-
-  function showStory(idx) {
-    stopStory();
-    if (!svStories.length) return;
-    idx = Math.max(0, Math.min(idx, svStories.length - 1));
-    svIdx = idx;
-    const s = svStories[idx];
-    const isVideo = /\.(mp4|webm|mov)$/.test(s.url);
-    SVM.innerHTML = '';
-    SVBi.style.transition = 'none'; SVBi.style.width = '0';
-    if (SVTime) SVTime.textContent = fmtAgo(s.at);
-    if (isVideo) {
-      const v = document.createElement('video');
-      v.src = s.url; v.autoplay = true; v.playsInline = true;
-      v.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
-      v.addEventListener('loadedmetadata', () => {
-        const dur = Math.min(v.duration * 1000, 15000) || STORY_DURATION;
-        startProgress(dur); svTimer = setTimeout(() => nextStory(), dur);
-      });
-      v.addEventListener('error', () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); });
-      SVM.appendChild(v);
-    } else {
-      const img = document.createElement('img');
-      img.src = s.url; img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
-      img.onload = () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); };
-      img.onerror = () => { startProgress(STORY_DURATION); svTimer = setTimeout(() => nextStory(), STORY_DURATION); };
-      SVM.appendChild(img);
-    }
-    SVDel.hidden = !(svOwner != null && typeof me !== 'undefined' && svOwner === me.id);
-  }
-
-  function startProgress(dur) {
-    clearInterval(svProgress);
-    requestAnimationFrame(() => { SVBi.style.transition = `width ${dur}ms linear`; SVBi.style.width = '100%'; });
-  }
-
-  function nextStory() { if (svIdx + 1 < svStories.length) showStory(svIdx + 1); else closeStoryViewer(); }
-  function prevStory() { if (svIdx > 0) showStory(svIdx - 1); else showStory(0); }
-
-  function closeStoryViewer() {
-    stopStory(); SV.hidden = true; SVM.innerHTML = ''; svStories = []; svOwner = null;
-  }
-
-  SVClose.onclick = closeStoryViewer;
-  SVDel.onclick = async () => {
-    const s = svStories[svIdx];
-    if (!s || !confirm('Удалить этот сторис?')) return;
-    try {
-      const r = await api('/api/stories/' + s.id, 'DELETE');
-      svStories = (r.stories || []).sort((a, b) => b.at.localeCompare(a.at));
-      if (!svStories.length) { closeStoryViewer(); window.renderProfileStories(); return; }
-      showStory(Math.min(svIdx, svStories.length - 1));
-      window.renderProfileStories();
-      toast('Сторис удалён');
-    } catch(x) { toast(x.message); }
-  };
-
-  SVM.addEventListener('click', e => {
-    const x = e.clientX, w = SVM.offsetWidth;
-    if (x < w / 3) prevStory(); else nextStory();
-  });
-
-  window.openStoryViewer = function(stories, ownerUid, startIdx) {
-    svStories = stories.slice().sort((a, b) => b.at.localeCompare(a.at));
-    svOwner = ownerUid;
-    SV.hidden = false;
-    showStory(startIdx || 0);
-  };
 })();
 </script>
 
