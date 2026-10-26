@@ -576,8 +576,9 @@ html[data-theme=dark] #recbar{background:#242f3d}
 .stk-grid-edit{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;overflow-y:auto;max-height:210px}
 .stk-grid-edit button{border:0;background:rgba(51,144,236,.08);border-radius:10px;aspect-ratio:1;display:grid;place-items:center;cursor:pointer;font-size:24px;position:relative;overflow:hidden;transition:background .15s}
 .stk-grid-edit img{width:100%;height:100%;object-fit:contain;border-radius:8px}
-.stk-del{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(220,53,69,.8);color:#fff;font-size:11px;display:grid;place-items:center;opacity:0;transition:opacity .15s;pointer-events:none}
+.stk-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(220,53,69,.85);color:#fff;font-size:12px;display:grid;place-items:center;opacity:0;transition:opacity .15s;pointer-events:none;font-style:normal;z-index:2}
 .stk-grid-edit button:hover .stk-del{opacity:1}
+.stk-grid-edit button:hover{background:rgba(220,53,69,.08)}
 /* Список паков в менеджере */
 .stk-packs-list{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px}
 .stk-pack-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:var(--bg2,#f0f2f5);cursor:pointer;transition:background .15s}
@@ -3072,8 +3073,9 @@ async function openEditPackDialog(sheet, packId) {
       sheet.querySelectorAll('[data-stk-del]').forEach(btn => {
         btn.onclick = async () => {
           if (!confirm('Удалить стикер?')) return;
+          const sid = btn.getAttribute('data-stk-del');
           try {
-            const r = await api('/api/stickerpacks/' + packId + '/stickers/' + btn.dataset.stkDel, 'DELETE');
+            const r = await api('/api/stickerpacks/' + packId + '/stickers/' + sid, 'DELETE');
             pack.stickers = r.stickers;
             renderStkBar(); renderEdit(); toast('Стикер удалён');
           } catch(x) { toast(x.message); }
@@ -3120,7 +3122,10 @@ $('.emo-tabs').onclick = e => {
   document.querySelectorAll('.emo-tab').forEach(t => t.classList.toggle('on', t === tab));
   $('#emoEmoji').hidden = tab.dataset.tab !== 'emoji';
   $('#emoStickers').hidden = tab.dataset.tab !== 'stickers';
-  if (tab.dataset.tab === 'stickers' && !stkPacks.length) loadStkPacks();
+  if (tab.dataset.tab === 'stickers') {
+    if (!stkPacks.length) loadStkPacks();
+    else renderStkBar();
+  }
 };
 // Вставка эмодзи
 $('#emoEmoji').onclick = e => {

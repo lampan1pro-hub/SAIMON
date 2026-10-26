@@ -2541,42 +2541,32 @@ async function finalSave() {
 }
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { await finalSave(); process.exit(0); });
 process.on('beforeExit', () => { if (pool && dirty.size) finalSave(); });
-
 // ========== СТИКЕР-ПАКИ ==========
 
-// Читаем все паки
 function readPacks() { return read(F.stickerPacks) || []; }
 function writePacks(p) { write(F.stickerPacks, p); }
 
-// Получить все публичные паки + свои
 app.get('/api/stickerpacks', (req, res) => {
-    const me = req.uid;
     const packs = readPacks();
     res.json(packs.map(p => ({
-        id: p.id,
-        name: p.name,
-        ownerId: p.ownerId,
-        stickers: p.stickers || [],
-        addedBy: p.addedBy || []
+        id: p.id, name: p.name, ownerId: p.ownerId,
+        stickers: p.stickers || [], addedBy: p.addedBy || []
     })));
 });
 
-// Создать пак
 app.post('/api/stickerpacks', async (req, res) => {
     const me = req.uid;
     const name = String(req.body.name || '').trim().slice(0, 40);
     if (!name) return res.status(400).json({ error: 'Укажите название пака' });
     const packs = readPacks();
-    const myPacks = packs.filter(p => p.ownerId === me);
-    if (myPacks.length >= 20) return res.status(400).json({ error: 'Максимум 20 паков' });
+    if (packs.filter(p => p.ownerId === me).length >= 20)
+        return res.status(400).json({ error: 'Максимум 20 паков' });
     const pack = { id: crypto.randomUUID(), name, ownerId: me, stickers: [], addedBy: [me], createdAt: new Date().toISOString() };
     packs.push(pack);
-    writePacks(packs);
-    await persist();
+    writePacks(packs); await persist();
     res.json({ success: true, pack });
 });
 
-// Переименовать пак (только владелец)
 app.patch('/api/stickerpacks/:packId', async (req, res) => {
     const me = req.uid;
     const packs = readPacks();
@@ -2585,45 +2575,37 @@ app.patch('/api/stickerpacks/:packId', async (req, res) => {
     if (pack.ownerId !== me) return res.status(403).json({ error: 'Нет доступа' });
     const name = String(req.body.name || '').trim().slice(0, 40);
     if (!name) return res.status(400).json({ error: 'Укажите название' });
-    pack.name = name;
-    writePacks(packs);
-    await persist();
+    pack.name = name; writePacks(packs); await persist();
     res.json({ success: true, pack });
 });
 
-// Удалить пак (только владелец)
 app.delete('/api/stickerpacks/:packId', async (req, res) => {
     const me = req.uid;
     const packs = readPacks();
     const idx = packs.findIndex(p => p.id === req.params.packId);
     if (idx === -1) return res.status(404).json({ error: 'Пак не найден' });
     if (packs[idx].ownerId !== me) return res.status(403).json({ error: 'Нет доступа' });
-    packs.splice(idx, 1);
-    writePacks(packs);
-    await persist();
+    packs.splice(idx, 1); writePacks(packs); await persist();
     res.json({ success: true });
 });
 
-// Добавить стикер в пак (только владелец)
 app.post('/api/stickerpacks/:packId/stickers', async (req, res) => {
     const me = req.uid;
     const packs = readPacks();
     const pack = packs.find(p => p.id === req.params.packId);
     if (!pack) return res.status(404).json({ error: 'Пак не найден' });
     if (pack.ownerId !== me) return res.status(403).json({ error: 'Только владелец может добавлять стикеры' });
-    if ((pack.stickers || []).length >= 120) return res.status(400).json({ error: 'Максимум 120 стикеров в паке' });
+    if ((pack.stickers || []).length >= 120) return res.status(400).json({ error: 'Максимум 120 стикеров' });
     const url = String(req.body.url || '');
     if (!fileOk(url)) return res.status(400).json({ error: 'Некорректный файл' });
     const emoji = String(req.body.emoji || '⭐').slice(0, 2);
     const sticker = { id: crypto.randomUUID(), url, emoji, addedAt: new Date().toISOString() };
     pack.stickers = pack.stickers || [];
     pack.stickers.push(sticker);
-    writePacks(packs);
-    await persist();
+    writePacks(packs); await persist();
     res.json({ success: true, sticker, stickers: pack.stickers });
 });
 
-// Удалить стикер из пака (только владелец)
 app.delete('/api/stickerpacks/:packId/stickers/:stickerId', async (req, res) => {
     const me = req.uid;
     const packs = readPacks();
@@ -2633,12 +2615,10 @@ app.delete('/api/stickerpacks/:packId/stickers/:stickerId', async (req, res) => 
     const before = (pack.stickers || []).length;
     pack.stickers = (pack.stickers || []).filter(s => s.id !== req.params.stickerId);
     if (pack.stickers.length === before) return res.status(404).json({ error: 'Стикер не найден' });
-    writePacks(packs);
-    await persist();
+    writePacks(packs); await persist();
     res.json({ success: true, stickers: pack.stickers });
 });
 
-// Добавить пак себе (любой пользователь)
 app.post('/api/stickerpacks/:packId/add', async (req, res) => {
     const me = req.uid;
     const packs = readPacks();
@@ -2647,23 +2627,22 @@ app.post('/api/stickerpacks/:packId/add', async (req, res) => {
     pack.addedBy = pack.addedBy || [];
     if (pack.addedBy.includes(me)) return res.json({ success: true, already: true });
     pack.addedBy.push(me);
-    writePacks(packs);
-    await persist();
+    writePacks(packs); await persist();
     res.json({ success: true });
 });
 
-// Убрать пак у себя (не владелец)
 app.post('/api/stickerpacks/:packId/remove', async (req, res) => {
     const me = req.uid;
     const packs = readPacks();
     const pack = packs.find(p => p.id === req.params.packId);
     if (!pack) return res.status(404).json({ error: 'Пак не найден' });
-    if (pack.ownerId === me) return res.status(400).json({ error: 'Владелец не может убрать свой пак — только удалить его' });
+    if (pack.ownerId === me) return res.status(400).json({ error: 'Владелец не может убрать свой пак' });
     pack.addedBy = (pack.addedBy || []).filter(id => id !== me);
-    writePacks(packs);
-    await persist();
+    writePacks(packs); await persist();
     res.json({ success: true });
 });
+
+// ========== КОНЕЦ СТИКЕР-ПАКОВ ==========
 
 // Render усыпляет бесплатный сервис через 15 минут без входящих запросов.
 // Пока сервер работает, он сам обращается к своему адресу раз в 8 минут (выключить: KEEP_ALIVE=0).
