@@ -354,12 +354,13 @@ const pub = u => ({
     // юзернеймы, если локальный кэш в браузере когда-то сохранился без них, и их станет не продать.
     handles: u.handles && u.handles.length ? u.handles : [u.handle],
     ...((u.handles || [u.handle]).length > 1 ? { others: u.handles.filter(h => h !== u.handle) } : {}),
-    avatar: u.avatar || '', createdAt: u.createdAt, ...(u.handleBuys && Object.keys(u.handleBuys).length ? { buys: u.handleBuys } : {}), online: sockets.has(u.id), ...(!sockets.has(u.id) && u.lastSeen && u.lastSeenMode !== 'nobody' ? { lastSeen: u.lastSeen } : {}), ...(u.bot && { bot: true }), ...(u.acc && { acc: u.acc }), ...(u.banned && { banned: true }), ...(u.rainbowBorder && premiumOn(u) && { rainbowBorder: true }), ...(u.rbColors && u.rainbowBorder ? { rbColors: u.rbColors } : {}), ...(u.pinnedChannel && { pinnedChannel: u.pinnedChannel, pinnedChannelData: (() => { const _ch = read(F.chats).find(c => c.id === u.pinnedChannel && c.type === 'channel'); return _ch ? { id: _ch.id, name: _ch.name, handle: _ch.handle || '', avatar: _ch.avatar || '', subscribers: _ch.members ? _ch.members.length : 0 } : null; })() }), ...(premiumOn(u) && { premium: u.premium, ...(u.nickGrad && { ng: u.nickGrad }) })
+    avatar: u.avatar || '', createdAt: u.createdAt, ...(u.handleBuys && Object.keys(u.handleBuys).length ? { buys: u.handleBuys } : {}), online: sockets.has(u.id), ...(!sockets.has(u.id) && u.lastSeen && u.lastSeenMode !== 'nobody' ? { lastSeen: u.lastSeen } : {}), ...(u.bot && { bot: true }), ...(u.acc && { acc: u.acc }), ...(u.banned && { banned: true }), ...(u.rainbowBorder && premiumOn(u) && { rainbowBorder: true }), ...(u.rbColors && u.rainbowBorder ? { rbColors: u.rbColors } : {}), ...(u.pinnedNft && { pinnedNft: u.pinnedNft }), ...(u.pinnedChannel && { pinnedChannel: u.pinnedChannel, pinnedChannelData: (() => { const _ch = read(F.chats).find(c => c.id === u.pinnedChannel && c.type === 'channel'); return _ch ? { id: _ch.id, name: _ch.name, handle: _ch.handle || '', avatar: _ch.avatar || '', subscribers: _ch.members ? _ch.members.length : 0 } : null; })() }), ...(premiumOn(u) && { premium: u.premium, ...(u.nickGrad && { ng: u.nickGrad }) })
 });
 const self = u => ({ ...pub(u), email: u.email, ...walletOf(u), lastSeenMode: u.lastSeenMode || 'everybody', lastSeen: u.lastSeen || null,
     ...(u.uListings && u.uListings.length ? { uListings: u.uListings, uListing: u.uListings.find(l => l.handle === u.handle) } : {}),
     ...(u.handles && u.handles.length > 1 ? { handles: u.handles } : {}),
-    ...(u.pinnedChannel ? { pinnedChannel: u.pinnedChannel } : {}), ...(u.rbColors ? { rbColors: u.rbColors } : {}) });
+    ...(u.pinnedChannel ? { pinnedChannel: u.pinnedChannel } : {}), ...(u.rbColors ? { rbColors: u.rbColors } : {}),
+    ...(u.pinnedNft ? { pinnedNft: u.pinnedNft } : {}) });
 
 function sendTo(ids, payload, exceptWs) {
     const json = JSON.stringify(payload);
@@ -1740,6 +1741,22 @@ app.post('/api/gifts/:id/wear', async (req, res) => {
     broadcast({ type: 'chat' }); // у всех обновится ник
     await persist();
     res.json({ success: true, acc: u.acc || null });
+});
+
+// Закрепить NFT в профиле (или открепить, если on=false)
+app.post('/api/gifts/:id/pin', async (req, res) => {
+    const me = req.uid, g = read(F.gifts).find(x => x.id === req.params.id);
+    if (!g || g.ownerId !== me) return res.status(403).json({ error: 'Это не ваш подарок' });
+    const users = read(F.users), u = users.find(x => x.id === me);
+    if (!u) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    if (req.body.on) {
+        u.pinnedNft = { gid: g.id, kind: g.kind, serial: g.serial, bd: g.bd, pt: g.pt || 'none', price: g.price };
+    } else {
+        delete u.pinnedNft;
+    }
+    write(F.users, users);
+    await persist();
+    res.json({ success: true, pinnedNft: u.pinnedNft || null });
 });
 
 // ---------- Улучшение NFT ----------

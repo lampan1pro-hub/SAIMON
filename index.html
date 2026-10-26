@@ -1219,6 +1219,17 @@ html[data-theme=dark] .tgp-pin-wrap{background:#17212b;box-shadow:none}
 .tgp-pin-time{font-size:12px;color:var(--t2);flex:none}
 .tgp-pin-msg{font-size:13px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 html[data-theme=dark] .tgp-pin:active{background:rgba(255,255,255,.06)}
+/* Закреплённый NFT в профиле */
+.tgp-nft-wrap{margin:0 12px 10px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+html[data-theme=dark] .tgp-nft-wrap{background:#17212b;box-shadow:none}
+.tgp-nft-label{padding:8px 14px 4px;font-size:13px;font-weight:600;color:var(--tg-blue,#3390ec)}
+.tgp-nft-card{display:flex;align-items:center;gap:12px;padding:6px 14px 12px;cursor:pointer;border:0;background:transparent;width:100%;text-align:left}
+.tgp-nft-card:active{background:rgba(0,0,0,.04)}
+html[data-theme=dark] .tgp-nft-card:active{background:rgba(255,255,255,.06)}
+.tgp-nft-thumb{width:52px;height:52px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:26px;position:relative;overflow:hidden}
+.tgp-nft-info{flex:1;min-width:0}
+.tgp-nft-name{font-size:15px;font-weight:500;color:var(--t)}
+.tgp-nft-sub{font-size:13px;color:var(--t2);margin-top:2px}
 
 #tosWrap{display:none;margin:10px 0 4px;align-items:flex-start;gap:8px;font-size:13px;color:var(--t2);line-height:1.4}
 #tosWrap.visible{display:flex}
@@ -3360,6 +3371,7 @@ ${profRow('🎨', '#ff6b35', 'Кастомизация', 'Обои, темы, ц
 ${profRow('🎁', '#ff9500', 'Магазин и рынок', 'Подарки и юзернеймы', 'data-go="market"')}
 ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-панель', 'Каналы и пользователи', 'id="padm"') : ''}
 </div>
+${pinnedNftHtml(me)}
 <div class="tgp-sec">Мои подарки</div><div class="gg tgp-gifts" id="pgifts"></div>
 ${renderAccountSwitcher()}
 <div class="tgp-card"><button type="button" class="tgp-item tgp-danger" id="lo">Выйти из аккаунта</button></div>
@@ -3566,6 +3578,15 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
   if ($('#ngs')) $('#ngs').onclick = () => nickColor({c1: $('#ng1').value, c2: $('#ng2').value});
   if ($('#ngr')) $('#ngr').onclick = () => nickColor({reset: true});
   if ($('#pgifts')) loadGifts(me.id, $('#pgifts'), true);
+  if ($('#openPinnedNft') && me.pinnedNft) {
+    $('#openPinnedNft').onclick = async () => {
+      try {
+        const gifts = await api('/api/gifts/' + me.id);
+        const g = gifts.find(x => x.id === me.pinnedNft.gid);
+        if (g) giftInfo(g, true, () => myProfile('hub'));
+      } catch {}
+    };
+  }
 }
 
 const ADMIN_HANDLES = ['saimon', 'admin'];
@@ -3688,6 +3709,7 @@ ${isMe || isSC ? '' : `<div class="tgp-card">
 ${cnames[u.id] ? '<button type="button" class="tgp-item tgp-danger" id="cnr">Убрать имя</button>' : ''}
 </div>`}
 ${isMe || isSC ? '' : '<div class="tgp-card"><button type="button" class="tgp-item" id="gpr">💎 Подарить подписку SAIMONPREMIYM</button></div>'}
+${isSC ? '' : pinnedNftHtml(u)}
 ${isSC ? '' : '<div class="tgp-sec">Подарки</div><div class="gg tgp-gifts" id="pgifts"></div>'}
 </div>`);
   if ($('#myrb')) $('#myrb').onclick = async () => { await toggleRainbow(); userProfile(me); };
@@ -3714,6 +3736,15 @@ ${isSC ? '' : '<div class="tgp-sec">Подарки</div><div class="gg tgp-gifts
       toast('Имя убрано'); repaintNames(); userProfile(u);
     } catch (x) { toast(x.message); }
   };
+  if ($('#openPinnedNft') && u.pinnedNft) {
+    $('#openPinnedNft').onclick = async () => {
+      try {
+        const gifts = await api('/api/gifts/' + u.id);
+        const g = gifts.find(x => x.id === u.pinnedNft.gid);
+        if (g) giftInfo(g, false, () => userProfile(u));
+      } catch {}
+    };
+  }
   loadGifts(u.id, $('#pgifts'), false);
 }
 
@@ -4014,6 +4045,16 @@ const bdTier = p => p <= 1 ? 'Мифический' : p <= 3 ? 'Легендар
 const bdLine = g => { const b = bdOf(g); return b ? `Фон «${esc(b.name)}» · ${pctTxt(b.pct)} · ${bdTier(b.pct)}` : ''; };
 
 const marsTxt = () => me.unlimited ? '∞' : (me.mars || 0);
+
+// Блок закреплённого NFT для профиля
+function pinnedNftHtml(u) {
+  const pn = u.pinnedNft;
+  if (!pn) return '';
+  const k = kindInfo(pn.kind);
+  const bg = (() => { const b = backdrops.get(pn.bd); return b ? `linear-gradient(150deg,${b.c[0]},${b.c[1]})` : `linear-gradient(135deg,${k.bg?k.bg[0]:'#c9ced6'},${k.bg?k.bg[1]:'#9aa3b0'})`; })();
+  return `<div class="tgp-nft-wrap"><div class="tgp-nft-label">📌 Закреплённый NFT</div><button type="button" class="tgp-nft-card" id="openPinnedNft"><div class="tgp-nft-thumb" style="background:${bg}"><span>${k.emoji}</span></div><div class="tgp-nft-info"><div class="tgp-nft-name">${esc(k.name)}</div><div class="tgp-nft-sub">#${pn.serial} · ${esc(rarityName(k.rarity))}</div></div></button></div>`;
+}
+
 function setMars(n, unlimited) {
   if (!me) return;
   me.mars = n;
@@ -4394,6 +4435,7 @@ ${g.note ? `<div class="gr"><div class="gv gnv">${esc(g.note)}</div></div>` : ''
 <div class="row"><button class="btn gok" id="gbk">OK</button></div>
 ${mine ? `
 ${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gwr">${me.acc && me.acc.gid === g.id ? '✨ Снять с ника' : '✨ Носить рядом с ником'}</button></div>`}
+${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gpinbtn">${me.pinnedNft && me.pinnedNft.gid === g.id ? '📌 Открепить из профиля' : '📌 Закрепить в профиле'}</button></div>`}
 ${g.listing ? '' : `<div class="row"><button class="btn gok" id="gupg" style="background:linear-gradient(135deg,#a259ff,#3390ec);color:#fff">🎲 Улучшить модель · 👽 ${Math.max(10, Math.round((g.price||k.price) * 0.3))} Mars</button></div>`}
 <div class="row"><button class="btn g gok" id="gsl">${g.listing ? `💰 На рынке за ${g.listing.price} Mars — изменить` : '💰 Продать на рынке'}</button></div>
 ${g.listing ? '<div class="row"><button class="btn r gok" id="gun">Снять с продажи</button></div>' : ''}
@@ -4413,6 +4455,16 @@ ${g.listing ? '<div class="row"><button class="btn r gok" id="gun">Снять с
       if (r.acc) me.acc = r.acc; else delete me.acc;
       save(); toast(on ? 'Подарок теперь рядом с вашим ником' : 'Подарок снят с ника');
       giftInfo(g, mine, back); renderList(); renderHead();
+    } catch (x) { const e = $('#ge'); if (e) e.textContent = x.message; b.disabled = false; }
+  };
+  if (mine && $('#gpinbtn')) $('#gpinbtn').onclick = async () => {
+    const isPinned = me.pinnedNft && me.pinnedNft.gid === g.id;
+    const b = $('#gpinbtn'); b.disabled = true;
+    try {
+      const r = await api(`/api/gifts/${encodeURIComponent(g.id)}/pin`, 'POST', {on: !isPinned});
+      if (r.pinnedNft) me.pinnedNft = r.pinnedNft; else delete me.pinnedNft;
+      save(); toast(isPinned ? 'NFT откреплён из профиля' : 'NFT закреплён в профиле');
+      giftInfo(g, mine, back);
     } catch (x) { const e = $('#ge'); if (e) e.textContent = x.message; b.disabled = false; }
   };
   if (mine && $('#gupg')) $('#gupg').onclick = async () => {
