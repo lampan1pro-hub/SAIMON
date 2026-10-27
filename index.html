@@ -1352,6 +1352,7 @@ html[data-theme=dark] #tosCard .tos-head{border-bottom-color:#2a3a4a}
       <div class="rh">
         <button class="ib" id="back" aria-label="Назад">‹</button>
         <div id="hd"></div>
+        <button class="ib" id="callBtn" aria-label="Позвонить" hidden>📞</button>
         <button class="ib" id="chatSearch" aria-label="Поиск по чату">🔍</button>
         <button class="ib" id="more" aria-label="Меню чата">⋮</button>
       </div>
@@ -2381,6 +2382,8 @@ async function onWs(m) {
     toast('🎁 Вам подарили подарок!');
   } else if (m.type === 'auth') {
     logout('Сессия устарела, войдите снова.');
+  } else if (['call_offer','call_answer','call_ice','call_end','call_reject','call_busy'].includes(m.type)) {
+    onCallWs(m);
   }
 }
 
@@ -2539,6 +2542,8 @@ function renderHead() {
   if (!canWrite) setHtml($('#rdonly'), isSaimonChat ? '🔒 Системные уведомления' : isBot ? '<button type="button" class="btn" id="botstart">▶️ Старт</button>' : iBlock ? 'Вы заблокировали этого пользователя · <button class="lnk" id="unb">Разблокировать</button>' : 'Писать в канал может только его автор');
   setHtml($('#hd'), cav(c, 's') +
     `<div class="im">${titleH(c)}<small class="${t || on ? 'ty' : ''}">${sub}</small></div>`);
+  const canCall = c.type === 'direct' && c.peer && !c.peer.bot;
+  $('#callBtn').hidden = !canCall;
   renderPins();
 }
 $('#hd').onclick = () => {
@@ -5041,4 +5046,283 @@ function setThemeAndWall(t) {
 })();
 </script>
 
+<!-- ===== ГОЛОСОВЫЕ ЗВОНКИ ===== -->
+<style>
+/* Оверлей входящего звонка */
+#callOverlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);animation:fadeIn .25s}
+#callBox{background:var(--bg,#fff);border-radius:24px;padding:32px 28px 28px;width:min(340px,92vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35);animation:popIn .3s var(--ease-out,cubic-bezier(.34,1.56,.64,1))}
+#callBox .call-av{width:80px;height:80px;border-radius:50%;margin:0 auto 14px;font-size:36px;display:flex;align-items:center;justify-content:center;background:var(--pl,#e8f4ff);color:var(--p,#3390ec)}
+#callBox .call-av img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+#callBox .call-name{font-size:20px;font-weight:700;margin-bottom:4px}
+#callBox .call-status{font-size:14px;color:var(--t2,#888);margin-bottom:24px}
+#callBox .call-timer{font-size:14px;color:var(--t2,#888);margin-bottom:24px;font-variant-numeric:tabular-nums}
+.call-btns{display:flex;justify-content:center;gap:20px}
+.call-btn{width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;font-size:24px;display:flex;align-items:center;justify-content:center;transition:transform .15s,opacity .15s}
+.call-btn:active{transform:scale(.92)}
+.call-btn.green{background:#4caf50;color:#fff}
+.call-btn.red{background:#f44336;color:#fff}
+.call-btn.grey{background:var(--b2,#e0e0e0);color:var(--tx,#222)}
+.call-btn.grey.on{background:#3390ec;color:#fff}
+/* Мини-полоска активного звонка */
+#callBar{position:fixed;top:0;left:0;right:0;z-index:999;background:#4caf50;color:#fff;padding:6px 16px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;cursor:pointer;animation:slideDown .3s}
+#callBar .cb-time{font-variant-numeric:tabular-nums;flex:1}
+#callBar .cb-end{background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:20px;padding:4px 14px;font-size:13px;font-weight:700;cursor:pointer}
+@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+/* Анимация пульса у аватара при звонке */
+@keyframes callPulse{0%,100%{box-shadow:0 0 0 0 rgba(51,144,236,.5)}70%{box-shadow:0 0 0 16px rgba(51,144,236,0)}}
+#callBox.ringing .call-av{animation:callPulse 1.2s infinite}
+</style>
+
+<div id="callOverlay" hidden>
+  <div id="callBox">
+    <div class="call-av" id="callAv"></div>
+    <div class="call-name" id="callName"></div>
+    <div class="call-status" id="callStatus"></div>
+    <div class="call-timer" id="callTimer" hidden></div>
+    <div class="call-btns" id="callBtns"></div>
+  </div>
+</div>
+<div id="callBar" hidden>
+  <span>📞</span>
+  <span id="cbName"></span>
+  <span class="cb-time" id="cbTime">0:00</span>
+  <button class="cb-end" id="cbEnd">Завершить</button>
+</div>
+
+<script>
+// ===== WebRTC звонки =====
+const CALL_ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+let callPc = null;       // RTCPeerConnection
+let callStream = null;   // локальный микрофон
+let callChatId = null;   // chatId текущего звонка
+let callPeerId = null;   // userId собеседника
+let callPeerName = '';   // имя собеседника
+let callRole = null;     // 'caller' | 'callee'
+let callState = null;    // 'ringing'|'incoming'|'active'|null
+let callTimerInt = null;
+let callSeconds = 0;
+let callMuted = false;
+let callRingAudio = null;
+
+function callWsEnsure() { return ws && ws.readyState === 1; }
+function callSend(type, data = {}) {
+  if (!callWsEnsure() || !callChatId) return;
+  ws.send(JSON.stringify({ type, chatId: callChatId, data }));
+}
+
+// --- Показать оверлей ---
+function showCallOverlay(state, peerName, peerAvatar) {
+  const ov = document.getElementById('callOverlay');
+  const box = document.getElementById('callBox');
+  const av = document.getElementById('callAv');
+  document.getElementById('callName').textContent = peerName;
+  document.getElementById('callTimer').hidden = true;
+  ov.hidden = false;
+  box.className = state === 'ringing' || state === 'incoming' ? 'ringing' : '';
+  if (peerAvatar) av.innerHTML = `<img src="${peerAvatar}" onerror="this.remove()">`;
+  else av.textContent = peerName ? peerName[0].toUpperCase() : '?';
+  if (state === 'incoming') {
+    document.getElementById('callStatus').textContent = 'Входящий звонок…';
+    document.getElementById('callBtns').innerHTML =
+      `<button class="call-btn green" id="callAccept" title="Принять">📞</button>
+       <button class="call-btn red"   id="callDecline" title="Отклонить">📵</button>`;
+    document.getElementById('callAccept').onclick = acceptCall;
+    document.getElementById('callDecline').onclick = declineCall;
+  } else if (state === 'ringing') {
+    document.getElementById('callStatus').textContent = 'Вызов…';
+    document.getElementById('callBtns').innerHTML =
+      `<button class="call-btn red" id="callCancel" title="Отменить">📵</button>`;
+    document.getElementById('callCancel').onclick = endCall;
+  } else if (state === 'active') {
+    box.className = '';
+    document.getElementById('callStatus').hidden = true;
+    document.getElementById('callTimer').hidden = false;
+    document.getElementById('callBtns').innerHTML =
+      `<button class="call-btn grey" id="callMute" title="Микрофон">🎤</button>
+       <button class="call-btn red"  id="callHangup" title="Завершить">📵</button>`;
+    document.getElementById('callMute').onclick = toggleMute;
+    document.getElementById('callHangup').onclick = endCall;
+    startCallTimer();
+  }
+}
+
+function hideCallOverlay() {
+  document.getElementById('callOverlay').hidden = true;
+  document.getElementById('callStatus').hidden = false;
+}
+
+// --- Мини-бар активного звонка (когда свернули оверлей) ---
+function showCallBar() {
+  const bar = document.getElementById('callBar');
+  document.getElementById('cbName').textContent = callPeerName;
+  bar.hidden = false;
+  bar.onclick = e => { if (e.target.id !== 'cbEnd') showCallOverlay('active', callPeerName); };
+  document.getElementById('cbEnd').onclick = e => { e.stopPropagation(); endCall(); };
+}
+function hideCallBar() { document.getElementById('callBar').hidden = true; }
+
+// --- Таймер звонка ---
+function startCallTimer() {
+  callSeconds = 0;
+  clearInterval(callTimerInt);
+  callTimerInt = setInterval(() => {
+    callSeconds++;
+    const t = Math.floor(callSeconds/60) + ':' + String(callSeconds%60).padStart(2,'0');
+    const el = document.getElementById('callTimer');
+    if (el) el.textContent = t;
+    document.getElementById('cbTime').textContent = t;
+  }, 1000);
+}
+function stopCallTimer() { clearInterval(callTimerInt); callTimerInt = null; }
+
+// --- Рингтон ---
+function startRing() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    let ring = true;
+    function beep() {
+      if (!ring) return;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 440; g.gain.value = 0.15;
+      o.start(); o.stop(ctx.currentTime + 0.4);
+      setTimeout(() => { if (ring) beep(); }, 900);
+    }
+    beep();
+    callRingAudio = { stop: () => { ring = false; ctx.close(); } };
+  } catch {}
+}
+function stopRing() { if (callRingAudio) { callRingAudio.stop(); callRingAudio = null; } }
+
+// --- Получить микрофон ---
+async function getMic() {
+  if (callStream) return callStream;
+  callStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  return callStream;
+}
+
+// --- Создать PeerConnection ---
+function createPc() {
+  if (callPc) { callPc.close(); callPc = null; }
+  const pc = new RTCPeerConnection(CALL_ICE);
+  callPc = pc;
+  pc.onicecandidate = e => { if (e.candidate) callSend('call_ice', { candidate: e.candidate }); };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'connected' && callState !== 'active') {
+      callState = 'active'; stopRing();
+      showCallOverlay('active', callPeerName);
+      showCallBar();
+    }
+    if (['disconnected','failed','closed'].includes(pc.connectionState) && callState === 'active') {
+      cleanupCall(true);
+    }
+  };
+  pc.ontrack = e => {
+    let audio = document.getElementById('callRemoteAudio');
+    if (!audio) { audio = document.createElement('audio'); audio.id = 'callRemoteAudio'; audio.autoplay = true; document.body.appendChild(audio); }
+    audio.srcObject = e.streams[0];
+  };
+  return pc;
+}
+
+// --- Позвонить ---
+async function startCall(chatId, peerId, peerName, peerAvatar) {
+  if (callState) return toast('Уже идёт звонок');
+  callChatId = chatId; callPeerId = peerId; callPeerName = peerName; callRole = 'caller'; callState = 'ringing';
+  showCallOverlay('ringing', peerName, peerAvatar);
+  try {
+    const pc = createPc();
+    const stream = await getMic();
+    stream.getTracks().forEach(t => pc.addTrack(t, stream));
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    callSend('call_offer', { sdp: offer });
+  } catch (e) {
+    toast('Нет доступа к микрофону'); cleanupCall(false);
+  }
+}
+
+// --- Принять звонок ---
+async function acceptCall() {
+  if (callState !== 'incoming') return;
+  callState = 'connecting';
+  stopRing();
+  document.getElementById('callStatus').textContent = 'Соединение…';
+  document.getElementById('callBtns').innerHTML = '';
+  try {
+    const stream = await getMic();
+    stream.getTracks().forEach(t => callPc.addTrack(t, stream));
+    const answer = await callPc.createAnswer();
+    await callPc.setLocalDescription(answer);
+    callSend('call_answer', { sdp: answer });
+  } catch (e) {
+    toast('Нет доступа к микрофону'); cleanupCall(false);
+  }
+}
+
+// --- Отклонить входящий ---
+function declineCall() { callSend('call_reject', {}); cleanupCall(false); }
+
+// --- Завершить звонок ---
+function endCall() { callSend('call_end', {}); cleanupCall(true); }
+
+// --- Выключить/включить микрофон ---
+function toggleMute() {
+  if (!callStream) return;
+  callMuted = !callMuted;
+  callStream.getAudioTracks().forEach(t => { t.enabled = !callMuted; });
+  const btn = document.getElementById('callMute');
+  if (btn) { btn.textContent = callMuted ? '🔇' : '🎤'; btn.classList.toggle('on', callMuted); }
+}
+
+// --- Очистка ---
+function cleanupCall(showToast) {
+  stopRing(); stopCallTimer();
+  if (callPc) { callPc.close(); callPc = null; }
+  if (callStream) { callStream.getTracks().forEach(t => t.stop()); callStream = null; }
+  const ra = document.getElementById('callRemoteAudio');
+  if (ra) ra.remove();
+  hideCallOverlay(); hideCallBar();
+  callChatId = null; callPeerId = null; callPeerName = '';
+  callRole = null; callState = null; callMuted = false;
+  if (showToast && callSeconds > 0)
+    toast(`📞 Звонок завершён · ${Math.floor(callSeconds/60)}:${String(callSeconds%60).padStart(2,'0')}`);
+}
+
+// --- Обработка входящих сигналов WebRTC ---
+async function onCallWs(m) {
+  const d = m.data || {};
+  if (m.type === 'call_offer') {
+    if (callState) { ws && ws.readyState===1 && ws.send(JSON.stringify({type:'call_busy', chatId:d.chatId, data:{from:me.id}})); return; }
+    callChatId = d.chatId; callPeerId = d.from; callRole = 'callee'; callState = 'incoming';
+    const c = [...(chats ? chats.values() : [])].find(x => x.id === d.chatId);
+    callPeerName = c && c.peer ? (c.peer.username || 'Собеседник') : 'Входящий звонок';
+    const av = c && c.peer && c.peer.avatar ? c.peer.avatar : '';
+    const pc = createPc();
+    await pc.setRemoteDescription(new RTCSessionDescription(d.sdp));
+    startRing();
+    showCallOverlay('incoming', callPeerName, av);
+  } else if (m.type === 'call_answer') {
+    if (!callPc || callRole !== 'caller') return;
+    await callPc.setRemoteDescription(new RTCSessionDescription(d.sdp));
+  } else if (m.type === 'call_ice') {
+    if (!callPc || !d.candidate) return;
+    try { await callPc.addIceCandidate(new RTCIceCandidate(d.candidate)); } catch {}
+  } else if (m.type === 'call_end') {
+    if (callState) { cleanupCall(true); toast('📵 Звонок завершён'); }
+  } else if (m.type === 'call_reject') {
+    if (callState === 'ringing') { cleanupCall(false); toast('📵 Не ответил'); }
+  } else if (m.type === 'call_busy') {
+    if (callState === 'ringing') { cleanupCall(false); toast('📵 Занято'); }
+  }
+}
+
+// --- Кнопка звонка в шапке чата ---
+document.getElementById('callBtn').addEventListener('click', () => {
+  const c = chats && chats.get(cur);
+  if (!c || c.type !== 'direct' || !c.peer) return;
+  startCall(c.id, c.peer.id, c.peer.username || c.peer.handle, c.peer.avatar || '');
+});
+</script>
 </body>
