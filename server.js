@@ -6,6 +6,8 @@ const os = require('os');
 const path = require('path');
 const cors = require('cors');
 const crypto = require('crypto');
+const { AsyncLocalStorage } = require('async_hooks');
+const viewerCtx = new AsyncLocalStorage(); // кто делает запрос — для настроек приватности (фото и т.п.)
 const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(require('@ffmpeg-installer/ffmpeg').path);
 
@@ -25,9 +27,15 @@ app.use('/api', (req, res, next) => {
     const s = token && read(F.sessions)[token];
     if (!s) return res.status(401).json({ error: 'Сессия устарела, войдите снова' }); // сессии бессрочные — живут пока не выйдешь вручную
     req.uid = s.uid;
+    req.token = token;
     req.query.userId = String(s.uid);
     if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) req.body.userId = s.uid;
-    next();
+    // Отмечаем активность сеанса (не чаще раза в 5 минут, чтобы не писать файл на каждый запрос)
+    if (!s.seen || Date.now() - s.seen > 300000) {
+        const all = read(F.sessions);
+        if (all[token]) { all[token].seen = Date.now(); all[token].ip = reqIp(req) || all[token].ip; if (!all[token].ua) all[token].ua = String(req.headers['user-agent'] || '').slice(0, 220); write(F.sessions, all); }
+    }
+    viewerCtx.run({ uid: s.uid }, next);
 });
 
 // ---------- Хранилище ----------
@@ -270,9 +278,10 @@ const checkPass = (p, stored) => isHash(stored) ? hashPass(p, stored.split(':')[
 
 const START_MARS = Number(process.env.START_MARS ?? 0); // стартовый баланс новых аккаунтов
 
-function newSession(uid) {
+const reqIp = req => String((req && (req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress))) || '').split(',')[0].trim().replace(/^::ffff:/, '');
+function newSession(uid, req) {
     const sessions = read(F.sessions), token = crypto.randomBytes(24).toString('hex');
-    sessions[token] = { uid, at: Date.now() };
+    sessions[token] = { uid, at: Date.now(), seen: Date.now(), ua: String((req && req.headers['user-agent']) || '').slice(0, 220), ip: reqIp(req) };
     write(F.sessions, sessions);
     return token;
 }
@@ -347,6 +356,27 @@ const UNLIMITED = new Set((process.env.UNLIMITED_MARS_HANDLES || 'saimon')
 const isUnlimited = u => UNLIMITED.has(u.handle);
 const walletOf = u => ({ mars: u.mars || 0, unlimited: isUnlimited(u) });
 
+// ===== Приватность =====
+// «Контакты» — те, с кем вы сами переписывались в личке, или кого вы сохранили под своим именем
+let _sentCache = { raw: null, set: null };
+function sentSet() {
+    const raw = mem[keyOf(F.messages)];
+    if (_sentCache.raw === raw) return _sentCache.set;
+    const set = new Set();
+    try { for (const m of JSON.parse(raw)) if (typeof m.chatId === 'string' && m.chatId.startsWith('d_') && !m.call) set.add(m.chatId + ':' + m.senderId); } catch {}
+    _sentCache = { raw, set };
+    return set;
+}
+const isContact = (owner, otherId) => !!otherId && (!!(owner.contactNames && owner.contactNames[otherId]) || sentSet().has(directId(owner.id, otherId) + ':' + owner.id));
+const PRIV_MODES = ['everybody', 'contacts', 'nobody'];
+function privOk(owner, field, viewer) {
+    const mode = owner[field] || 'everybody';
+    if (mode === 'everybody' || viewer === owner.id) return true;
+    if (mode === 'nobody' || !viewer) return false;
+    return isContact(owner, viewer);
+}
+const viewerId = () => { const s = viewerCtx.getStore(); return s ? s.uid : null; };
+
 const pub = u => ({
     id: u.id, username: u.username, handle: u.handle, verified: VERIFIED.has(u.handle) || !!u.verified, bio: u.bio || '',
     // Полный список юзернеймов отдаём всегда (не только когда их больше одного) — иначе клиент при
@@ -354,9 +384,11 @@ const pub = u => ({
     // юзернеймы, если локальный кэш в браузере когда-то сохранился без них, и их станет не продать.
     handles: u.handles && u.handles.length ? u.handles : [u.handle],
     ...((u.handles || [u.handle]).length > 1 ? { others: u.handles.filter(h => h !== u.handle) } : {}),
-    avatar: u.avatar || '', createdAt: u.createdAt, ...(u.handleBuys && Object.keys(u.handleBuys).length ? { buys: u.handleBuys } : {}), online: sockets.has(u.id), ...(!sockets.has(u.id) && u.lastSeen && u.lastSeenMode !== 'nobody' ? { lastSeen: u.lastSeen } : {}), ...(u.bot && { bot: true }), ...(u.acc && { acc: u.acc }), ...(u.banned && { banned: true }), ...(u.rainbowBorder && premiumOn(u) && { rainbowBorder: true }), ...(u.rbColors && u.rainbowBorder ? { rbColors: u.rbColors } : {}), ...(u.pinnedNft && { pinnedNft: u.pinnedNft }), ...(u.pinnedChannel && { pinnedChannel: u.pinnedChannel, pinnedChannelData: (() => { const _ch = read(F.chats).find(c => c.id === u.pinnedChannel && c.type === 'channel'); return _ch ? { id: _ch.id, name: _ch.name, handle: _ch.handle || '', avatar: _ch.avatar || '', subscribers: _ch.members ? _ch.members.length : 0 } : null; })() }), ...(premiumOn(u) && { premium: u.premium, ...(u.nickGrad && { ng: u.nickGrad }) })
+    avatar: privOk(u, 'privPhoto', viewerId()) ? (u.avatar || '') : '', createdAt: u.createdAt, ...(u.handleBuys && Object.keys(u.handleBuys).length ? { buys: u.handleBuys } : {}), online: sockets.has(u.id), ...(!sockets.has(u.id) && u.lastSeen && u.lastSeenMode !== 'nobody' ? { lastSeen: u.lastSeen } : {}), ...(u.bot && { bot: true }), ...(u.acc && { acc: u.acc }), ...(u.banned && { banned: true }), ...(u.rainbowBorder && premiumOn(u) && { rainbowBorder: true }), ...(u.rbColors && u.rainbowBorder ? { rbColors: u.rbColors } : {}), ...(u.pinnedNft && { pinnedNft: u.pinnedNft }), ...(u.pinnedChannel && { pinnedChannel: u.pinnedChannel, pinnedChannelData: (() => { const _ch = read(F.chats).find(c => c.id === u.pinnedChannel && c.type === 'channel'); return _ch ? { id: _ch.id, name: _ch.name, handle: _ch.handle || '', avatar: _ch.avatar || '', subscribers: _ch.members ? _ch.members.length : 0 } : null; })() }), ...(premiumOn(u) && { premium: u.premium, ...(u.nickGrad && { ng: u.nickGrad }) })
 });
-const self = u => ({ ...pub(u), email: u.email, ...walletOf(u), lastSeenMode: u.lastSeenMode || 'everybody', lastSeen: u.lastSeen || null,
+const self = u => ({ ...pub(u), avatar: u.avatar || '', email: u.email, ...walletOf(u), lastSeenMode: u.lastSeenMode || 'everybody', lastSeen: u.lastSeen || null,
+    archived: u.archived || [],
+    privCall: u.privCall || 'everybody', privPhoto: u.privPhoto || 'everybody', privGift: u.privGift || 'everybody', readReceipts: u.readReceipts !== false, pushPreview: u.pushPreview !== false,
     ...(u.uListings && u.uListings.length ? { uListings: u.uListings, uListing: u.uListings.find(l => l.handle === u.handle) } : {}),
     ...(u.handles && u.handles.length > 1 ? { handles: u.handles } : {}),
     ...(u.pinnedChannel ? { pinnedChannel: u.pinnedChannel } : {}), ...(u.rbColors ? { rbColors: u.rbColors } : {}),
@@ -429,11 +461,15 @@ function shape(chat, me, users, list) {
     if (clr) list = list.filter(m => m.timestamp > clr);
     const byId = id => users.find(u => u.id === id);
     const reads = chat.reads || {};
+    const rrOff = id => { const x = byId(id); return !!x && x.readReceipts === false; };
+    // Отчёты о прочтении: выключивший не показывает свои ✓✓ и сам не видит чужие
+    const outReads = rrOff(me) ? (reads[me] ? { [me]: reads[me] } : {}) : Object.fromEntries(Object.entries(reads).filter(([k]) => Number(k) === me || !rrOff(Number(k))));
     const o = {
         id: chat.id, type: chat.type, name: chat.name, avatar: chat.avatar || '',
-        creator: chat.creator, createdAt: chat.createdAt, reads,
+        creator: chat.creator, createdAt: chat.createdAt, reads: outReads, ttl: chat.ttl || 0,
         last: outMsg(list[list.length - 1] || null, chat, () => ixOf(users)),
         unread: list.filter(m => m.senderId !== me && m.timestamp > (reads[me] || '')).length,
+        mentions: list.filter(m => m.mentions && m.mentions.includes(me) && m.timestamp > (reads[me] || '')).length,
         pins: (chat.pins || []).map(id => list.find(m => m.id === id)).filter(Boolean)
             .map(m => ({ id: m.id, senderId: m.senderId,
                 name: ((users.find(u => u.id === m.senderId) || {}).username) || '—',
@@ -444,6 +480,9 @@ function shape(chat, me, users, list) {
         const p = byId(chat.members.find(i => i !== me));
         o.peer = p ? pub(p) : null;
     } else if (chat.type === 'group') {
+        o.members = chat.members.map(byId).filter(Boolean).map(pub);
+    } else if (chat.type === 'saved') {
+        o.name = 'Избранное';
         o.members = chat.members.map(byId).filter(Boolean).map(pub);
     } else { // канал
         o.description = chat.description || '';
@@ -579,7 +618,10 @@ function notifyMessage(chat, msg, preview) {
     const direct = chat.type === 'direct';
     const media = { video: '🎬 Видео', voice: '🎤 Голосовое', image: '📷 Фото' }[msg.media && msg.media.kind] || (msg.media ? '📎 Вложение' : '');
     const text = preview || msg.text || (msg.gift ? '🎁 Подарок' : media);
-    sendPush(to, { title: direct ? who : chat.name, body: (direct || chat.type === 'channel' && !chat.open ? '' : who + ': ') + text.slice(0, 140), chatId: chat.id, tag: 'chat-' + chat.id });
+    const pUsers = read(F.users), hide = new Set(to.filter(id => (pUsers.find(u => u.id === id) || {}).pushPreview === false));
+    const full = to.filter(id => !hide.has(id));
+    if (full.length) sendPush(full, { title: direct ? who : chat.name, body: (direct || chat.type === 'channel' && !chat.open ? '' : who + ': ') + text.slice(0, 140), chatId: chat.id, tag: 'chat-' + chat.id });
+    if (hide.size) sendPush([...hide], { title: direct ? who : chat.name, body: 'Новое сообщение', chatId: chat.id, tag: 'chat-' + chat.id });
 }
 app.post('/api/push/subscribe', async (req, res) => {
     const sub = req.body.subscription;
@@ -600,6 +642,10 @@ app.post('/api/push/unsubscribe', async (req, res) => {
 
 // Сервис-воркер и манифест: уведомления приходят, даже когда вкладка закрыта; приложение можно «установить» на экран
 const SW_JS = `self.addEventListener('install',()=>self.skipWaiting());
+self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET'||r.headers.get('range'))return;let u;try{u=new URL(r.url)}catch(x){return}
+if(u.origin!==self.location.origin||!/^\\/uploads\\/[\\w-]+\\.(jpg|png|webp|gif)$/.test(u.pathname))return;
+e.respondWith(caches.open('sg-media-v1').then(async c=>{const hit=await c.match(u.pathname);if(hit)return hit;const res=await fetch(r);
+if(res.ok&&res.status===200){try{const b=await res.clone().blob();const h=new Headers(res.headers);h.set('x-sg-at',String(Date.now()));h.set('x-sg-size',String(b.size));await c.put(u.pathname,new Response(b,{status:200,headers:h}))}catch(x){}}return res}).catch(()=>fetch(r)))});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch(x){}
 e.waitUntil(self.registration.showNotification(d.title||'SAIMONGRAM',{body:d.body||'Новое сообщение',tag:d.tag||'msg',renotify:true,icon:'/icon-192.png',badge:'/icon-192.png',data:{chatId:d.chatId||''}}))});
@@ -641,7 +687,7 @@ app.post('/api/register', async (req, res) => {
     };
     users.push(user);
     write(F.users, users);
-    const token = newSession(user.id);
+    const token = newSession(user.id, req);
     await persist();
     saimonChatNotify(user.id, req, 'register');
     res.json({ success: true, user: self(user), token });
@@ -657,7 +703,7 @@ app.post('/api/login', async (req, res) => {
     ) && checkPass(password, u.password));
     if (!user) return res.status(401).json({ error: 'Неверный логин или пароль' });
     if (!isHash(user.password)) { user.password = hashPass(password); write(F.users, users); }
-    const token = newSession(user.id);
+    const token = newSession(user.id, req);
     await persist();
     saimonChatNotify(user.id, req, 'login');
     res.json({ success: true, user: self(user), token });
@@ -740,6 +786,9 @@ app.put('/api/profile/:id', (req, res) => {
     if (!u) return res.status(404).json({ error: 'Пользователь не найден' });
 
     const { username, handle, bio, avatar, lastSeenMode } = req.body;
+    for (const f of ['privCall', 'privPhoto', 'privGift']) if (req.body[f] !== undefined && PRIV_MODES.includes(req.body[f])) u[f] = req.body[f];
+    if (typeof req.body.readReceipts === 'boolean') u.readReceipts = req.body.readReceipts;
+    if (typeof req.body.pushPreview === 'boolean') u.pushPreview = req.body.pushPreview;
     if (lastSeenMode !== undefined) {
         const allowed = ['everybody', 'nobody'];
         if (allowed.includes(lastSeenMode)) u.lastSeenMode = lastSeenMode;
@@ -926,8 +975,16 @@ app.post('/api/usernames/buy', async (req, res) => {
 });
 
 // ---------- Чаты ----------
+const savedId = uid => 's_' + uid;
+function ensureSaved(uid) {
+    const chats = read(F.chats);
+    if (chats.some(c => c.id === savedId(uid))) return;
+    chats.push({ id: savedId(uid), type: 'saved', name: 'Избранное', members: [uid], creator: uid, reads: {}, createdAt: new Date(0).toISOString() });
+    write(F.chats, chats);
+}
 app.get('/api/chats/:userId', (req, res) => {
     const me = req.uid;
+    ensureSaved(me);
     const users = read(F.users);
     const grouped = new Map();
     read(F.messages).forEach(m => {
@@ -1705,6 +1762,7 @@ app.post('/api/gifts/buy', async (req, res) => {
     if (!buyer || !users.some(u => u.id === toId)) return res.status(400).json({ error: 'Получатель не найден' });
     if (toId === BOT_ID) return res.status(400).json({ error: 'Боту нельзя дарить подарки' });
     if (toId !== me && blockedEither(me, toId)) return res.status(400).json({ error: 'Нельзя отправить подарок: один из вас заблокировал другого' });
+    if (toId !== me && !privOk(users.find(u => u.id === toId), 'privGift', me)) return res.status(400).json({ error: 'Пользователь ограничил, кто может дарить ему подарки' });
 
     const minted = gifts.filter(g => g.kind === item.kind).length;
     if (minted >= item.supply) return res.status(400).json({ error: 'Этот подарок распродан' });
@@ -1872,6 +1930,7 @@ app.post('/api/gifts/:id/transfer', async (req, res) => {
     if (toId === me || !read(F.users).some(u => u.id === toId)) return res.status(400).json({ error: 'Выберите другого получателя' });
     if (blockedEither(me, toId)) return res.status(400).json({ error: 'Нельзя передать подарок: один из вас заблокировал другого' });
     const users = read(F.users), owner = users.find(u => u.id === me);
+    if (!privOk(users.find(u => u.id === toId), 'privGift', me)) return res.status(400).json({ error: 'Пользователь ограничил, кто может дарить ему подарки' });
     if (owner && owner.acc && owner.acc.gid === g.id) { delete owner.acc; write(F.users, users); broadcast({ type: 'chat' }); } // подарок ушёл — аксессуар снимается
     delete g.listing; // подарок ушёл — лот закрывается
     g.ownerId = toId;
@@ -1883,6 +1942,106 @@ app.post('/api/gifts/:id/transfer', async (req, res) => {
     await persist();
     res.json({ success: true });
 });
+
+// ---------- Архив чатов ----------
+app.put('/api/archive', async (req, res) => {
+    const users = read(F.users), u = users.find(x => x.id === req.uid);
+    if (!u) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    const id = String(req.body.chatId || '');
+    if (!read(F.chats).some(c => c.id === id && c.members.includes(req.uid))) return res.status(404).json({ error: 'Чат не найден' });
+    const set = new Set(u.archived || []);
+    if (req.body.on) set.add(id); else set.delete(id);
+    u.archived = [...set].slice(-500);
+    write(F.users, users);
+    sendTo([req.uid], { type: 'archive', data: { archived: u.archived } });
+    await persist();
+    res.json({ success: true, archived: u.archived });
+});
+
+// ---------- Активные сеансы ----------
+const sidOf = t => crypto.createHash('sha256').update(String(t)).digest('hex').slice(0, 16);
+function uaName(ua) {
+    ua = String(ua || '');
+    const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'Устройство';
+    const br = /YaBrowser/.test(ua) ? 'Яндекс Браузер' : /Edg\//.test(ua) ? 'Edge' : /OPR\/|Opera/.test(ua) ? 'Opera' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Firefox|FxiOS/.test(ua) ? 'Firefox' : /Chrome|CriOS/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : '';
+    return { os, name: br ? os + ' · ' + br : os, kind: /iPhone|Android.*Mobile|Mobile/.test(ua) ? 'phone' : /iPad|Tablet/.test(ua) ? 'tablet' : 'desktop' };
+}
+const maskIp = ip => !ip ? '' : ip.includes('.') ? ip.split('.').slice(0, 2).join('.') + '.*.*' : ip.split(':').slice(0, 3).join(':') + ':…';
+function closeTokenSockets(uid, tokens) {
+    const set = sockets.get(uid);
+    if (set) for (const w of [...set]) if (tokens.includes(w.token)) { try { w.send(JSON.stringify({ type: 'auth', data: { ok: false } })); w.close(); } catch {} }
+}
+app.get('/api/sessions', (req, res) => {
+    const all = read(F.sessions);
+    const list = Object.entries(all).filter(([, s]) => s.uid === req.uid).map(([t, s]) => ({
+        id: sidOf(t), ...uaName(s.ua), ip: maskIp(s.ip), at: s.at || 0, seen: s.seen || s.at || 0, current: t === req.token
+    })).sort((a, b) => (b.current - a.current) || (b.seen - a.seen));
+    res.json(list);
+});
+app.delete('/api/sessions/:id', async (req, res) => {
+    const all = read(F.sessions);
+    const t = Object.keys(all).find(k => all[k].uid === req.uid && sidOf(k) === req.params.id);
+    if (!t) return res.status(404).json({ error: 'Сеанс не найден' });
+    if (t === req.token) return res.status(400).json({ error: 'Это текущее устройство — для выхода используйте «Выйти из аккаунта»' });
+    delete all[t];
+    write(F.sessions, all);
+    closeTokenSockets(req.uid, [t]);
+    await persist();
+    res.json({ success: true });
+});
+app.post('/api/sessions/terminate-others', async (req, res) => {
+    const all = read(F.sessions), gone = Object.keys(all).filter(k => all[k].uid === req.uid && k !== req.token);
+    gone.forEach(k => delete all[k]);
+    write(F.sessions, all);
+    closeTokenSockets(req.uid, gone);
+    await persist();
+    res.json({ success: true, count: gone.length });
+});
+
+// ---------- Автоудаление сообщений в чате ----------
+const TTL_OK = { 0: 'выключено', 86400: '1 день', 604800: '1 неделя', 2592000: '1 месяц' };
+app.put('/api/chats/:chatId/ttl', async (req, res) => {
+    const chats = read(F.chats), chat = chats.find(c => String(c.id) === req.params.chatId);
+    if (!chat || !chat.members.includes(req.uid)) return res.status(403).json({ error: 'Нет доступа' });
+    if (chat.type === 'channel' && chat.creator !== req.uid) return res.status(403).json({ error: 'Только автор канала' });
+    const ttl = Number(req.body.ttl);
+    if (!(ttl in TTL_OK)) return res.status(400).json({ error: 'Некорректный срок' });
+    if ((chat.ttl || 0) === ttl) return res.json({ success: true, ttl });
+    chat.ttl = ttl;
+    write(F.chats, chats);
+    const u = read(F.users).find(x => x.id === req.uid);
+    const msg = { id: crypto.randomUUID(), chatId: chat.id, senderId: req.uid, sys: 'ttl',
+        text: ttl ? `⏳ ${u ? u.username : 'Участник'} включил(а) автоудаление: ${TTL_OK[ttl]}` : `⏳ ${u ? u.username : 'Участник'} выключил(а) автоудаление`, timestamp: new Date().toISOString() };
+    const msgs = read(F.messages); msgs.push(msg); write(F.messages, msgs);
+    sendTo(chat.members, { type: 'message', data: outMsg(msg, chat) });
+    sendTo(chat.members, { type: 'chat' });
+    await persist();
+    res.json({ success: true, ttl });
+});
+function sweepTtl() {
+    try {
+        const chats = read(F.chats).filter(c => c.ttl > 0);
+        if (!chats.length) return;
+        const msgs = read(F.messages), now = Date.now(), gone = new Map();
+        const keep = msgs.filter(m => {
+            const c = chats.find(x => x.id === m.chatId);
+            if (!c || now - new Date(m.timestamp).getTime() < c.ttl * 1000) return true;
+            if (!gone.has(c.id)) gone.set(c.id, []);
+            gone.get(c.id).push(m.id);
+            return false;
+        });
+        if (!gone.size) return;
+        write(F.messages, keep);
+        for (const [cid, ids] of gone) {
+            const c = chats.find(x => x.id === cid);
+            if (ids.length <= 100) ids.forEach(id => sendTo(c.members, { type: 'messageDeleted', data: { chatId: cid, messageId: id } }));
+            sendTo(c.members, { type: 'chat' });
+        }
+        persist();
+    } catch (e) { console.error('ttl:', e.message); }
+}
+setInterval(sweepTtl, 5 * 60 * 1000);
+setTimeout(sweepTtl, 20000);
 
 // ---------- Закрепление сообщений (до 5 на чат) ----------
 app.post('/api/chats/:chatId/pin', async (req, res) => {
@@ -2341,6 +2500,90 @@ app.put('/api/premium/rainbow', async (req, res) => {
 });
 
 // ---------- WebSocket ----------
+// ===== Звонки 1-на-1: пересылка сигналов WebRTC + запись звонка в чате =====
+// call в сообщении: { status: 'ringing'|'active'|'ended'|'missed'|'declined'|'busy', dur?: секунды }
+const CALL_TYPES = ['call_offer', 'call_answer', 'call_ice', 'call_end', 'call_reject', 'call_busy', 'call_cam'];
+const CALL_RING_MS = 45000; // столько ждём ответа, потом «Нет ответа»
+const calls = new Map();    // chatId -> { caller, callee, msgId, answeredAt, timer, ws:Set }
+
+function saveCallMsg(chat, caller, call) {
+    const msg = { id: crypto.randomUUID(), chatId: chat.id, senderId: caller, text: '', call, timestamp: new Date().toISOString() };
+    const msgs = read(F.messages);
+    msgs.push(msg);
+    write(F.messages, msgs);
+    sendTo(chat.members, { type: 'message', data: msg });
+    return msg;
+}
+function updateCallMsg(chatId, msgId, call) {
+    const msgs = read(F.messages), msg = msgs.find(x => x.id === msgId);
+    if (!msg) return;
+    msg.call = call;
+    write(F.messages, msgs);
+    const chat = read(F.chats).find(c => c.id === chatId);
+    if (chat) sendTo(chat.members, { type: 'callUpdate', data: { chatId, messageId: msgId, call } });
+}
+function finishCall(chatId, byUid, status) {
+    const call = calls.get(chatId);
+    if (!call) return;
+    calls.delete(chatId);
+    clearTimeout(call.timer);
+    const res = { status, ...(call.video && { video: true }) };
+    if (status === 'ended' && call.answeredAt) res.dur = Math.max(0, Math.round((Date.now() - call.answeredAt) / 1000));
+    updateCallMsg(chatId, call.msgId, res);
+    // Обеим сторонам (всем их вкладкам) — сигнал, что звонок окончен
+    sendTo([call.caller, call.callee], { type: 'call_end', data: { from: byUid, chatId, reason: status } });
+    if (status === 'missed') {
+        const chat = read(F.chats).find(c => c.id === chatId);
+        if (chat) notifyMessage(chat, { senderId: call.caller }, '📞 Пропущенный звонок');
+    }
+}
+const inCall = id => [...calls.values()].some(c => c.caller === id || c.callee === id);
+
+function handleCallWs(uid, chat, m, ws) {
+    if (chat.type !== 'direct') return;
+    const toId = chat.members.find(i => i !== uid);
+    if (!toId || toId === BOT_ID || blockedEither(uid, toId)) return;
+    const d = m.data && typeof m.data === 'object' ? m.data : {};
+    const call = calls.get(chat.id);
+    const relay = () => sendTo([toId], { type: m.type, data: { ...d, from: uid, chatId: chat.id } });
+
+    if (m.type === 'call_offer') {
+        if (call) return;
+        const callee = read(F.users).find(x => x.id === toId);
+        if (!callee || !privOk(callee, 'privCall', uid))
+            return ws.send(JSON.stringify({ type: 'call_end', data: { from: toId, chatId: chat.id, reason: 'privacy' } }));
+        if (inCall(toId) || inCall(uid)) {
+            saveCallMsg(chat, uid, { status: 'busy', ...(d.video === true && { video: true }) });
+            return ws.send(JSON.stringify({ type: 'call_busy', data: { from: toId, chatId: chat.id } }));
+        }
+        const video = d.video === true;
+        const msg = saveCallMsg(chat, uid, { status: 'ringing', ...(video && { video: true }) });
+        calls.set(chat.id, {
+            caller: uid, callee: toId, msgId: msg.id, answeredAt: 0, ws: new Set([ws]), video,
+            timer: setTimeout(() => finishCall(chat.id, null, 'missed'), CALL_RING_MS)
+        });
+        relay();
+        notifyMessage(chat, { senderId: uid }, video ? '📹 Входящий видеозвонок' : '📞 Входящий аудиозвонок');
+    } else if (m.type === 'call_answer') {
+        if (!call || uid !== call.callee || call.answeredAt) return;
+        call.answeredAt = Date.now();
+        call.ws.add(ws);
+        clearTimeout(call.timer);
+        updateCallMsg(chat.id, call.msgId, { status: 'active', ...(call.video && { video: true }) });
+        relay();
+        // Другие вкладки принявшего — убрать экран входящего звонка
+        sendTo([uid], { type: 'call_end', data: { from: uid, chatId: chat.id, elsewhere: true } }, ws);
+    } else if (m.type === 'call_ice' || m.type === 'call_cam') {
+        if (call) relay();
+    } else if (m.type === 'call_end') {
+        if (!call) return;
+        finishCall(chat.id, uid, call.answeredAt ? 'ended' : uid === call.caller ? 'missed' : 'declined');
+    } else if (m.type === 'call_reject' || m.type === 'call_busy') {
+        if (!call || uid !== call.callee || call.answeredAt) return;
+        finishCall(chat.id, uid, m.type === 'call_busy' ? 'busy' : 'declined');
+    }
+}
+
 wss.on('connection', ws => {
     let uid = null;
     ws.isAlive = true;
@@ -2355,6 +2598,7 @@ wss.on('connection', ws => {
                 const sess = read(F.sessions)[m.token];
                 if (!sess) { ws.send(JSON.stringify({ type: 'auth', data: { ok: false } })); return ws.close(); }
                 uid = sess.uid;
+                ws.token = m.token;
                 ws.active = m.active !== false;
                 if (!sockets.has(uid)) sockets.set(uid, new Set());
                 sockets.get(uid).add(ws);
@@ -2389,8 +2633,16 @@ wss.on('connection', ws => {
                     if (w > 0 && h > 0 && w < 20000 && h < 20000) { media.w = Math.round(w); media.h = Math.round(h); }
                     const dur = Number(m.media.dur);
                     if (media.kind === 'voice' && dur > 0 && dur < 3600) media.dur = Math.round(dur);
+                    if (media.kind === 'video' && m.media.circle === true) { media.circle = true; if (dur > 0 && dur <= 61) media.dur = Math.round(dur); }
                 }
                 if (!text && !media) return;
+                // Упоминания @юзернейм в группах и открытых каналах
+                let mentions;
+                if ((chat.type === 'group' || (chat.type === 'channel' && chat.open)) && /@[a-z0-9_]{3,20}/i.test(text)) {
+                    const hs = new Set([...text.matchAll(/(^|[^a-zA-Z0-9_])@([a-zA-Z0-9_]{3,20})/g)].map(x => x[2].toLowerCase()));
+                    const ids = read(F.users).filter(u => u.id !== uid && chat.members.includes(u.id) && (u.handles || [u.handle]).some(h => hs.has(h))).map(u => u.id);
+                    if (ids.length) mentions = ids;
+                }
 
                 // Ответ на сообщение: сохраняем снапшот оригинала (переживёт его удаление)
                 let reply;
@@ -2399,7 +2651,7 @@ wss.on('connection', ws => {
                     if (orig) {
                         const u = read(F.users).find(x => x.id === orig.senderId);
                         reply = { id: orig.id, name: u ? u.username : 'Удалённый аккаунт', ...(u ? { handle: u.handle } : {}),
-                            text: String(orig.text || '').slice(0, 120), mk: orig.media ? orig.media.kind : (orig.gift ? 'gift' : '') };
+                            text: String(orig.text || '').slice(0, 120), mk: orig.media ? (orig.media.circle ? 'circle' : orig.media.kind) : (orig.gift ? 'gift' : '') };
                     }
                 }
                 // Пересылка: помечаем, от кого оригинал
@@ -2411,7 +2663,7 @@ wss.on('connection', ws => {
 
                 const msg = {
                     id: crypto.randomUUID(), chatId: chat.id, senderId: uid, text,
-                    ...(media && { media }), ...(reply && { reply }), ...(fwd && { fwd }), timestamp: new Date().toISOString()
+                    ...(media && { media }), ...(reply && { reply }), ...(fwd && { fwd }), ...(mentions && { mentions }), timestamp: new Date().toISOString()
                 };
                 if (chat.type === 'channel' && !chat.open) { msg.viewers = [uid]; msg.fv = rollFv(fakeInChannel(chat, read(F.users))); }
                 const msgs = read(F.messages);
@@ -2429,7 +2681,12 @@ wss.on('connection', ws => {
                 if (!at || (chat.reads[uid] || '') >= at) return;
                 chat.reads[uid] = at;
                 write(F.chats, chats);
-                sendTo(chat.members, { type: 'read', data: { chatId: chat.id, userId: uid, at } });
+                const rUsers = read(F.users), rOff = id => (rUsers.find(x => x.id === id) || {}).readReceipts === false;
+                const rTo = chat.members.filter(id => id === uid || (!rOff(uid) && !rOff(id)));
+                sendTo(rTo, { type: 'read', data: { chatId: chat.id, userId: uid, at } });
+
+            } else if (CALL_TYPES.includes(m.type)) {
+                handleCallWs(uid, chat, m, ws);
 
             } else if (m.type === 'typing') {
                 if (chat.type === 'channel') return;
@@ -2444,6 +2701,10 @@ wss.on('connection', ws => {
     ws.on('close', () => {
         if (!uid || !sockets.has(uid)) return;
         sockets.get(uid).delete(ws);
+        // Закрылась вкладка, на которой шёл звонок — завершаем его
+        for (const [cid, call] of calls) {
+            if (call.ws.has(ws)) finishCall(cid, uid, call.answeredAt ? 'ended' : uid === call.caller ? 'missed' : 'declined');
+        }
         if (!sockets.get(uid).size) {
             sockets.delete(uid);
             // Сохраняем время последнего выхода
