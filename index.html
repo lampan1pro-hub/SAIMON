@@ -3616,7 +3616,7 @@ function adminPanel() {
     try {
       const q = encodeURIComponent($('#admq').value.trim());
       const list = await api('/api/admin/users?q=' + q);
-      $('#admu').innerHTML = list.length ? list.map(u => `<div class="adm-row"><div><b>${esc(u.username)}</b><div class="adm-sub">${u.handle ? '@' + esc(u.handle) : 'без юзернейма'}</div></div><button type="button" class="btn r adm-btn" data-ban="${u.id}" data-name="${esc(u.username)}">Заблокировать</button><button type="button" class="btn r adm-btn" data-del="${u.id}" data-name="${esc(u.username)}">Удалить</button></div>`).join('') : '<div class="adm-sub">Никого не нашли</div>';
+      $('#admu').innerHTML = list.length ? list.map(u => `<div class="adm-row"><div><b>${esc(u.username)}</b><div class="adm-sub">${u.handle ? '@' + esc(u.handle) : 'без юзернейма'}</div></div><button type="button" class="btn g adm-btn" data-pw="${u.id}" data-name="${esc(u.username)}">Сбросить пароль</button><button type="button" class="btn r adm-btn" data-ban="${u.id}" data-name="${esc(u.username)}">Заблокировать</button><button type="button" class="btn r adm-btn" data-del="${u.id}" data-name="${esc(u.username)}">Удалить</button></div>`).join('') : '<div class="adm-sub">Никого не нашли</div>';
     } catch (x) { toast(x.message); }
   };
   $('#admch').onclick = async e => {
@@ -3627,7 +3627,12 @@ function adminPanel() {
   $('#admu').onclick = async e => {
     const ban = e.target.closest('[data-ban]');
     const del = e.target.closest('[data-del]');
-    if (ban) {
+    const pw = e.target.closest('[data-pw]');
+    if (pw) {
+      const pass = prompt(`Новый пароль для ${pw.dataset.name} (минимум 6 символов):`);
+      if (pass === null) return;
+      try { await api('/api/admin/users/' + pw.dataset.pw + '/reset-password', 'POST', { password: pass }); toast('Пароль сброшен, сессии завершены'); } catch (x) { toast(x.message); }
+    } else if (ban) {
       if (!confirm(`Заблокировать ${ban.dataset.name}?\nИмя, юзернеймы и фото будут удалены, аккаунт заморозится.`)) return;
       try { await api('/api/admin/users/' + ban.dataset.ban + '/block', 'POST'); toast('Аккаунт заблокирован'); loadUs(); loadCh(); loadBan(); } catch (x) { toast(x.message); }
     } else if (del) {

@@ -2141,6 +2141,27 @@ app.get('/api/admin/banned', adminOnly, (req, res) => {
     })));
 });
 
+// Сброс пароля пользователя из админки: админ задаёт новый пароль, старый хэш перезаписывается,
+// все сессии пользователя завершаются (вход на всех устройствах закроется).
+app.post('/api/admin/users/:id/reset-password', adminOnly, async (req, res) => {
+    const users = read(F.users);
+    const u = users.find(x => String(x.id) === req.params.id);
+    if (!u || u.bot || u.fake) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (ADMIN_HANDLES.includes(u.handle)) return res.status(400).json({ error: 'Нельзя сбросить пароль администратору' });
+    const pass = String(req.body && req.body.password || '');
+    if (pass.length < 6) return res.status(400).json({ error: 'Пароль должен быть минимум 6 символов' });
+    if (pass.length > 72) return res.status(400).json({ error: 'Пароль слишком длинный' });
+    u.password = hashPass(pass);
+    write(F.users, users);
+    // все активные сессии пользователя завершаем
+    const sessions = read(F.sessions);
+    Object.keys(sessions).forEach(t => { if (String(sessions[t].uid) === String(u.id)) delete sessions[t]; });
+    write(F.sessions, sessions);
+    sendTo([u.id], { type: 'session' });
+    await persist();
+    res.json({ success: true, username: u.username });
+});
+
 // Полное удаление аккаунта: убирает пользователя, его сессии, личные чаты и освобождает юзернеймы.
 // Сообщения в группах и каналах остаются (как в Telegram), но автор показывается как «Удалённый аккаунт».
 app.delete('/api/admin/users/:id', adminOnly, async (req, res) => {
