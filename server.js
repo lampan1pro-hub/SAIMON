@@ -1505,7 +1505,7 @@ app.get('/api/blocks', (req, res) => {
 const MARS_PER_MIN = Number(process.env.MARS_PER_MIN) || 1;
 const CATALOG = [
     // обычные
-    { kind: 'heart',    rarity: 'common',    emoji: '💝', name: 'Сердечко',     price: 15,    supply: 15000, bg: ['#ff9aa2', '#ff5e7e'] },
+    { kind: 'heart',    rarity: 'common',    emoji: '💝', name: 'Сердечко',     price: 15,    supply: 10000, bg: ['#ff9aa2', '#ff5e7e'] },
     { kind: 'star',     rarity: 'common',    emoji: '⭐', name: 'Звезда',       price: 20,    supply: 5000, bg: ['#ffe29a', '#ffa751'] },
     { kind: 'flower',   rarity: 'common',    emoji: '🌸', name: 'Сакура',       price: 25,    supply: 4000, bg: ['#ffd1dc', '#f78fb3'] },
     { kind: 'coffee',   rarity: 'common',    emoji: '☕', name: 'Кофе',         price: 30,    supply: 4000, bg: ['#d7b899', '#8b5e3c'] },
@@ -1513,7 +1513,6 @@ const CATALOG = [
     { kind: 'bear',     rarity: 'common',    emoji: '🧸', name: 'Мишка',        price: 50,    supply: 2000, bg: ['#ffd89b', '#f2a65a'] },
     { kind: 'cat',      rarity: 'common',    emoji: '🐱', name: 'Котик',        price: 60,    supply: 2500, bg: ['#cfd9ff', '#8e9eea'] },
     // редкие
-    { kind: 'hamster',  rarity: 'rare',      emoji: '🐹', name: 'Грейс',        price: 225,   supply: 1000, bg: ['#f5c89a', '#c97c3a'] },
     { kind: 'balloon',  rarity: 'rare',      emoji: '🎈', name: 'Шарик',        price: 80,    supply: 1500, bg: ['#ff9a9e', '#e8505b'] },
     { kind: 'rocket',   rarity: 'rare',      emoji: '🚀', name: 'Ракета',       price: 120,   supply: 1000, bg: ['#a1c4fd', '#5b7cfa'] },
     { kind: 'gamepad',  rarity: 'rare',      emoji: '🎮', name: 'Геймпад',      price: 150,   supply: 800,  bg: ['#a18cd1', '#5f4bb6'] },
@@ -1533,18 +1532,7 @@ const CATALOG = [
     { kind: 'dragon',   rarity: 'legendary', emoji: '🐉', name: 'Дракон',       price: 5000,  supply: 10,   bg: ['#ff9966', '#c0392b'] },
     { kind: 'planet',   rarity: 'legendary', emoji: '🪐', name: 'Сатурн',       price: 8000,  supply: 7,    bg: ['#f093fb', '#5b2a86'] },
     { kind: 'phoenix',  rarity: 'legendary', emoji: '🦅', name: 'Феникс',       price: 15000, supply: 3,    bg: ['#ffd200', '#f12711'] },
-    { kind: 'infinity', rarity: 'legendary', emoji: '♾️', name: 'Бесконечность', price: 50000, supply: 2,    bg: ['#232526', '#0f9b8e'] },
-    // ——— ultra ———
-    { kind: 'eye',      rarity: 'ultra',     emoji: '👁️',  name: 'Глаз Бога',    price: 25000,  supply: 5,  bg: ['#1a1a2e', '#e94560'] },
-    { kind: 'blackhole',rarity: 'ultra',     emoji: '🌑',  name: 'Сингулярность',price: 50000,  supply: 3,  bg: ['#0d0d0d', '#3a0ca3'] },
-    { kind: 'quantum',  rarity: 'ultra',     emoji: '💠',  name: 'Квант',         price: 75000,  supply: 4,  bg: ['#00b4d8', '#023e8a'] },
-    { kind: 'meteor',   rarity: 'ultra',     emoji: '☄️',  name: 'Армагеддон',   price: 100000, supply: 3,  bg: ['#e63946', '#1d1d1d'] },
-    { kind: 'zero',     rarity: 'ultra',     emoji: '🧊',  name: 'Криос',         price: 150000, supply: 2,  bg: ['#caf0f8', '#0077b6'] },
-    { kind: 'portal',   rarity: 'ultra',     emoji: '🌀',  name: 'Варп',          price: 200000, supply: 5,  bg: ['#7b2d8b', '#120458'] },
-    { kind: 'antimatter',rarity: 'ultra',    emoji: '⚫',  name: 'Аннигилятор',  price: 333000, supply: 2,  bg: ['#1c1c1c', '#6b0f1a'] },
-    { kind: 'omega',    rarity: 'ultra',     emoji: '🌀',  name: 'Омега',         price: 500000, supply: 3,  bg: ['#2d00f7', '#000000'] },
-    // ★ Уникальный душепривязанный NFT — только у saimon и admin. Нельзя продать, передать и улучшить.
-    { kind: 'burger',   rarity: 'unique',    emoji: '🍔', name: 'Бургер',        price: 77000000, supply: 2, bg: ['#ff9800', '#e65100'], soulbound: true }
+    { kind: 'infinity', rarity: 'legendary', emoji: '♾️', name: 'Бесконечность', price: 50000, supply: 1,    bg: ['#232526', '#0f9b8e'] },
 ];
 // Фоны подарков: при покупке фон выпадает случайно. pct — шанс выпадения в процентах (чем меньше, тем реже и ценнее)
 const BACKDROPS = [
@@ -1590,9 +1578,6 @@ function pickBackdrop(forUser) {
     for (const b of BACKDROPS) { if ((r -= b.pct) < 0) return b; }
     return BACKDROPS[0];
 }
-
-// NFT с флагом soulbound нельзя продать, передать или улучшить
-const isSoulbound = g => { const item = CATALOG.find(c => c.kind === g.kind); return !!(item && item.soulbound); };
 
 const giftOut = (g, users) => {
     const f = users.find(u => u.id === g.fromId);
@@ -1783,7 +1768,6 @@ app.post('/api/gifts/:id/upgrade', async (req, res) => {
     const gifts = read(F.gifts);
     const g = gifts.find(x => x.id === req.params.id);
     if (!g || g.ownerId !== me) return res.status(403).json({ error: 'Это не ваш подарок' });
-    if (isSoulbound(g)) return res.status(400).json({ error: 'Этот NFT уникальный — его нельзя улучшить' });
     if (g.listing) return res.status(400).json({ error: 'Снимите подарок с продажи перед улучшением' });
     const item = CATALOG.find(c => c.kind === g.kind);
     if (!item) return res.status(400).json({ error: 'Подарок не найден в каталоге' });
@@ -1838,7 +1822,6 @@ app.post('/api/market/list', async (req, res) => {
     const me = req.uid, price = Math.floor(Number(req.body.price));
     const gifts = read(F.gifts), g = gifts.find(x => x.id === String(req.body.giftId));
     if (!g || g.ownerId !== me) return res.status(403).json({ error: 'Это не ваш подарок' });
-    if (isSoulbound(g)) return res.status(400).json({ error: 'Этот NFT уникальный — его нельзя продать' });
     if (!Number.isFinite(price) || price < 1 || price > MAX_LOT) return res.status(400).json({ error: `Цена — от 1 до ${MAX_LOT} Mars` });
     const users = read(F.users), u = users.find(x => x.id === me);
     if (u && u.acc && u.acc.gid === g.id) { delete u.acc; write(F.users, users); broadcast({ type: 'chat' }); } // проданный подарок нельзя носить
@@ -1886,7 +1869,6 @@ app.post('/api/gifts/:id/transfer', async (req, res) => {
     const me = req.uid, toId = Number(req.body.toId);
     const gifts = read(F.gifts), g = gifts.find(x => x.id === req.params.id);
     if (!g || g.ownerId !== me) return res.status(403).json({ error: 'Это не ваш подарок' });
-    if (isSoulbound(g)) return res.status(400).json({ error: 'Этот NFT уникальный — его нельзя передать' });
     if (toId === me || !read(F.users).some(u => u.id === toId)) return res.status(400).json({ error: 'Выберите другого получателя' });
     if (blockedEither(me, toId)) return res.status(400).json({ error: 'Нельзя передать подарок: один из вас заблокировал другого' });
     const users = read(F.users), owner = users.find(u => u.id === me);
@@ -2513,36 +2495,6 @@ function checkFfmpeg() {
     });
 }
 
-// Выдаёт уникальный NFT «Бургер» пользователям saimon и admin (если у них его ещё нет)
-function ensureBurgerNFT() {
-    const BURGER_HANDLES = ['saimon', 'admin'];
-    const users = read(F.users);
-    const gifts = read(F.gifts);
-    let changed = false;
-    for (const handle of BURGER_HANDLES) {
-        const u = users.find(x => (x.handles || [x.handle]).includes(handle));
-        if (!u) continue;
-        const already = gifts.some(g => g.kind === 'burger' && g.ownerId === u.id);
-        if (already) continue;
-        const serial = gifts.filter(g => g.kind === 'burger').length + 1;
-        gifts.push({
-            id: 'k_' + crypto.randomUUID(),
-            kind: 'burger',
-            serial,
-            ownerId: u.id,
-            fromId: u.id,
-            price: 77000000,
-            at: new Date().toISOString(),
-            bd: 'cosmos',
-            pt: 'cosmic',
-            note: ''
-        });
-        changed = true;
-        console.log(`🍔 NFT «Бургер» выдан пользователю @${handle} (serial #${serial})`);
-    }
-    if (changed) write(F.gifts, gifts);
-}
-
 async function init() {
     checkFfmpeg();
     let hasMeta = false;
@@ -2582,7 +2534,6 @@ async function init() {
     purgeBotAccounts();
     ensureBot();
     ensureSaimonChatBot();
-    ensureBurgerNFT();
     await ensureVapid();
     await persist();
 

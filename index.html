@@ -173,10 +173,6 @@ input,textarea{font:inherit;color:inherit}
 .gc.r-rare{box-shadow:0 0 0 2px #6ab7ff inset}
 .gc.r-epic{box-shadow:0 0 0 2px #c58bff inset}
 .gc.r-legendary{box-shadow:0 0 0 2px #ffd54a inset,0 0 12px rgba(255,213,74,.55)}
-.gc.r-unique{box-shadow:0 0 0 2px #ff5722 inset,0 0 18px rgba(255,87,34,.7),0 0 32px rgba(255,87,34,.35);animation:unique-glow 2s ease-in-out infinite}
-@keyframes unique-glow{0%,100%{box-shadow:0 0 0 2px #ff5722 inset,0 0 18px rgba(255,87,34,.7),0 0 32px rgba(255,87,34,.35)}50%{box-shadow:0 0 0 2px #ff9800 inset,0 0 28px rgba(255,152,0,.9),0 0 48px rgba(255,152,0,.5)}}
-.gc.r-ultra{box-shadow:0 0 0 2px #a855f7 inset,0 0 20px rgba(168,85,247,.8),0 0 40px rgba(99,102,241,.5);animation:ultra-glow 1.6s ease-in-out infinite}
-@keyframes ultra-glow{0%,100%{box-shadow:0 0 0 2px #a855f7 inset,0 0 20px rgba(168,85,247,.8),0 0 40px rgba(99,102,241,.5)}50%{box-shadow:0 0 0 2px #e879f9 inset,0 0 32px rgba(232,121,249,1),0 0 60px rgba(168,85,247,.7)}}
 #hd small.ty:empty{display:none}
 @media(max-width:400px){.sh h1{font-size:19px}}
 @media(max-width:340px){#meBtn span{display:none}#meBtn{padding:4px}}
@@ -447,8 +443,6 @@ html[data-theme=dark] .gc{box-shadow:none}
 html[data-theme=dark] .gc.r-rare{box-shadow:0 0 0 2px #4a90d9 inset}
 html[data-theme=dark] .gc.r-epic{box-shadow:0 0 0 2px #a46de0 inset}
 html[data-theme=dark] .gc.r-legendary{box-shadow:0 0 0 2px #e6b830 inset,0 0 12px rgba(230,184,48,.45)}
-html[data-theme=dark] .gc.r-unique{box-shadow:0 0 0 2px #ff5722 inset,0 0 18px rgba(255,87,34,.7),0 0 32px rgba(255,87,34,.35);animation:unique-glow 2s ease-in-out infinite}
-html[data-theme=dark] .gc.r-ultra{box-shadow:0 0 0 2px #a855f7 inset,0 0 20px rgba(168,85,247,.8),0 0 40px rgba(99,102,241,.5);animation:ultra-glow 1.6s ease-in-out infinite}
 html[data-theme=dark] hr{border-color:#263648}
 
 
@@ -3999,7 +3993,7 @@ ${c.description ? `<p style="margin-top:12px">${esc(c.description)}</p>` : ''}
 /* ---------- Mars и подарки ---------- */
 let catalog = new Map(); // kind -> {emoji, name, price, supply, sold, bg}
 const kindInfo = k => catalog.get(k) || {emoji: '🎁', name: 'Подарок', rarity: 'common', price: 0, supply: 0, sold: 0, bg: ['#c9ced6', '#9aa3b0']};
-const RARITY = [['common', 'Обычные', 'Обычный'], ['rare', 'Редкие', 'Редкий'], ['epic', 'Эпические', 'Эпический'], ['legendary', 'Легендарные', 'Легендарный'], ['ultra', 'Ультра', 'Ультра'], ['unique', 'Уникальные', 'Уникальный']];
+const RARITY = [['common', 'Обычные', 'Обычный'], ['rare', 'Редкие', 'Редкий'], ['epic', 'Эпические', 'Эпический'], ['legendary', 'Легендарные', 'Легендарный']];
 const rarityName = r => (RARITY.find(x => x[0] === r) || RARITY[0])[2];
 const gradient = k => `linear-gradient(150deg,${k.bg[0]},${k.bg[1]})`;
 let backdrops = new Map(); // id -> {name, pct, c}
@@ -4447,11 +4441,10 @@ ${g.note ? `<div class="gr"><div class="gv gnv">${esc(g.note)}</div></div>` : ''
 ${mine ? `
 ${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gwr">${me.acc && me.acc.gid === g.id ? '✨ Снять с ника' : '✨ Носить рядом с ником'}</button></div>`}
 ${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gpinbtn">${me.pinnedNft && me.pinnedNft.gid === g.id ? '📌 Открепить из профиля' : '📌 Закрепить в профиле'}</button></div>`}
-${k.soulbound ? '<div style="text-align:center;margin:10px 0 2px;padding:8px 12px;background:rgba(255,87,34,.12);border:1px solid rgba(255,87,34,.35);border-radius:10px;font-size:13px;color:#ff5722">🔒 Уникальный NFT · нельзя улучшить, продать или передать</div>' : `
 ${g.listing ? '' : `<div class="row"><button class="btn gok" id="gupg" style="background:linear-gradient(135deg,#a259ff,#3390ec);color:#fff">🎲 Улучшить модель · 👽 ${Math.max(10, Math.round((g.price||k.price) * 0.3))} Mars</button></div>`}
 <div class="row"><button class="btn g gok" id="gsl">${g.listing ? `💰 На рынке за ${g.listing.price} Mars — изменить` : '💰 Продать на рынке'}</button></div>
 ${g.listing ? '<div class="row"><button class="btn r gok" id="gun">Снять с продажи</button></div>' : ''}
-<div class="row"><button class="btn g gok" id="gtr">Передать</button></div>`}` : ''}`);
+<div class="row"><button class="btn g gok" id="gtr">Передать</button></div>` : ''}`);
   $('#gbk').onclick = back;
   if (mine) {
     $('#gsl').onclick = () => askPrice(g, k, () => giftInfo(g, mine, back));
@@ -4563,7 +4556,7 @@ async function shop(to) {
 <div style="color:var(--t2);font-size:13px;margin-bottom:10px">Mars начисляются за время в приложении: ${d.perMin} в минуту, пока вкладка открыта.</div>
 ${to ? `<div style="margin-bottom:10px;font-weight:600">Подарок для ${esc(to.username)}</div>` : '<button type="button" class="btn g" id="mk" style="margin-bottom:10px">🛒 Рынок NFT — купить у игроков или продать свой</button>'}
 ${RARITY.map(([r, title]) => {
-    const items = d.catalog.filter(c => c.rarity === r && !c.soulbound);
+    const items = d.catalog.filter(c => c.rarity === r);
     return items.length ? `<div class="sec" style="padding:10px 0 6px">${title}</div><div class="gg">${items.map(c => {
       const left = c.supply - c.sold;
       return `<div class="gc r-${c.rarity} ${left ? '' : 'off'}" data-k="${c.kind}" style="background:${gradient(c)}"><div class="gi">${c.emoji}</div><div class="gn">${esc(c.name)}</div><div class="gs">👽 ${c.price}</div><div class="gs">${left ? 'осталось ' + left : 'распродано'}</div></div>`;
@@ -4590,7 +4583,7 @@ async function openShopForChannel(chatId, channelName) {
   modal(`<h2>🎁 Подарить каналу «${esc(channelName)}»</h2>
 <div style="margin:6px 0 10px;font-weight:600">👽 <span class="mars-n">${me.unlimited ? '∞' : (me.mars || 0)}</span> Mars</div>
 ${RARITY.map(([r, title]) => {
-    const items = d.catalog.filter(c => c.rarity === r && !c.soulbound);
+    const items = d.catalog.filter(c => c.rarity === r);
     return items.length ? `<div class="sec" style="padding:10px 0 6px">${title}</div><div class="gg">${items.map(c => {
       const left = c.supply - c.sold;
       return `<div class="gc r-${c.rarity} ${left ? '' : 'off'}" data-k="${c.kind}" style="background:${gradient(c)}"><div class="gi">${c.emoji}</div><div class="gn">${esc(c.name)}</div><div class="gs">👽 ${c.price}</div><div class="gs">${left ? 'осталось ' + left : 'распродано'}</div></div>`;
