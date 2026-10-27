@@ -2507,7 +2507,7 @@ async function init() {
         });
     }
     // Чего нет в базе (первый запуск) — берём из локальных файлов, иначе пустой список
-    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks']) {
+    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks', 'sticker_packs']) {
         if (mem[k] === undefined) {
             const d = loadFile(F[k]);
             mem[k] = JSON.stringify((k === 'sessions' || k === 'blocks') && Array.isArray(d) ? {} : d); // объекты {токен: …}, {кто: [кого]}
@@ -2543,7 +2543,7 @@ for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, async () => { await fin
 process.on('beforeExit', () => { if (pool && dirty.size) finalSave(); });
 // ========== СТИКЕР-ПАКИ ==========
 
-function readPacks() { return read(F.stickerPacks) || []; }
+function readPacks() { try { return read(F.stickerPacks) || []; } catch { return []; } }
 function writePacks(p) { write(F.stickerPacks, p); }
 
 app.get('/api/stickerpacks', (req, res) => {
