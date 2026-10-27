@@ -2865,8 +2865,8 @@ let stkActivePack = null; // id активного пака
 async function loadStkPacks() {
   try {
     stkPacks = await api('/api/stickerpacks');
-    renderStkBar();
   } catch(x) { console.error('loadStkPacks:', x); }
+  renderStkBar();
 }
 
 function renderStkBar() {
@@ -3123,8 +3123,8 @@ $('.emo-tabs').onclick = e => {
   $('#emoEmoji').hidden = tab.dataset.tab !== 'emoji';
   $('#emoStickers').hidden = tab.dataset.tab !== 'stickers';
   if (tab.dataset.tab === 'stickers') {
+    renderStkBar();
     if (!stkPacks.length) loadStkPacks();
-    else renderStkBar();
   }
 };
 // Вставка эмодзи
