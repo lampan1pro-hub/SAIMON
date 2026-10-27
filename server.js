@@ -348,7 +348,7 @@ const isUnlimited = u => UNLIMITED.has(u.handle);
 const walletOf = u => ({ mars: u.mars || 0, unlimited: isUnlimited(u) });
 
 const pub = u => ({
-    id: u.id, username: u.username, handle: u.handle, verified: VERIFIED.has(u.handle), bio: u.bio || '',
+    id: u.id, username: u.username, handle: u.handle, verified: VERIFIED.has(u.handle) || !!u.verified, bio: u.bio || '',
     // Полный список юзернеймов отдаём всегда (не только когда их больше одного) — иначе клиент при
     // каждом обновлении профиля (checkSession при заходе в приложение) может «забыть» второстепенные
     // юзернеймы, если локальный кэш в браузере когда-то сохранился без них, и их станет не продать.
@@ -1505,7 +1505,7 @@ app.get('/api/blocks', (req, res) => {
 const MARS_PER_MIN = Number(process.env.MARS_PER_MIN) || 1;
 const CATALOG = [
     // обычные
-    { kind: 'heart',    rarity: 'common',    emoji: '💝', name: 'Сердечко',     price: 15,    supply: 10000, bg: ['#ff9aa2', '#ff5e7e'] },
+    { kind: 'heart',    rarity: 'common',    emoji: '💝', name: 'Сердечко',     price: 15,    supply: 15000, bg: ['#ff9aa2', '#ff5e7e'] },
     { kind: 'star',     rarity: 'common',    emoji: '⭐', name: 'Звезда',       price: 20,    supply: 5000, bg: ['#ffe29a', '#ffa751'] },
     { kind: 'flower',   rarity: 'common',    emoji: '🌸', name: 'Сакура',       price: 25,    supply: 4000, bg: ['#ffd1dc', '#f78fb3'] },
     { kind: 'coffee',   rarity: 'common',    emoji: '☕', name: 'Кофе',         price: 30,    supply: 4000, bg: ['#d7b899', '#8b5e3c'] },
@@ -1513,6 +1513,7 @@ const CATALOG = [
     { kind: 'bear',     rarity: 'common',    emoji: '🧸', name: 'Мишка',        price: 50,    supply: 2000, bg: ['#ffd89b', '#f2a65a'] },
     { kind: 'cat',      rarity: 'common',    emoji: '🐱', name: 'Котик',        price: 60,    supply: 2500, bg: ['#cfd9ff', '#8e9eea'] },
     // редкие
+    { kind: 'hamster',  rarity: 'rare',      emoji: '🐹', name: 'Грейс',        price: 225,   supply: 1000, bg: ['#f5c89a', '#c97c3a'] },
     { kind: 'balloon',  rarity: 'rare',      emoji: '🎈', name: 'Шарик',        price: 80,    supply: 1500, bg: ['#ff9a9e', '#e8505b'] },
     { kind: 'rocket',   rarity: 'rare',      emoji: '🚀', name: 'Ракета',       price: 120,   supply: 1000, bg: ['#a1c4fd', '#5b7cfa'] },
     { kind: 'gamepad',  rarity: 'rare',      emoji: '🎮', name: 'Геймпад',      price: 150,   supply: 800,  bg: ['#a18cd1', '#5f4bb6'] },
@@ -1532,7 +1533,18 @@ const CATALOG = [
     { kind: 'dragon',   rarity: 'legendary', emoji: '🐉', name: 'Дракон',       price: 5000,  supply: 10,   bg: ['#ff9966', '#c0392b'] },
     { kind: 'planet',   rarity: 'legendary', emoji: '🪐', name: 'Сатурн',       price: 8000,  supply: 7,    bg: ['#f093fb', '#5b2a86'] },
     { kind: 'phoenix',  rarity: 'legendary', emoji: '🦅', name: 'Феникс',       price: 15000, supply: 3,    bg: ['#ffd200', '#f12711'] },
-    { kind: 'infinity', rarity: 'legendary', emoji: '♾️', name: 'Бесконечность', price: 50000, supply: 1,    bg: ['#232526', '#0f9b8e'] }
+    { kind: 'infinity', rarity: 'legendary', emoji: '♾️', name: 'Бесконечность', price: 50000, supply: 2,    bg: ['#232526', '#0f9b8e'] },
+    // ——— ultra ———
+    { kind: 'eye',      rarity: 'ultra',     emoji: '👁️',  name: 'Глаз Бога',    price: 25000,  supply: 5,  bg: ['#1a1a2e', '#e94560'] },
+    { kind: 'blackhole',rarity: 'ultra',     emoji: '🌑',  name: 'Сингулярность',price: 50000,  supply: 3,  bg: ['#0d0d0d', '#3a0ca3'] },
+    { kind: 'quantum',  rarity: 'ultra',     emoji: '💠',  name: 'Квант',         price: 75000,  supply: 4,  bg: ['#00b4d8', '#023e8a'] },
+    { kind: 'meteor',   rarity: 'ultra',     emoji: '☄️',  name: 'Армагеддон',   price: 100000, supply: 3,  bg: ['#e63946', '#1d1d1d'] },
+    { kind: 'zero',     rarity: 'ultra',     emoji: '🧊',  name: 'Криос',         price: 150000, supply: 2,  bg: ['#caf0f8', '#0077b6'] },
+    { kind: 'portal',   rarity: 'ultra',     emoji: '🌀',  name: 'Варп',          price: 200000, supply: 5,  bg: ['#7b2d8b', '#120458'] },
+    { kind: 'antimatter',rarity: 'ultra',    emoji: '⚫',  name: 'Аннигилятор',  price: 333000, supply: 2,  bg: ['#1c1c1c', '#6b0f1a'] },
+    { kind: 'omega',    rarity: 'ultra',     emoji: '🌀',  name: 'Омега',         price: 500000, supply: 3,  bg: ['#2d00f7', '#000000'] },
+    // ★ Уникальный душепривязанный NFT — только у saimon и admin. Нельзя продать, передать и улучшить.
+    { kind: 'burger',   rarity: 'unique',    emoji: '🍔', name: 'Бургер',        price: 77000000, supply: 2, bg: ['#ff9800', '#e65100'], soulbound: true }
 ];
 // Фоны подарков: при покупке фон выпадает случайно. pct — шанс выпадения в процентах (чем меньше, тем реже и ценнее)
 const BACKDROPS = [
@@ -1578,6 +1590,9 @@ function pickBackdrop(forUser) {
     for (const b of BACKDROPS) { if ((r -= b.pct) < 0) return b; }
     return BACKDROPS[0];
 }
+
+// NFT с флагом soulbound нельзя продать, передать или улучшить
+const isSoulbound = g => { const item = CATALOG.find(c => c.kind === g.kind); return !!(item && item.soulbound); };
 
 const giftOut = (g, users) => {
     const f = users.find(u => u.id === g.fromId);
@@ -1768,6 +1783,7 @@ app.post('/api/gifts/:id/upgrade', async (req, res) => {
     const gifts = read(F.gifts);
     const g = gifts.find(x => x.id === req.params.id);
     if (!g || g.ownerId !== me) return res.status(403).json({ error: 'Это не ваш подарок' });
+    if (isSoulbound(g)) return res.status(400).json({ error: 'Этот NFT уникальный — его нельзя улучшить' });
     if (g.listing) return res.status(400).json({ error: 'Снимите подарок с продажи перед улучшением' });
     const item = CATALOG.find(c => c.kind === g.kind);
     if (!item) return res.status(400).json({ error: 'Подарок не найден в каталоге' });
@@ -1822,6 +1838,7 @@ app.post('/api/market/list', async (req, res) => {
     const me = req.uid, price = Math.floor(Number(req.body.price));
     const gifts = read(F.gifts), g = gifts.find(x => x.id === String(req.body.giftId));
     if (!g || g.ownerId !== me) return res.status(403).json({ error: 'Это не ваш подарок' });
+    if (isSoulbound(g)) return res.status(400).json({ error: 'Этот NFT уникальный — его нельзя продать' });
     if (!Number.isFinite(price) || price < 1 || price > MAX_LOT) return res.status(400).json({ error: `Цена — от 1 до ${MAX_LOT} Mars` });
     const users = read(F.users), u = users.find(x => x.id === me);
     if (u && u.acc && u.acc.gid === g.id) { delete u.acc; write(F.users, users); broadcast({ type: 'chat' }); } // проданный подарок нельзя носить
@@ -1869,6 +1886,7 @@ app.post('/api/gifts/:id/transfer', async (req, res) => {
     const me = req.uid, toId = Number(req.body.toId);
     const gifts = read(F.gifts), g = gifts.find(x => x.id === req.params.id);
     if (!g || g.ownerId !== me) return res.status(403).json({ error: 'Это не ваш подарок' });
+    if (isSoulbound(g)) return res.status(400).json({ error: 'Этот NFT уникальный — его нельзя передать' });
     if (toId === me || !read(F.users).some(u => u.id === toId)) return res.status(400).json({ error: 'Выберите другого получателя' });
     if (blockedEither(me, toId)) return res.status(400).json({ error: 'Нельзя передать подарок: один из вас заблокировал другого' });
     const users = read(F.users), owner = users.find(u => u.id === me);
@@ -2047,7 +2065,15 @@ app.delete('/api/chats/:chatId', async (req, res) => {
 const ADMIN_HANDLES = ['saimon'];
 const ADMIN_HANDLE = 'saimon'; // главный (нельзя заблокировать/удалить)
 const isAdminUid = uid => { const u = read(F.users).find(x => x.id === uid); return !!u && ADMIN_HANDLES.includes(u.handle); };
-const adminOnly = (req, res, next) => isAdminUid(req.uid) ? next() : res.status(403).json({ error: 'Нет доступа' });
+// Пароль админ-панели: спрашивается у админа перед входом и проверяется сервером при каждом запросе.
+// Меняется через ADMIN_PIN=новый_пароль, по умолчанию 8015.
+const ADMIN_PIN = process.env.ADMIN_PIN || '8015';
+const adminOnly = (req, res, next) => {
+    if (!isAdminUid(req.uid)) return res.status(403).json({ error: 'Нет доступа' });
+    const pin = String(req.headers['x-admin-pin'] || req.query.pin || '');
+    if (pin !== ADMIN_PIN) return res.status(403).json({ error: 'Неверный пароль админ-панели' });
+    next();
+};
 
 app.get('/api/admin/channels', adminOnly, (req, res) => {
     const users = read(F.users);
@@ -2141,26 +2167,6 @@ app.get('/api/admin/banned', adminOnly, (req, res) => {
     })));
 });
 
-// Сброс пароля пользователя из админки: админ задаёт новый пароль, старый хэш перезаписывается,
-// все сессии пользователя завершаются (вход на всех устройствах закроется).
-app.post('/api/admin/users/:id/reset-password', adminOnly, async (req, res) => {
-    const users = read(F.users);
-    const u = users.find(x => String(x.id) === req.params.id);
-    if (!u || u.bot || u.fake) return res.status(404).json({ error: 'Пользователь не найден' });
-    if (ADMIN_HANDLES.includes(u.handle)) return res.status(400).json({ error: 'Нельзя сбросить пароль администратору' });
-    const pass = String(req.body && req.body.password || '');
-    if (pass.length < 6) return res.status(400).json({ error: 'Пароль должен быть минимум 6 символов' });
-    if (pass.length > 72) return res.status(400).json({ error: 'Пароль слишком длинный' });
-    u.password = hashPass(pass);
-    write(F.users, users);
-    // все активные сессии пользователя завершаем
-    const sessions = read(F.sessions);
-    Object.keys(sessions).forEach(t => { if (String(sessions[t].uid) === String(u.id)) delete sessions[t]; });
-    write(F.sessions, sessions);
-    sendTo([u.id], { type: 'session' });
-    await persist();
-    res.json({ success: true, username: u.username });
-});
 
 // Полное удаление аккаунта: убирает пользователя, его сессии, личные чаты и освобождает юзернеймы.
 // Сообщения в группах и каналах остаются (как в Telegram), но автор показывается как «Удалённый аккаунт».
@@ -2232,18 +2238,19 @@ app.delete('/api/admin/users/:id', adminOnly, async (req, res) => {
 });
 
 
-// Выдача / снятие верификации (галочки) администратором
+// Выдача / снятие верификации (галочки) администратором.
+// Флаг хранится в аккаунте (u.verified) и переживает перезапуск сервера;
+// также работает при смене юзернейма — галочка привязана к аккаунту, а не к нику.
 app.post('/api/admin/users/:id/verify', adminOnly, async (req, res) => {
     const users = read(F.users);
     const u = users.find(x => String(x.id) === req.params.id);
-    if (!u) return res.status(404).json({ error: 'Пользователь не найден' });
-    if (VERIFIED.has(u.handle)) {
-        VERIFIED.delete(u.handle);
-    } else {
-        VERIFIED.add(u.handle);
-    }
+    if (!u || u.bot || u.fake) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (ADMIN_HANDLES.includes(u.handle)) return res.status(400).json({ error: 'У администратора галочка и так есть' });
+    u.verified = !u.verified;
+    write(F.users, users);
     broadcast({ type: 'chat' });
-    res.json({ success: true, verified: VERIFIED.has(u.handle), handle: u.handle });
+    await persist();
+    res.json({ success: true, verified: !!u.verified, username: u.username });
 });
 
 // ---------- Подписка SAIMONPREMIYM ----------
@@ -2506,6 +2513,36 @@ function checkFfmpeg() {
     });
 }
 
+// Выдаёт уникальный NFT «Бургер» пользователям saimon и admin (если у них его ещё нет)
+function ensureBurgerNFT() {
+    const BURGER_HANDLES = ['saimon', 'admin'];
+    const users = read(F.users);
+    const gifts = read(F.gifts);
+    let changed = false;
+    for (const handle of BURGER_HANDLES) {
+        const u = users.find(x => (x.handles || [x.handle]).includes(handle));
+        if (!u) continue;
+        const already = gifts.some(g => g.kind === 'burger' && g.ownerId === u.id);
+        if (already) continue;
+        const serial = gifts.filter(g => g.kind === 'burger').length + 1;
+        gifts.push({
+            id: 'k_' + crypto.randomUUID(),
+            kind: 'burger',
+            serial,
+            ownerId: u.id,
+            fromId: u.id,
+            price: 77000000,
+            at: new Date().toISOString(),
+            bd: 'cosmos',
+            pt: 'cosmic',
+            note: ''
+        });
+        changed = true;
+        console.log(`🍔 NFT «Бургер» выдан пользователю @${handle} (serial #${serial})`);
+    }
+    if (changed) write(F.gifts, gifts);
+}
+
 async function init() {
     checkFfmpeg();
     let hasMeta = false;
@@ -2545,6 +2582,7 @@ async function init() {
     purgeBotAccounts();
     ensureBot();
     ensureSaimonChatBot();
+    ensureBurgerNFT();
     await ensureVapid();
     await persist();
 

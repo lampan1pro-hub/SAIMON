@@ -173,6 +173,10 @@ input,textarea{font:inherit;color:inherit}
 .gc.r-rare{box-shadow:0 0 0 2px #6ab7ff inset}
 .gc.r-epic{box-shadow:0 0 0 2px #c58bff inset}
 .gc.r-legendary{box-shadow:0 0 0 2px #ffd54a inset,0 0 12px rgba(255,213,74,.55)}
+.gc.r-unique{box-shadow:0 0 0 2px #ff5722 inset,0 0 18px rgba(255,87,34,.7),0 0 32px rgba(255,87,34,.35);animation:unique-glow 2s ease-in-out infinite}
+@keyframes unique-glow{0%,100%{box-shadow:0 0 0 2px #ff5722 inset,0 0 18px rgba(255,87,34,.7),0 0 32px rgba(255,87,34,.35)}50%{box-shadow:0 0 0 2px #ff9800 inset,0 0 28px rgba(255,152,0,.9),0 0 48px rgba(255,152,0,.5)}}
+.gc.r-ultra{box-shadow:0 0 0 2px #a855f7 inset,0 0 20px rgba(168,85,247,.8),0 0 40px rgba(99,102,241,.5);animation:ultra-glow 1.6s ease-in-out infinite}
+@keyframes ultra-glow{0%,100%{box-shadow:0 0 0 2px #a855f7 inset,0 0 20px rgba(168,85,247,.8),0 0 40px rgba(99,102,241,.5)}50%{box-shadow:0 0 0 2px #e879f9 inset,0 0 32px rgba(232,121,249,1),0 0 60px rgba(168,85,247,.7)}}
 #hd small.ty:empty{display:none}
 @media(max-width:400px){.sh h1{font-size:19px}}
 @media(max-width:340px){#meBtn span{display:none}#meBtn{padding:4px}}
@@ -443,6 +447,8 @@ html[data-theme=dark] .gc{box-shadow:none}
 html[data-theme=dark] .gc.r-rare{box-shadow:0 0 0 2px #4a90d9 inset}
 html[data-theme=dark] .gc.r-epic{box-shadow:0 0 0 2px #a46de0 inset}
 html[data-theme=dark] .gc.r-legendary{box-shadow:0 0 0 2px #e6b830 inset,0 0 12px rgba(230,184,48,.45)}
+html[data-theme=dark] .gc.r-unique{box-shadow:0 0 0 2px #ff5722 inset,0 0 18px rgba(255,87,34,.7),0 0 32px rgba(255,87,34,.35);animation:unique-glow 2s ease-in-out infinite}
+html[data-theme=dark] .gc.r-ultra{box-shadow:0 0 0 2px #a855f7 inset,0 0 20px rgba(168,85,247,.8),0 0 40px rgba(99,102,241,.5);animation:ultra-glow 1.6s ease-in-out infinite}
 html[data-theme=dark] hr{border-color:#263648}
 
 
@@ -3587,7 +3593,13 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
 const ADMIN_HANDLES = ['saimon', 'admin'];
 const ADMIN_HANDLE = 'saimon';
 // Админ-панель: каналы (удалить любой) и пользователи (заблокировать). Сервер проверяет права сам.
+let adminPin = null; // пароль админ-панели на текущую сессию
 function adminPanel() {
+  if (adminPin === null) {
+    const p = prompt('Пароль админ-панели:');
+    if (p === null) return;
+    adminPin = p;
+  }
   modal(`<div class="sec" style="padding:0 0 6px">🛠 Админ-панель</div>
 <div class="sec" style="padding:8px 0 4px">Каналы</div><div id="admch" style="max-height:240px;overflow:auto"></div>
 <div class="sec" style="padding:12px 0 4px">Пользователи</div>
@@ -3597,47 +3609,46 @@ function adminPanel() {
 <div class="row"><button type="button" class="btn g" data-x>Закрыть</button></div>`);
   const loadBan = async () => {
     try {
-      const list = await api('/api/admin/banned');
+      const list = await api('/api/admin/banned?pin=' + encodeURIComponent(adminPin));
       $('#admb').innerHTML = list.length ? list.map(u => `<div class="adm-row"><div><b>${esc(u.name)}</b><div class="adm-sub">${u.reserved.length ? 'заняты: ' + u.reserved.map(esc).join(', ') : 'без юзернеймов'}</div></div><button type="button" class="btn g adm-btn" data-unban="${u.id}" data-name="${esc(u.name)}">Разблокировать</button></div>`).join('') : '<div class="adm-sub">Заблокированных нет</div>';
-    } catch (x) { toast(x.message); }
+    } catch (x) { if (x.message === 'Неверный пароль админ-панели') adminPin = null; toast(x.message); }
   };
   $('#admb').onclick = async e => {
     const b = e.target.closest('[data-unban]'); if (!b) return;
     if (!confirm(`Разблокировать ${b.dataset.name}? Аккаунт вернётся со старым именем и юзернеймами.`)) return;
-    try { await api('/api/admin/users/' + b.dataset.unban + '/unblock', 'POST'); toast('Аккаунт разблокирован'); loadBan(); loadUs(); } catch (x) { toast(x.message); }
+    try { await api('/api/admin/users/' + b.dataset.unban + '/unblock?pin=' + encodeURIComponent(adminPin), 'POST'); toast('Аккаунт разблокирован'); loadBan(); loadUs(); } catch (x) { toast(x.message); }
   };
   const loadCh = async () => {
     try {
-      const list = await api('/api/admin/channels');
+      const list = await api('/api/admin/channels?pin=' + encodeURIComponent(adminPin));
       $('#admch').innerHTML = list.length ? list.map(c => `<div class="adm-row"><div><b>${esc(c.name)}</b><div class="adm-sub">${c.handle ? '@' + esc(c.handle) + ' · ' : ''}${c.members} уч. · ${esc(c.creator)}</div></div><button type="button" class="btn r adm-btn" data-delch="${esc(c.id)}" data-name="${esc(c.name)}">Удалить</button></div>`).join('') : '<div class="adm-sub">Каналов нет</div>';
     } catch (x) { toast(x.message); }
   };
   const loadUs = async () => {
     try {
       const q = encodeURIComponent($('#admq').value.trim());
-      const list = await api('/api/admin/users?q=' + q);
-      $('#admu').innerHTML = list.length ? list.map(u => `<div class="adm-row"><div><b>${esc(u.username)}</b><div class="adm-sub">${u.handle ? '@' + esc(u.handle) : 'без юзернейма'}</div></div><button type="button" class="btn g adm-btn" data-pw="${u.id}" data-name="${esc(u.username)}">Сбросить пароль</button><button type="button" class="btn r adm-btn" data-ban="${u.id}" data-name="${esc(u.username)}">Заблокировать</button><button type="button" class="btn r adm-btn" data-del="${u.id}" data-name="${esc(u.username)}">Удалить</button></div>`).join('') : '<div class="adm-sub">Никого не нашли</div>';
+      const list = await api('/api/admin/users?q=' + q + '&pin=' + encodeURIComponent(adminPin));
+      $('#admu').innerHTML = list.length ? list.map(u => `<div class="adm-row"><div><b>${esc(u.username)}</b><div class="adm-sub">${u.handle ? '@' + esc(u.handle) : 'без юзернейма'}</div></div><button type="button" class="btn g adm-btn" data-ver="${u.id}" data-name="${esc(u.username)}">${u.verified ? '❌ Галочка' : '✅ Галочка'}</button><button type="button" class="btn r adm-btn" data-ban="${u.id}" data-name="${esc(u.username)}">Заблокировать</button><button type="button" class="btn r adm-btn" data-del="${u.id}" data-name="${esc(u.username)}">Удалить</button></div>`).join('') : '<div class="adm-sub">Никого не нашли</div>';
     } catch (x) { toast(x.message); }
   };
   $('#admch').onclick = async e => {
     const b = e.target.closest('[data-delch]'); if (!b) return;
     if (!confirm(`Удалить канал «${b.dataset.name}» вместе со всеми сообщениями?`)) return;
-    try { await api('/api/admin/channels/' + b.dataset.delch, 'DELETE'); toast('Канал удалён'); loadCh(); } catch (x) { toast(x.message); }
+    try { await api('/api/admin/channels/' + b.dataset.delch + '?pin=' + encodeURIComponent(adminPin), 'DELETE'); toast('Канал удалён'); loadCh(); } catch (x) { toast(x.message); }
   };
   $('#admu').onclick = async e => {
     const ban = e.target.closest('[data-ban]');
     const del = e.target.closest('[data-del]');
-    const pw = e.target.closest('[data-pw]');
-    if (pw) {
-      const pass = prompt(`Новый пароль для ${pw.dataset.name} (минимум 6 символов):`);
-      if (pass === null) return;
-      try { await api('/api/admin/users/' + pw.dataset.pw + '/reset-password', 'POST', { password: pass }); toast('Пароль сброшен, сессии завершены'); } catch (x) { toast(x.message); }
+    const ver = e.target.closest('[data-ver]');
+    if (ver) {
+      try { await api('/api/admin/users/' + ver.dataset.ver + '/verify?pin=' + encodeURIComponent(adminPin), 'POST'); toast('Галочка обновлена'); } catch (x) { if (x.message === 'Неверный пароль админ-панели') adminPin = null; toast(x.message); }
+      await loadUs();
     } else if (ban) {
       if (!confirm(`Заблокировать ${ban.dataset.name}?\nИмя, юзернеймы и фото будут удалены, аккаунт заморозится.`)) return;
-      try { await api('/api/admin/users/' + ban.dataset.ban + '/block', 'POST'); toast('Аккаунт заблокирован'); loadUs(); loadCh(); loadBan(); } catch (x) { toast(x.message); }
+      try { await api('/api/admin/users/' + ban.dataset.ban + '/block?pin=' + encodeURIComponent(adminPin), 'POST'); toast('Аккаунт заблокирован'); loadUs(); loadCh(); loadBan(); } catch (x) { toast(x.message); }
     } else if (del) {
       if (!confirm(`Удалить ${del.dataset.name} полностью?\nАккаунт исчезнет навсегда, юзернеймы освободятся.\nЭто нельзя отменить.`)) return;
-      try { await api('/api/admin/users/' + del.dataset.del, 'DELETE'); toast('✅ Аккаунт удалён, юзернеймы освобождены'); loadUs(); loadBan(); } catch (x) { toast(x.message); }
+      try { await api('/api/admin/users/' + del.dataset.del + '?pin=' + encodeURIComponent(adminPin), 'DELETE'); toast('✅ Аккаунт удалён, юзернеймы освобождены'); loadUs(); loadBan(); } catch (x) { toast(x.message); }
     }
   };
   let t; $('#admq').oninput = () => { clearTimeout(t); t = setTimeout(loadUs, 250); };
@@ -3988,7 +3999,7 @@ ${c.description ? `<p style="margin-top:12px">${esc(c.description)}</p>` : ''}
 /* ---------- Mars и подарки ---------- */
 let catalog = new Map(); // kind -> {emoji, name, price, supply, sold, bg}
 const kindInfo = k => catalog.get(k) || {emoji: '🎁', name: 'Подарок', rarity: 'common', price: 0, supply: 0, sold: 0, bg: ['#c9ced6', '#9aa3b0']};
-const RARITY = [['common', 'Обычные', 'Обычный'], ['rare', 'Редкие', 'Редкий'], ['epic', 'Эпические', 'Эпический'], ['legendary', 'Легендарные', 'Легендарный']];
+const RARITY = [['common', 'Обычные', 'Обычный'], ['rare', 'Редкие', 'Редкий'], ['epic', 'Эпические', 'Эпический'], ['legendary', 'Легендарные', 'Легендарный'], ['ultra', 'Ультра', 'Ультра'], ['unique', 'Уникальные', 'Уникальный']];
 const rarityName = r => (RARITY.find(x => x[0] === r) || RARITY[0])[2];
 const gradient = k => `linear-gradient(150deg,${k.bg[0]},${k.bg[1]})`;
 let backdrops = new Map(); // id -> {name, pct, c}
@@ -4436,10 +4447,11 @@ ${g.note ? `<div class="gr"><div class="gv gnv">${esc(g.note)}</div></div>` : ''
 ${mine ? `
 ${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gwr">${me.acc && me.acc.gid === g.id ? '✨ Снять с ника' : '✨ Носить рядом с ником'}</button></div>`}
 ${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gpinbtn">${me.pinnedNft && me.pinnedNft.gid === g.id ? '📌 Открепить из профиля' : '📌 Закрепить в профиле'}</button></div>`}
+${k.soulbound ? '<div style="text-align:center;margin:10px 0 2px;padding:8px 12px;background:rgba(255,87,34,.12);border:1px solid rgba(255,87,34,.35);border-radius:10px;font-size:13px;color:#ff5722">🔒 Уникальный NFT · нельзя улучшить, продать или передать</div>' : `
 ${g.listing ? '' : `<div class="row"><button class="btn gok" id="gupg" style="background:linear-gradient(135deg,#a259ff,#3390ec);color:#fff">🎲 Улучшить модель · 👽 ${Math.max(10, Math.round((g.price||k.price) * 0.3))} Mars</button></div>`}
 <div class="row"><button class="btn g gok" id="gsl">${g.listing ? `💰 На рынке за ${g.listing.price} Mars — изменить` : '💰 Продать на рынке'}</button></div>
 ${g.listing ? '<div class="row"><button class="btn r gok" id="gun">Снять с продажи</button></div>' : ''}
-<div class="row"><button class="btn g gok" id="gtr">Передать</button></div>` : ''}`);
+<div class="row"><button class="btn g gok" id="gtr">Передать</button></div>`}` : ''}`);
   $('#gbk').onclick = back;
   if (mine) {
     $('#gsl').onclick = () => askPrice(g, k, () => giftInfo(g, mine, back));
@@ -4551,7 +4563,7 @@ async function shop(to) {
 <div style="color:var(--t2);font-size:13px;margin-bottom:10px">Mars начисляются за время в приложении: ${d.perMin} в минуту, пока вкладка открыта.</div>
 ${to ? `<div style="margin-bottom:10px;font-weight:600">Подарок для ${esc(to.username)}</div>` : '<button type="button" class="btn g" id="mk" style="margin-bottom:10px">🛒 Рынок NFT — купить у игроков или продать свой</button>'}
 ${RARITY.map(([r, title]) => {
-    const items = d.catalog.filter(c => c.rarity === r);
+    const items = d.catalog.filter(c => c.rarity === r && !c.soulbound);
     return items.length ? `<div class="sec" style="padding:10px 0 6px">${title}</div><div class="gg">${items.map(c => {
       const left = c.supply - c.sold;
       return `<div class="gc r-${c.rarity} ${left ? '' : 'off'}" data-k="${c.kind}" style="background:${gradient(c)}"><div class="gi">${c.emoji}</div><div class="gn">${esc(c.name)}</div><div class="gs">👽 ${c.price}</div><div class="gs">${left ? 'осталось ' + left : 'распродано'}</div></div>`;
@@ -4578,7 +4590,7 @@ async function openShopForChannel(chatId, channelName) {
   modal(`<h2>🎁 Подарить каналу «${esc(channelName)}»</h2>
 <div style="margin:6px 0 10px;font-weight:600">👽 <span class="mars-n">${me.unlimited ? '∞' : (me.mars || 0)}</span> Mars</div>
 ${RARITY.map(([r, title]) => {
-    const items = d.catalog.filter(c => c.rarity === r);
+    const items = d.catalog.filter(c => c.rarity === r && !c.soulbound);
     return items.length ? `<div class="sec" style="padding:10px 0 6px">${title}</div><div class="gg">${items.map(c => {
       const left = c.supply - c.sold;
       return `<div class="gc r-${c.rarity} ${left ? '' : 'off'}" data-k="${c.kind}" style="background:${gradient(c)}"><div class="gi">${c.emoji}</div><div class="gn">${esc(c.name)}</div><div class="gs">👽 ${c.price}</div><div class="gs">${left ? 'осталось ' + left : 'распродано'}</div></div>`;
