@@ -268,7 +268,7 @@ const hashPass = (p, salt = crypto.randomBytes(8).toString('hex')) =>
 const isHash = s => /^[0-9a-f]{16}:[0-9a-f]{64}$/.test(s);
 const checkPass = (p, stored) => isHash(stored) ? hashPass(p, stored.split(':')[0]) === stored : p === stored;
 
-const START_MARS = Number(process.env.START_MARS ?? 10); // стартовый баланс новых аккаунтов
+const START_MARS = Number(process.env.START_MARS ?? 0); // стартовый баланс новых аккаунтов
 
 function newSession(uid) {
     const sessions = read(F.sessions), token = crypto.randomBytes(24).toString('hex');
