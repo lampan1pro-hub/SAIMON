@@ -9493,4 +9493,142 @@ ${d.log.length ? d.log.map(l => `<div class="spm-row"><div><b>${esc(l.name)}${l.
   $('#card').querySelectorAll('[data-um]').forEach(b => b.onclick = async () => { try { await api('/api/admin/spam/' + b.dataset.um + '/unmute?' + admQ(), 'POST'); toast('Пауза снята'); adminSpam(); } catch (x) { toast(x.message); } });
 }
 </script>
+<style>
+/* ===== Свои обои с размытием ===== */
+#wpPh{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;border-radius:inherit}
+#wpPh>i{position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(var(--wpb,0px));transform:scale(var(--wps,1))}
+#wpPh::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,var(--wpd,0))}
+html[data-theme=dark] #wpPh{--wpd:.22}
+html[data-wallpaper-custom] #room{background:transparent!important}
+html[data-wallpaper-custom] #room::before,html[data-wallpaper-custom] #msgs::before{display:none!important}
+.wpx{padding:12px 14px 14px;display:flex;flex-direction:column;gap:12px}
+.wpx-pv{position:relative;height:190px;border-radius:18px;overflow:hidden;background:#cfd8e3;isolation:isolate}
+.wpx-pv>i{position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(var(--wpb,0px));transform:scale(var(--wps,1))}
+html[data-theme=dark] .wpx-pv .b1,html[data-theme=dark] .wpx-pv .b3{background:#1f2c3a;color:#e9eef5}
+html[data-theme=dark] .wpx-pv::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.22)}
+.wpx-pv .b{position:absolute;z-index:1;max-width:62%;padding:7px 11px;border-radius:16px;font-size:14px;line-height:1.3;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.wpx-pv .b1{left:12px;top:22px;background:#fff;color:#111;border-bottom-left-radius:6px}
+.wpx-pv .b2{right:12px;top:70px;background:var(--p,#3390ec);color:#fff;border-bottom-right-radius:6px}
+.wpx-pv .b3{left:12px;top:118px;background:#fff;color:#111;border-bottom-left-radius:6px}
+.wpx-pv .tag{position:absolute;z-index:1;right:10px;bottom:10px;font-size:12px;font-weight:600;padding:4px 9px;border-radius:99px;background:rgba(0,0,0,.45);color:#fff}
+.wpx-row{display:flex;align-items:center;gap:12px}
+.wpx-row b{font-size:15px;font-weight:600;flex:none}
+.wpx-row output{margin-left:auto;font-size:14px;color:var(--muted,#8a94a6);min-width:76px;text-align:right}
+.wpx input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;margin:0;background:transparent;cursor:pointer;--pct:0%}
+.wpx input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--p,#3390ec) var(--pct),rgba(127,140,160,.28) var(--pct))}
+.wpx input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--p,#3390ec) var(--pct),rgba(127,140,160,.28) var(--pct))}
+.wpx input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;margin-top:-9px;border-radius:50%;background:#fff;border:0;box-shadow:0 1px 5px rgba(0,0,0,.3)}
+.wpx input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#fff;border:0;box-shadow:0 1px 5px rgba(0,0,0,.3)}
+.wpx-sc{display:flex;justify-content:space-between;font-size:12px;color:var(--muted,#8a94a6);margin-top:-6px}
+.wpx-bt{display:flex;gap:8px}
+.wpx-bt button{flex:1;border:0;border-radius:14px;padding:11px 8px;font:600 14px inherit;font-family:inherit;cursor:pointer;background:rgba(127,140,160,.16);color:inherit}
+.wpx-bt button.pri{background:var(--p,#3390ec);color:#fff}
+.wpx-bt button.dan{color:#e5484d}
+</style>
+<script>
+// ===================================================================
+//  Свои обои чата: своё фото + ползунок «Размытие»
+// ===================================================================
+(() => {
+  const BLUR_MAX = 30;
+  const wpGet = () => { try { return localStorage.getItem('wallpaper_custom') || ''; } catch { return ''; } };
+  const wpOn = () => { try { return localStorage.getItem('wallpaper') === 'custom' && !!wpGet(); } catch { return false; } };
+  const wpBlur = () => { let v = 0; try { v = +localStorage.getItem('wallpaper_blur'); } catch {} return Math.max(0, Math.min(BLUR_MAX, Number.isFinite(v) ? v : 0)); };
+  const blurLabel = v => v === 0 ? 'Чёткое' : v <= 6 ? 'Слегка' : v <= 16 ? 'Средне' : 'Сильно';
+  // чтобы по краям не было светлой каймы от размытия — немного увеличиваем
+  const setVars = (el, v) => { if (!el) return; el.style.setProperty('--wpb', v + 'px'); el.style.setProperty('--wps', String(1 + v * 0.012)); };
+
+  function wpLayer(make) {
+    const room = document.getElementById('room'); if (!room) return null;
+    let l = document.getElementById('wpPh');
+    if (!l && make) { l = document.createElement('div'); l.id = 'wpPh'; l.setAttribute('aria-hidden', 'true'); l.innerHTML = '<i></i>'; room.prepend(l); }
+    return l;
+  }
+  function wpPaint() {
+    const chat = document.getElementById('chat');
+    if (wpOn()) {
+      const l = wpLayer(true); if (!l) return;
+      const url = wpGet();
+      if (l.dataset.src !== String(url.length) + url.slice(-32)) { l.firstChild.style.backgroundImage = `url("${url}")`; l.dataset.src = String(url.length) + url.slice(-32); }
+      setVars(l, wpBlur());
+      document.documentElement.dataset.wallpaperCustom = '1';
+      if (chat) { chat.style.backgroundImage = ''; chat.style.background = ''; }
+      return true;
+    }
+    const l = wpLayer(false); if (l) l.remove();
+    return false;
+  }
+  const orig = window.applyWallpaper;
+  window.applyWallpaper = function () {
+    if (wpOn()) return wpPaint();
+    wpPaint();
+    if (typeof orig === 'function') return orig.apply(this, arguments);
+  };
+
+  // сжать фото, чтобы влезло в память браузера
+  async function wpStore(file) {
+    const tries = [[1800, .84], [1400, .78], [1100, .72], [900, .66]];
+    for (const [max, q] of tries) {
+      const { blob } = await prepImage(file, max, q);
+      const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+      try { localStorage.setItem('wallpaper_custom', url); localStorage.setItem('wallpaper', 'custom'); return true; }
+      catch { try { localStorage.removeItem('wallpaper_custom'); } catch {} }
+    }
+    return false;
+  }
+  async function wpPick() {
+    const f = await pickFile('image/*'); if (!f) return;
+    toast('Ставлю обои…');
+    try {
+      if (!(await wpStore(f))) return toast('Фото слишком большое — попробуйте другое');
+      document.querySelectorAll('[data-wall]').forEach(x => x.classList.remove('active'));
+      applyWallpaper(); wpMount(); toast('🖼 Обои установлены');
+    } catch (x) { toast(x.message || 'Не удалось открыть фото'); }
+  }
+
+  // блок в «Обои и тема»
+  function wpMount() {
+    const card = document.getElementById('card'); if (!card) return;
+    const up = card.querySelector('#custWallUp'); if (!up) return;
+    const host = up.parentElement;
+    host.querySelector('.wpx')?.remove();
+    const url = wpGet(), on = wpOn(), v = wpBlur();
+    up.hidden = !!url; card.querySelector('#custWallFile')?.remove();
+    if (!url) { up.onclick = wpPick; return; }
+    const box = document.createElement('div'); box.className = 'wpx';
+    box.innerHTML = `<div class="wpx-pv"><i></i><div class="b b1">Привет! Как тебе обои?</div><div class="b b2">Своё фото 😍</div><div class="b b3">Размытие можно менять</div>${on ? '' : '<span class="tag">Сейчас не включены</span>'}</div>
+<div class="wpx-row"><b>Размытие</b><output>${blurLabel(v)}</output></div>
+<input type="range" min="0" max="${BLUR_MAX}" step="1" value="${v}" aria-label="Размытие обоев">
+<div class="wpx-sc"><span>Чётко</span><span>Сильно размыто</span></div>
+<div class="wpx-bt">${on ? '' : '<button type="button" class="pri" data-wp="use">Поставить</button>'}<button type="button" data-wp="pick">📷 Другое фото</button><button type="button" class="dan" data-wp="del">Убрать</button></div>`;
+    host.appendChild(box);
+    const pv = box.querySelector('.wpx-pv'); pv.firstChild.style.backgroundImage = `url("${url}")`; setVars(pv, v);
+    const rg = box.querySelector('input'), out = box.querySelector('output');
+    const pct = () => rg.style.setProperty('--pct', (rg.value / BLUR_MAX * 100) + '%'); pct();
+    rg.oninput = () => { const n = +rg.value; pct(); out.textContent = blurLabel(n); setVars(pv, n); setVars(wpLayer(false), n); };
+    rg.onchange = () => { try { localStorage.setItem('wallpaper_blur', rg.value); } catch {} };
+    box.querySelector('[data-wp="pick"]').onclick = wpPick;
+    box.querySelector('[data-wp="use"]')?.addEventListener('click', () => { try { localStorage.setItem('wallpaper', 'custom'); } catch {} document.querySelectorAll('[data-wall]').forEach(x => x.classList.remove('active')); applyWallpaper(); wpMount(); toast('Обои применены'); });
+    box.querySelector('[data-wp="del"]').onclick = () => {
+      try { localStorage.removeItem('wallpaper_custom'); if (localStorage.getItem('wallpaper') === 'custom') localStorage.setItem('wallpaper', 'default'); } catch {}
+      document.documentElement.removeAttribute('data-wallpaper-custom');
+      applyWallpaper(); wpMount(); toast('Свои обои убраны');
+    };
+  }
+  // после выбора готовых обоев — обновить блок (подпись «не включены»)
+  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-wall]')) setTimeout(() => { wpPaint(); wpMount(); }, 0); });
+
+  const mp = window.myProfile;
+  if (typeof mp === 'function') window.myProfile = function (view) {
+    const r = mp.apply(this, arguments);
+    if (view === 'customization') { try { wpMount(); } catch (x) { console.warn(x); } }
+    return r;
+  };
+  // при открытии чата слой должен быть на месте
+  const oc = window.openChat;
+  if (typeof oc === 'function') window.openChat = function () { const r = oc.apply(this, arguments); try { wpPaint(); } catch {} return r; };
+  try { applyWallpaper(); } catch {}
+})();
+</script>
+
 </body>
