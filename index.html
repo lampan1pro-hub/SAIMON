@@ -2346,9 +2346,9 @@ async function onWs(m) {
   } else if (m.type === 'messageEdited') {
     const l = msgs.get(d.chatId), i = l ? l.findIndex(x => x.id === d.messageId) : -1;
     if (i >= 0) {
-      l[i].text = d.text; l[i].edited = d.edited; if ('ai' in d) l[i].ai = d.ai;
+      l[i].text = d.text; l[i].edited = d.edited;
       const c = chats.get(d.chatId), el = cur === d.chatId && bubbleEl(d.messageId);
-      if (el && c) { const keep = 'ai' in d && stick; el.outerHTML = bubbleHtml(c, l, i); if (keep) msgsEl.scrollTop = msgsEl.scrollHeight; }
+      if (el && c) el.outerHTML = bubbleHtml(c, l, i);
     }
     const c = chats.get(d.chatId);
     if (c && c.last && c.last.id === d.messageId) { c.last.text = d.text; c.last.edited = d.edited; }
@@ -2593,12 +2593,12 @@ function renderHead() {
   const c = chats.get(cur);
   if (!c) return;
   const t = typing.has(cur), on = c.peer && c.peer.online;
-  const sub = c.type === 'saved' ? 'заметки, ссылки и пересланное' : t ? (c.peer && c.peer.id === 103 ? 'думает…' : 'печатает…') : c.type === 'group' ? c.members.length + ' участн.' : c.type === 'channel' ? subs(c.subscribers) : (c.peer && c.peer.bot ? 'бот' : on ? 'в сети' : fmtLastSeen(c.peer));
+  const sub = c.type === 'saved' ? 'заметки, ссылки и пересланное' : t ? 'печатает…' : c.type === 'group' ? c.members.length + ' участн.' : c.type === 'channel' ? subs(c.subscribers) : (c.peer && c.peer.bot ? 'бот' : on ? 'в сети' : fmtLastSeen(c.peer));
   const isBot = c.type === 'direct' && c.peer && c.peer.bot;
   const isSaimonChat = c.type === 'direct' && c.peer && c.peer.handle === 'saimon_chat';
   const iBlock = c.type === 'direct' && c.peer && blocked.has(c.peer.id);
   const isCustomBot = isBot && c.peer.custom, isHours = isBot && c.peer.id === 102;
-  const canWrite = !iBlock && (!isBot || c.peer.id === 103 || (isCustomBot && !!c.last)) && (c.type !== 'channel' || c.creator === me.id || c.open); // в канал пишет только автор; своим ботам — после «Начать»
+  const canWrite = !iBlock && (!isBot || (isCustomBot && !!c.last)) && (c.type !== 'channel' || c.creator === me.id || c.open); // в канал пишет только автор; своим ботам — после «Начать»
   $('#form').hidden = !canWrite; $('#rdonly').hidden = canWrite;
   if (!canWrite) setHtml($('#rdonly'), isSaimonChat ? '🔒 Системные уведомления' : isBot ? (isHours && c.last ? '<button type="button" class="btn" id="hbstudio">🛠 Hours Studio — мои боты</button>' : `<button type="button" class="btn" id="botstart">▶️ ${isCustomBot ? 'Начать' : 'Старт'}</button>`) : iBlock ? 'Вы заблокировали этого пользователя · <button class="lnk" id="unb">Разблокировать</button>' : 'Писать в канал может только его автор');
   setHtml($('#hd'), cav(c, 's') +
@@ -2852,8 +2852,8 @@ function bubbleHtml(c, l, i) {
   // само сообщение (как в Telegram), а не отдельной кнопкой с тремя точками — см. msgsEl touch-обработчики.
   const fwdH = m.fwd ? `<div class="fwd">↪️ Переслано от <b>${esc(m.fwd.name)}</b></div>` : '';
   const rpH = m.reply ? `<div class="rp" data-r="${esc(m.reply.id)}"><b>${esc(m.reply.name)}</b><span>${m.reply.mk === 'circle' ? '⭕ Видеосообщение' : m.reply.mk === 'voice' ? '🎤 Голосовое сообщение' : m.reply.mk === 'sticker' ? '🎭 Стикер' : m.reply.mk === 'image' ? '📷 Фото' : m.reply.mk === 'video' ? '🎥 Видео' : m.reply.mk === 'gift' ? '🎁 Подарок' : esc(m.reply.text || '')}</span></div>` : '';
-  const ae = !m.media && !m.gift && !m.call && !m.prem && !m.preview && !(m.buttons && m.buttons.length) && m.senderId !== 103 && aeOnly(m.text);
-  return `<div class="m ${ae ? 'jmb jmb' + ae.length : ''} ${mine && !ch ? 'me' : ''} ${ch ? '' : grpCls(l, i)} ${m.media || m.gift ? 'mm' : ''} ${ch ? 'ch' : ''} ${m.pending ? 'pending' : ''} ${m.media && m.media.sticker ? 'stk' : ''} ${m.media && m.media.circle ? 'circm' : ''} ${m.mentions && m.mentions.includes(me.id) ? 'ment' : ''}" data-id="${esc(m.id)}"${m.cid ? ` data-cid="${esc(m.cid)}"` : ''}>${who}${fwdH}${rpH}${m.call ? callBubble(m.call, mine) : ''}${m.gift ? giftBubble(m.gift, mine, m.text) : ''}${m.prem ? premBubble(m.prem, mine) : ''}${m.media ? mediaHtml(m.media) : ''}${sgTrHtml(m)}${ae ? `<span class="tx">${aeHtml(ae)}</span>` : m.senderId === 103 && (m.text || m.ai) && !m.gift ? aiHtml(m) : m.text && !m.gift ? `<span class="tx">${linkify(m.text)}</span>` : ''}${aiTr.size ? aiTrHtml(m) : ''}${m.preview && !m.gift ? lpCard(m.preview) : ''}${btnsHtml(m)}${rxHtml(m)}<time>${ch && m.views != null ? `<span class="vw" data-vw>👁 ${fmtViews(m.views)}</span>` : ''}${m.edited ? 'изм. ' : ''}${hm(m.timestamp)}${st}</time>${ch ? cmRow(m) : ''}</div>`;
+  const ae = !m.media && !m.gift && !m.call && !m.prem && !m.preview && !(m.buttons && m.buttons.length) && aeOnly(m.text);
+  return `<div class="m ${ae ? 'jmb jmb' + ae.length : ''} ${mine && !ch ? 'me' : ''} ${ch ? '' : grpCls(l, i)} ${m.media || m.gift ? 'mm' : ''} ${ch ? 'ch' : ''} ${m.pending ? 'pending' : ''} ${m.media && m.media.sticker ? 'stk' : ''} ${m.media && m.media.circle ? 'circm' : ''} ${m.mentions && m.mentions.includes(me.id) ? 'ment' : ''}" data-id="${esc(m.id)}"${m.cid ? ` data-cid="${esc(m.cid)}"` : ''}>${who}${fwdH}${rpH}${m.call ? callBubble(m.call, mine) : ''}${m.gift ? giftBubble(m.gift, mine, m.text) : ''}${m.prem ? premBubble(m.prem, mine) : ''}${m.media ? mediaHtml(m.media) : ''}${sgTrHtml(m)}${ae ? `<span class="tx">${aeHtml(ae)}</span>` : m.text && !m.gift ? `<span class="tx">${linkify(m.text)}</span>` : ''}${m.preview && !m.gift ? lpCard(m.preview) : ''}${btnsHtml(m)}${rxHtml(m)}<time>${ch && m.views != null ? `<span class="vw" data-vw>👁 ${fmtViews(m.views)}</span>` : ''}${m.edited ? 'изм. ' : ''}${hm(m.timestamp)}${st}</time>${ch ? cmRow(m) : ''}</div>`;
 }
 // @юзернеймы в тексте — кликабельные (ищут и «второстепенные» handles)
 const HNDL_RE = /(^|[^a-zA-Z0-9_])@([a-z0-9_]{3,20})/g;
@@ -3617,12 +3617,12 @@ ${profRow('👤', '#3390ec', 'Аккаунт', 'Имя, юзернейм, «О �
 ${profRow('💎', '#8e44ff', 'SAIMONPREMIYM', me.premium ? (me.premium === 'forever' ? 'Подписка навсегда' : 'Активна до ' + new Date(me.premium).toLocaleDateString('ru-RU')) : 'Подписки нет', 'data-go="premium"')}
 </div>
 <div class="tgp-card">
-${profRow('🎨', 'linear-gradient(135deg,#a35bff,#ff5bb0)', 'Внешний вид', 'Оформление, обои и тема', 'data-go="look"')}
+${profRow('🎨', 'linear-gradient(135deg,#a35bff,#ff5bb0)', 'Внешний вид', 'Оформление, обои, сезонный стиль', 'data-go="look"')}
 ${profRow('🔔', '#ff9f0a', 'Звуки и данные', 'Уведомления, звонок, память', 'data-go="device"')}
 ${profRow('🔐', '#34c77b', 'Безопасность', 'Приватность, код-пароль, сеансы', 'data-go="security"')}
 </div>
 <div class="tgp-card">
-${profRow('🧰', 'linear-gradient(135deg,#22d3ee,#6366f1 55%,#d946ef)', 'Инструменты', 'Saimon AI, свои боты, QR-код', 'data-go="tools"')}
+${profRow('🧰', 'linear-gradient(135deg,#22d3ee,#6366f1 55%,#d946ef)', 'Инструменты', 'Свои боты, QR-код', 'data-go="tools"')}
 ${profRow('🎁', '#ff9500', 'Подарки и Mars', 'Магазин, рынок NFT, аукционы', 'data-go="market"')}
 ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-панель', 'Каналы и пользователи', 'id="padm"') : ''}
 </div>
@@ -3675,6 +3675,7 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
     body = `<div class="tgp-card">
 ${profRow('✨', 'linear-gradient(135deg,#a35bff,#ff5bb0)', 'Оформление', 'Текст, пузырьки, цвет сообщений', 'data-sg="appearance"')}
 ${profRow('🖼', '#ff6b35', 'Обои и тема', 'Обои чата, цветовая тема', 'data-go="customization"')}
+${profRow('🎄', 'linear-gradient(135deg,#e11d48,#7c3aed 50%,#06b6d4)', 'Сезонный стиль', SEASONS[sgPref('season', 'off')].name, 'data-season-pick')}
 </div>`;
   } else if (view === 'device') {
     body = `<div class="tgp-card">
@@ -3693,7 +3694,6 @@ ${profRow('📷', '#3390ec', 'Подключить устройство', 'Вх�
 </div>`;
   } else if (view === 'tools') {
     body = `<div class="tgp-card">
-${profRow('✨', 'linear-gradient(135deg,#22d3ee,#6366f1 55%,#d946ef)', 'Saimon AI', 'Умный помощник: вопросы, фото, поиск', 'data-aiopen')}
 ${profRow('🤖', 'linear-gradient(135deg,#ff8a3d,#ff3d8b,#7b5cff)', 'Hours — свои боты', 'Команды, кнопки, мини-приложения', 'data-hbstudio')}
 </div>
 <div class="tgp-card">
@@ -3771,7 +3771,7 @@ ${profRow('📷', '#34c77b', 'Сканировать QR', 'Профиль дру
   $('#card').querySelectorAll('[data-myqr]').forEach(b => b.onclick = () => sgShowQR(me));
   $('#card').querySelectorAll('[data-hbstudio]').forEach(b => b.onclick = () => hbStudio());
   $('#card').querySelectorAll('[data-back]').forEach(b => b.onclick = () => myProfile(SG_FOLDERS.includes(view) || !window.sgFolder ? 'hub' : window.sgFolder));
-  $('#card').querySelectorAll('[data-aiopen]').forEach(b => b.onclick = () => aiOpen());
+  $('#card').querySelectorAll('[data-season-pick]').forEach(b => b.onclick = () => seasonPicker());
   $('#card').querySelectorAll('[data-scan]').forEach(b => b.onclick = () => { closeModal(); sgScanQR(); });
   $('#card').querySelectorAll('[data-nft]').forEach(b => b.onclick = () => market());
   $('#card').querySelectorAll('[data-auc]').forEach(b => b.onclick = () => auctions());
@@ -3872,7 +3872,7 @@ ${profRow('📷', '#34c77b', 'Сканировать QR', 'Профиль дру
   }
 }
 
-const ADMIN_HANDLES = ['saimon', 'admin'];
+const ADMIN_HANDLES = ['saimon']; // админка, статистика и рассылка — только у @saimon (сервер проверяет сам)
 const ADMIN_HANDLE = 'saimon';
 // Админ-панель: каналы (удалить любой) и пользователи (заблокировать). Сервер проверяет права сам.
 let adminPin = null; // пароль админ-панели на текущую сессию
@@ -3883,6 +3883,7 @@ function adminPanel() {
     adminPin = p;
   }
   modal(`<div class="sec" style="padding:0 0 6px">🛠 Админ-панель</div>
+<div class="adm-entry"><button type="button" id="admSt"><span>📊</span><b>Статистика</b><small>онлайн, сообщения, рост</small></button><button type="button" id="admBc"><span>📢</span><b>Рассылка</b><small>сообщение всем</small></button></div>
 <div class="sec" style="padding:8px 0 4px">Каналы</div><div id="admch" style="max-height:240px;overflow:auto"></div>
 <div class="sec" style="padding:12px 0 4px">Пользователи</div>
 <div class="f"><input id="admq" placeholder="Имя или @юзернейм" autocapitalize="off" autocomplete="off"></div>
@@ -3934,6 +3935,8 @@ function adminPanel() {
     }
   };
   let t; $('#admq').oninput = () => { clearTimeout(t); t = setTimeout(loadUs, 250); };
+  $('#admSt').onclick = adminStats;
+  $('#admBc').onclick = adminBroadcast;
   loadCh(); loadUs(); loadBan();
 }
 
@@ -5098,7 +5101,6 @@ function msgMenu(id) {
 <div class="acts">
 ${act('reply', '↩️', 'Ответить')}
 ${m.text ? act('copy', '📋', 'Копировать') : ''}
-${m.text || (m.media && m.media.tr) ? act('aitr', '🌍', 'Перевести · ИИ') : ''}
 ${m.gift || m.call ? '' : act('fwd', '↪️', 'Переслать')}
 ${act('pin', pinned ? '📍' : '📌', pinned ? 'Открепить' : 'Закрепить')}
 ${act('find', '🔍', 'Поиск в чате')}
@@ -5114,7 +5116,6 @@ ${mine ? act('del', '🗑', 'Удалить', 'red') : ''}
     if (k === 'reply') startReply(id);
     else if (k === 'copy') { try { await navigator.clipboard.writeText(m.text); toast('Скопировано'); } catch { toast('Не удалось скопировать'); } }
     else if (k === 'fwd') forwardPick(id);
-    else if (k === 'aitr') aiTranslate(id);
     else if (k === 'pin') togglePin(id);
     else if (k === 'find') { $('#sbar').hidden = false; $('#sres').hidden = true; $('#si').value = ''; $('#si').focus(); }
     else if (k === 'edit') startEdit(id);
@@ -5218,7 +5219,6 @@ function chatMenu(id) {
   items.unshift(['hide', sgIsHidden(c.id) ? '👁 Вернуть в список чатов' : '🙈 Скрыть чат (по код-паролю)', 'g']);
   if (c.type !== 'saved') items.unshift(['arch', ((me.archived || []).includes(c.id)) ? '📤 Вернуть из архива' : '🗄 В архив', 'g']);
   items.unshift(['media', '🖼 Медиа, ссылки и голосовые', 'g']);
-  if (c.type !== 'saved' && !(c.peer && c.peer.id === 103)) items.unshift(['aisum', '✨ Пересказ чата · ИИ', 'g']);
   modal(`<h2 style="margin-bottom:6px">${esc(title(c))}</h2>${items.map(([k, t, cls]) =>
     `<div class="row"><button class="btn ${cls}" data-a="${k}">${t}</button></div>`).join('')}
 <div class="row"><button type="button" class="btn g" data-x>Отмена</button></div>`);
@@ -6102,6 +6102,8 @@ function sgApplyUi() {
   const mc = sgPref('mc', 'blue');
   if (mc === 'blue') delete r.dataset.mc; else r.dataset.mc = mc;
   r.dataset.anim = sgPref('anim', 'full');
+  if (sgPref('glass', false)) r.dataset.glass = '1'; else delete r.dataset.glass;
+  if (typeof glassLayout === 'function') glassLayout();
 }
 sgApplyUi();
 const sgFmtBytes = b => b < 1024 ? b + ' Б' : b < 1048576 ? (b / 1024).toFixed(0) + ' КБ' : b < 1073741824 ? (b / 1048576).toFixed(1).replace('.0', '') + ' МБ' : (b / 1073741824).toFixed(2) + ' ГБ';
@@ -6375,6 +6377,8 @@ async function sgSettings(view, opts = {}) {
 <div class="tgp-card"><div class="sg-shapes">${[['classic', 'Классика', 6], ['round', 'Скруглённые', 10], ['xround', 'Очень круглые', 14]].map(([v, t, r]) => `<button type="button" data-bs="${v}" class="${bs === v ? 'on' : ''}"><i style="border-radius:${r}px"></i>${t}</button>`).join('')}</div></div>
 <div class="sg-sec">Цвет моих сообщений</div>
 <div class="tgp-card"><div class="sg-colors">${SG_COLORS.map(([v, g]) => `<button type="button" data-mc="${v}" class="${mc === v ? 'on' : ''}" style="background:${g}" aria-label="${v}"></button>`).join('')}</div></div>
+<div class="sg-sec">Стекло</div>
+<div class="tgp-card">${sgRow({ ic: '💧', bg: 'linear-gradient(135deg,#7dd3fc,#a78bfa)', t: 'Жидкое стекло', sub: 'Прозрачная шапка и поле ввода — чат виден сквозь них', right: sgTg(sgPref('glass', false)), attr: 'data-act="glass"' })}</div>
 <div class="sg-sec">Анимации</div>
 <div class="tgp-card">${sgSeg('anim', [['full', 'Полные'], ['min', 'Минимум'], ['off', 'Выкл']], an)}</div>
 <div class="sg-note">«Минимум» и «Выкл» помогают на слабых телефонах и экономят батарею.</div>
@@ -6488,6 +6492,7 @@ ${sgRow({ ic: '🎬', bg: '#ff6b8a', t: 'Видео', sub: 'Выкл — вид�
   card.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
     const a = b.dataset.act;
     if (a === 'push') { await togglePush(); setTimeout(again, 400); }
+    else if (a === 'glass') { sgSetPref('glass', flip(b)); sgApplyUi(); }
     else if (a === 'vib_msg' || a === 'vib_call' || a === 'al_photo' || a === 'al_video') { sgSetPref(a, flip(b)); if (a === 'vib_msg' && sgPref(a, true)) try { navigator.vibrate && navigator.vibrate(30); } catch {} }
     else if (a === 'preview' || a === 'rr') {
       const on = flip(b);
@@ -8223,32 +8228,6 @@ html[data-theme="dark"] .ql-card{background:#17212b;color:#f2f5f8}
 .ql-ask .sg-btn{width:100%;margin:6px 0 0}
 .ql-ask .ql-no{background:rgba(127,127,127,.16)!important;color:inherit!important;box-shadow:none!important}
 
-/* ===== Saimon AI ===== */
-.ai-ib{background:linear-gradient(135deg,#22d3ee,#6366f1 55%,#d946ef)!important;color:#fff!important;border-radius:50%;box-shadow:0 4px 14px rgba(99,102,241,.45)}
-#msgs .aitx{white-space:pre-wrap}
-html #msgs .m .aitx b{display:inline!important;font-weight:700!important;color:inherit!important;font-size:inherit!important;margin:0!important;padding:0!important}
-html #msgs .m .aitx i{font-style:italic}
-#msgs .aitx code.aic{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em;padding:1px 5px;border-radius:6px;background:rgba(127,127,127,.18)}
-#msgs .aipre{position:relative;margin:6px 0;padding:30px 12px 10px;border-radius:14px;background:rgba(0,0,0,.28);overflow-x:auto;white-space:pre;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:#e6edf3}
-html[data-theme="light"] #msgs .aipre,html:not([data-theme="dark"]) #msgs .aipre{background:#0f172a}
-#msgs .aipre code{white-space:pre}
-.aicopy{position:absolute;top:6px;right:8px;border:0;border-radius:8px;padding:3px 8px;background:rgba(255,255,255,.12);color:#cbd5e1;font-size:11px;cursor:pointer}
-.aidots{display:inline-flex;gap:4px;vertical-align:middle;padding:4px 2px}
-.aidots i{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.35;animation:aiDot 1.2s infinite}
-.aidots i:nth-child(2){animation-delay:.2s}.aidots i:nth-child(3){animation-delay:.4s}
-@keyframes aiDot{30%{opacity:1;transform:translateY(-3px)}60%{opacity:.35;transform:none}}
-.aist{opacity:.75;font-size:.95em}
-.aicaret{display:inline-block;width:7px;height:1em;margin-left:2px;vertical-align:-2px;border-radius:2px;background:linear-gradient(#6366f1,#d946ef);animation:aiCaret .9s steps(2) infinite}
-@keyframes aiCaret{50%{opacity:0}}
-.aitr{margin-top:6px;padding:7px 10px;border-radius:12px;background:rgba(127,127,127,.13);font-size:.95em;white-space:pre-wrap}
-.aitr small{display:block;font-size:11px;opacity:.6;margin-bottom:2px}
-.aitr.err{color:#e5484d}
-.aisum{padding:2px 4px 10px}
-.aisum-h{display:flex;gap:12px;align-items:center;margin-bottom:12px}
-.aisum-h b{display:block;font-size:17px}.aisum-h small{opacity:.6}
-.aisum-ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:linear-gradient(135deg,#22d3ee,#6366f1 55%,#d946ef);box-shadow:0 6px 16px rgba(99,102,241,.4)}
-.aisum-b{white-space:pre-wrap;line-height:1.5;font-size:15px;padding:12px 14px;border-radius:16px;background:rgba(127,127,127,.1)}
-.aisum-n{display:block;margin-top:8px;opacity:.5;font-size:12px}
 /* ===== Аукцион ===== */
 .auc-entry{display:flex;align-items:center;gap:10px;width:100%;margin:8px 0 10px;padding:12px 14px;border:0;border-radius:18px;color:#fff;cursor:pointer;text-align:left;font-family:inherit;background:linear-gradient(135deg,#ff8a3d,#ff3d8b 55%,#7b5cff);box-shadow:0 8px 22px rgba(255,61,139,.3)}
 .auc-entry span{font-size:22px}.auc-entry b{font-size:15.5px}.auc-entry small{flex:1;opacity:.85;font-size:12.5px}.auc-entry i{font-style:normal;font-size:22px;opacity:.8}
@@ -8282,6 +8261,219 @@ html[data-theme="light"] #msgs .aipre,html:not([data-theme="dark"]) #msgs .aipre
 .auc-st input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:14px;border:1px solid rgba(127,127,127,.3);background:transparent;color:inherit;font-size:17px}
 .auc-st .sg-seg{margin:0}
 .auc-st .sg-btn{width:100%;margin:12px 0 0}
+
+/* ===== Сезонные стили ===== */
+#seasonFx{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:40}
+#seasonFx[hidden]{display:none}
+/* Новый год */
+html[data-season="ny"]{--mgrad:linear-gradient(135deg,#e11d48,#f43f5e 45%,#fb7185);--mglow:rgba(225,29,72,.35)}
+html[data-season="ny"] #chat{background:linear-gradient(180deg,#dbeafe 0%,#eff6ff 55%,#fff1f2 100%)!important}
+html[data-season="ny"][data-theme="dark"] #chat{background:linear-gradient(180deg,#0b1a3a 0%,#0f2147 55%,#1c1430 100%)!important}
+html[data-season="ny"] #chat::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Ctext x='10' y='26' font-size='18' transform='rotate%280 10 26%29'%3E%E2%9D%84%3C/text%3E%3Ctext x='62' y='44' font-size='24' transform='rotate%28-8 62 44%29'%3E%F0%9F%8E%84%3C/text%3E%3Ctext x='30' y='92' font-size='14' transform='rotate%2812 30 92%29'%3E%E2%AD%90%3C/text%3E%3Ctext x='88' y='104' font-size='20' transform='rotate%288 88 104%29'%3E%F0%9F%8E%81%3C/text%3E%3Ctext x='100' y='22' font-size='12' transform='rotate%280 100 22%29'%3E%E2%9D%84%3C/text%3E%3Ctext x='8' y='70' font-size='13' transform='rotate%280 8 70%29'%3E%E2%9C%A8%3C/text%3E%3C/svg%3E")!important;background-size:120px 120px!important;background-position:0 0!important;opacity:.22!important}
+html[data-season="ny"][data-theme="dark"] #chat::before{opacity:.16!important}
+html[data-season="ny"] .rh,html[data-season="ny"] .sh{position:relative}
+html[data-season="ny"] .rh::after,html[data-season="ny"] .sh::after{content:'';position:absolute;left:10px;right:10px;bottom:-7px;height:12px;pointer-events:none;z-index:3;
+  background:radial-gradient(circle,#ff4d6d 0 3px,transparent 4px) 0 50%/48px 12px repeat-x,radial-gradient(circle,#ffd166 0 3px,transparent 4px) 16px 50%/48px 12px repeat-x,radial-gradient(circle,#4ade80 0 3px,transparent 4px) 32px 50%/48px 12px repeat-x;
+  filter:drop-shadow(0 0 4px rgba(255,209,102,.9));animation:nyBlink 1.6s steps(2) infinite}
+@keyframes nyBlink{50%{filter:drop-shadow(0 0 7px rgba(255,77,109,.95)) hue-rotate(120deg)}}
+html[data-season="ny"] #list::before{content:'🎄 С наступающим!';display:block;margin:6px 14px 4px;padding:10px 14px;border-radius:18px;font-weight:700;font-size:14px;color:#fff;background:linear-gradient(135deg,#0b2a5b,#1d4ed8 55%,#e11d48);box-shadow:0 6px 18px rgba(29,78,216,.3)}
+/* Хэллоуин */
+html[data-season="hw"]{--mgrad:linear-gradient(135deg,#ff7a00,#f43f5e 45%,#7c3aed);--mglow:rgba(255,122,0,.35)}
+html[data-season="hw"] #chat{background:linear-gradient(180deg,#fff7ed 0%,#fde7d4 55%,#ede9fe 100%)!important}
+html[data-season="hw"][data-theme="dark"] #chat{background:linear-gradient(180deg,#14091f 0%,#1f0f33 55%,#2a1206 100%)!important}
+html[data-season="hw"] #chat::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Ctext x='12' y='32' font-size='24' transform='rotate%28-8 12 32%29'%3E%F0%9F%8E%83%3C/text%3E%3Ctext x='66' y='30' font-size='20' transform='rotate%2810 66 30%29'%3E%F0%9F%A6%87%3C/text%3E%3Ctext x='90' y='96' font-size='22' transform='rotate%280 90 96%29'%3E%F0%9F%95%B8%3C/text%3E%3Ctext x='24' y='100' font-size='20' transform='rotate%286 24 100%29'%3E%F0%9F%91%BB%3C/text%3E%3Ctext x='70' y='72' font-size='14' transform='rotate%28-20 70 72%29'%3E%F0%9F%8D%AC%3C/text%3E%3Ctext x='104' y='52' font-size='10' transform='rotate%280 104 52%29'%3E%E2%AD%90%3C/text%3E%3C/svg%3E")!important;background-size:120px 120px!important;background-position:0 0!important;opacity:.2!important}
+html[data-season="hw"][data-theme="dark"] #chat::before{opacity:.14!important}
+html[data-season="hw"] #room::after{content:'🕸';position:absolute;top:58px;right:4px;font-size:64px;line-height:1;opacity:.35;pointer-events:none;z-index:2;transform:rotate(12deg)}
+html[data-season="hw"] #list::before{content:'🎃 Сладость или гадость?';display:block;margin:6px 14px 4px;padding:10px 14px;border-radius:18px;font-weight:700;font-size:14px;color:#fff;background:linear-gradient(135deg,#1a0b2e,#5b21b6 50%,#ff7a00);box-shadow:0 6px 18px rgba(255,122,0,.3)}
+/* Лето */
+html[data-season="su"]{--mgrad:linear-gradient(135deg,#06b6d4,#0ea5e9 45%,#f59e0b);--mglow:rgba(6,182,212,.35)}
+html[data-season="su"] #chat{background:radial-gradient(circle at 92% 6%,rgba(255,214,102,.75) 0,rgba(255,214,102,0) 32%),linear-gradient(180deg,#e0f7fa 0%,#f0fdff 55%,#fff7e0 100%)!important}
+html[data-season="su"][data-theme="dark"] #chat{background:radial-gradient(circle at 92% 6%,rgba(255,190,70,.28) 0,rgba(255,190,70,0) 32%),linear-gradient(180deg,#062a33 0%,#07323d 55%,#2a2108 100%)!important}
+html[data-season="su"] #chat::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Ctext x='8' y='36' font-size='24' transform='rotate%28-6 8 36%29'%3E%F0%9F%8C%B4%3C/text%3E%3Ctext x='70' y='30' font-size='20' transform='rotate%280 70 30%29'%3E%E2%98%80%3C/text%3E%3Ctext x='30' y='96' font-size='18' transform='rotate%2810 30 96%29'%3E%F0%9F%8D%89%3C/text%3E%3Ctext x='92' y='92' font-size='16' transform='rotate%28-10 92 92%29'%3E%F0%9F%90%9A%3C/text%3E%3Ctext x='60' y='70' font-size='16' transform='rotate%280 60 70%29'%3E%F0%9F%8C%8A%3C/text%3E%3Ctext x='104' y='60' font-size='15' transform='rotate%288 104 60%29'%3E%F0%9F%8D%B9%3C/text%3E%3C/svg%3E")!important;background-size:120px 120px!important;background-position:0 0!important;opacity:.2!important}
+html[data-season="su"][data-theme="dark"] #chat::before{opacity:.14!important}
+html[data-season="su"] #list::before{content:'🌴 Лето! Отдыхаем';display:block;margin:6px 14px 4px;padding:10px 14px;border-radius:18px;font-weight:700;font-size:14px;color:#fff;background:linear-gradient(135deg,#00b4d8,#0ea5e9 55%,#ffb703);box-shadow:0 6px 18px rgba(14,165,233,.3)}
+/* выбор стиля */
+.sn-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sn-card{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 8px 10px;border-radius:20px;border:2px solid transparent;background:rgba(127,127,127,.1);color:inherit;font-family:inherit;text-align:left;cursor:pointer;transition:border-color .2s,transform .15s}
+.sn-card:active{transform:scale(.97)}
+.sn-card.on{border-color:#4f8dff;background:rgba(79,141,255,.12)}
+.sn-card b{font-size:15px;padding:4px 4px 0}.sn-card small{font-size:12px;opacity:.6;padding:0 4px}
+.sn-pv{position:relative;display:grid;place-items:center;width:100%;height:84px;border-radius:14px;overflow:hidden}
+.sn-pv span{font-size:40px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.3))}
+.sn-pv-ny::after{content:'❄  ❄   ❄ ❄';position:absolute;inset:6px 8px auto;color:#fff;opacity:.8;font-size:12px;letter-spacing:6px}
+.sn-pv-hw::after{content:'🦇      🦇';position:absolute;top:6px;left:8px;font-size:13px}
+.sn-pv-su::after{content:'';position:absolute;top:-20px;right:-20px;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(255,236,170,.95),rgba(255,214,102,0) 70%)}
+.sn-card:first-child{grid-column:auto}
+
+/* ===== Админ: статистика и рассылка ===== */
+.adm-entry{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 8px}
+.adm-entry button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:14px;border:0;border-radius:20px;color:#fff;cursor:pointer;font-family:inherit;text-align:left}
+.adm-entry button span{font-size:24px}.adm-entry button b{font-size:16px}.adm-entry button small{opacity:.85;font-size:12px}
+#admSt{background:linear-gradient(135deg,#4f8dff,#7b5cff);box-shadow:0 8px 20px rgba(79,141,255,.3)}
+#admBc{background:linear-gradient(135deg,#ff8a3d,#ff3d8b);box-shadow:0 8px 20px rgba(255,61,139,.3)}
+.adm-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.adm-top h2{flex:1;margin:0;font-size:20px}
+.adm-top .tgp-back{position:static;width:38px;height:38px;border-radius:50%;border:0;background:rgba(127,127,127,.14);color:inherit;font-size:24px;cursor:pointer;padding-bottom:3px}
+.adm-rf{width:38px;height:38px;border-radius:50%;border:0;background:rgba(127,127,127,.14);color:inherit;font-size:18px;cursor:pointer}
+.adm-live{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 14px;border-radius:18px;background:rgba(52,199,123,.12);margin-bottom:10px;font-size:15px}
+.adm-live b{font-size:22px}.adm-live small{width:100%;padding-left:18px;color:var(--t2);font-size:12.5px;margin-top:-4px}
+.adm-dot{width:10px;height:10px;border-radius:50%;background:#34c77b;box-shadow:0 0 0 0 rgba(52,199,123,.6);animation:qlPulse 1.6s infinite}
+.adm-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.adm-tile{display:flex;flex-direction:column;gap:1px;padding:12px;border-radius:18px;background:rgba(127,127,127,.1)}
+.adm-tile span{font-size:18px}.adm-tile b{font-size:22px;font-variant-numeric:tabular-nums}.adm-tile small{font-size:12.5px;color:var(--t2)}
+.adm-tile i{font-style:normal;font-size:11.5px;color:var(--t2);margin-top:4px;line-height:1.35}
+.adm-card{padding:12px;border-radius:18px;background:rgba(127,127,127,.1);margin-bottom:10px}
+.adm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.adm-grid2 .adm-card{margin-bottom:10px}
+.adm-h{font-weight:700;font-size:13.5px;margin:0 0 6px;color:var(--t2)}
+.adm-kv{display:flex;justify-content:space-between;gap:8px;padding:5px 0;font-size:14px;border-top:1px solid rgba(127,127,127,.12)}
+.adm-kv:first-of-type{border-top:0}
+.adm-kv small{color:var(--t2)}
+.adm-kv b{font-variant-numeric:tabular-nums}
+.adm-seg{margin:0 0 10px!important}
+.adm-ct b{display:block;font-size:15px}.adm-ct small{color:var(--t2);font-size:12px}
+.adm-chart{width:100%;height:auto;display:block;margin-top:6px;overflow:visible}
+.adm-chart .adm-ax{stroke:rgba(127,127,127,.3);stroke-width:1}
+.adm-bar path{fill:#4f8dff;opacity:.55;transition:opacity .15s}
+.adm-bar.today path{opacity:1}
+.adm-bar.hl path,.adm-bar:hover path{opacity:1;fill:#7b5cff}
+.adm-bar{cursor:pointer}
+.adm-vl{font-size:10.5px;font-weight:700;fill:currentColor;text-anchor:middle}
+.adm-xl{font-size:9.5px;fill:currentColor;opacity:.55;text-anchor:middle}
+.adm-tip{font-size:12.5px;color:var(--t2);text-align:center;margin-top:4px;min-height:16px}
+.adm-note{font-size:13px;color:var(--t2);margin-bottom:8px}
+.adm-ta{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:16px;border:1px solid rgba(127,127,127,.3);background:transparent;color:inherit;font:inherit;font-size:15px;resize:vertical}
+.adm-len{text-align:right;font-size:12px;color:var(--t2);margin:2px 4px 4px}
+.adm-chk{display:flex;align-items:center;gap:8px;font-size:14px;margin:4px 2px}
+.adm-pv{padding:10px;border-radius:18px;background:rgba(127,127,127,.1)}
+.adm-pv-h{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:14px}
+.adm-pv-av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;background:linear-gradient(135deg,#4f8dff,#7b5cff)}
+.adm-pv-b{display:inline-block;max-width:90%;padding:8px 12px;border-radius:16px 16px 16px 4px;background:var(--bg,#fff);white-space:pre-wrap;word-break:break-word;font-size:14.5px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+html[data-theme="dark"] .adm-pv-b{background:#1f2d3d}
+.adm-pv-b a{color:#3d8bff}
+.btn.adm-send{width:100%;background:linear-gradient(135deg,#ff8a3d,#ff3d8b)!important;color:#fff!important;border:0}
+.adm-hist{padding:8px 10px;border-radius:14px;background:rgba(127,127,127,.08);margin-bottom:6px;font-size:13.5px}
+.adm-hist div{white-space:pre-wrap;max-height:60px;overflow:hidden}
+.adm-hist small{color:var(--t2);font-size:12px}
+
+/* ===== Жидкое стекло ===== */
+html[data-glass] #room>.rh,html[data-glass] #pbar,html[data-glass] #sbar{position:relative;z-index:20}
+html[data-glass] #room>#editbar,html[data-glass] #room>#replybar,html[data-glass] #room>#pend,html[data-glass] #room>#recbar,html[data-glass] #room>#emobar,html[data-glass] #room>#form,html[data-glass] #room>#rdonly{position:relative;z-index:20}
+html[data-glass] #msgs{margin-top:calc(-1 * var(--g-top,0px))!important;padding-top:calc(var(--g-top,0px) + 10px)!important;margin-bottom:calc(-1 * var(--g-bot,0px))!important;padding-bottom:calc(var(--g-bot,0px) + 12px)!important;scroll-padding-top:var(--g-top,0px)}
+html[data-glass] #room>.rh,html[data-glass] #form,html[data-glass] #pbar:not([hidden]),html[data-glass] #sbar:not([hidden]),html[data-glass] #replybar:not([hidden]),html[data-glass] #editbar:not([hidden]),html[data-glass] #rdonly:not([hidden]){
+  background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,.38))!important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.9)!important;backdrop-filter:blur(24px) saturate(1.9)!important;
+  border:1px solid rgba(255,255,255,.55)!important;
+  box-shadow:0 10px 30px rgba(15,23,42,.12),inset 0 1px 0 rgba(255,255,255,.85),inset 0 -1px 0 rgba(255,255,255,.25)!important}
+html[data-glass][data-theme="dark"] #room>.rh,html[data-glass][data-theme="dark"] #form,html[data-glass][data-theme="dark"] #pbar:not([hidden]),html[data-glass][data-theme="dark"] #sbar:not([hidden]),html[data-glass][data-theme="dark"] #replybar:not([hidden]),html[data-glass][data-theme="dark"] #editbar:not([hidden]),html[data-glass][data-theme="dark"] #rdonly:not([hidden]){
+  background:linear-gradient(180deg,rgba(40,54,72,.55),rgba(20,30,44,.35))!important;border-color:rgba(255,255,255,.1)!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(255,255,255,.04)!important}
+html[data-glass] #form{border-radius:30px!important;margin:0 10px 10px!important}
+html[data-glass] #pbar:not([hidden]),html[data-glass] #sbar:not([hidden]){margin:6px 8px 0!important;border-radius:18px!important}
+html[data-glass] #replybar:not([hidden]),html[data-glass] #editbar:not([hidden]){margin:0 10px 6px!important;border-radius:18px!important}
+html[data-glass] #msgs{-webkit-mask-image:linear-gradient(to bottom,transparent 0,transparent 8px,#000 24px);mask-image:linear-gradient(to bottom,transparent 0,transparent 8px,#000 24px)}
+html[data-glass] #room>.rh{margin:8px 8px 0!important;border-radius:24px!important}
+html[data-glass] #form textarea,html[data-glass] #form input,html[data-glass] #form .inp,html[data-glass] #form #inp{background:transparent!important}
+/* пузыри — полупрозрачные с бликом (без размытия, чтобы не тормозило) */
+html[data-glass] #msgs .m:not(.me):not(.jmb):not(.stk){background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(255,255,255,.7))!important;box-shadow:0 2px 10px rgba(15,23,42,.08),inset 0 1px 0 rgba(255,255,255,.9),inset 0 0 0 1px rgba(255,255,255,.5)!important}
+html[data-glass][data-theme="dark"] #msgs .m:not(.me):not(.jmb):not(.stk){background:linear-gradient(180deg,rgba(44,58,78,.78),rgba(28,40,56,.68))!important;box-shadow:0 2px 10px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.1),inset 0 0 0 1px rgba(255,255,255,.05)!important}
+html[data-glass] #msgs .m.me:not(.jmb):not(.stk){box-shadow:0 4px 14px var(--mglow,rgba(79,141,255,.3)),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -1px 0 rgba(0,0,0,.08)!important}
+html[data-glass] #msgs .day{background:rgba(255,255,255,.45)!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
+html[data-glass][data-theme="dark"] #msgs .day{background:rgba(0,0,0,.28)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+/* список чатов, нижние листы, уведомления */
+html[data-glass] #side .sh{background:linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,.35))!important;-webkit-backdrop-filter:blur(20px) saturate(1.8);backdrop-filter:blur(20px) saturate(1.8)}
+html[data-glass][data-theme="dark"] #side .sh{background:linear-gradient(180deg,rgba(40,54,72,.5),rgba(20,30,44,.3))!important}
+html[data-glass] #sgSheet{--sheet-bg:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(28px) saturate(1.8);backdrop-filter:blur(28px) saturate(1.8);box-shadow:0 -10px 40px rgba(15,23,42,.18),inset 0 1px 0 rgba(255,255,255,.9)}
+html[data-glass][data-theme="dark"] #sgSheet{--sheet-bg:rgba(26,37,50,.7);box-shadow:0 -10px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1)}
+html[data-glass] #toast{background:rgba(30,30,36,.6)!important;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:inset 0 1px 0 rgba(255,255,255,.18)}
+/* превью в настройках */
+html[data-glass] .sg-prev .m:not(.me){background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(255,255,255,.7))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 0 0 1px rgba(255,255,255,.5)!important}
+html[data-glass][data-theme="dark"] .sg-prev .m:not(.me){background:linear-gradient(180deg,rgba(44,58,78,.78),rgba(28,40,56,.68))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.1)!important}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  html[data-glass] #room>.rh,html[data-glass] #form{background:rgba(255,255,255,.92)!important}
+  html[data-glass][data-theme="dark"] #room>.rh,html[data-glass][data-theme="dark"] #form{background:rgba(23,33,48,.94)!important}
+}
+
+/* ===== Уютные сезонные темы: украшения на сообщениях ===== */
+html[data-season] #msgs .m{position:relative}
+html[data-season] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm){overflow:visible}
+html[data-season] #msgs .m.jmb::before,html[data-season] #msgs .m.jmb::after,html[data-season] #msgs .m.mm::before,html[data-season] #msgs .m.stk::before,html[data-season] #msgs .m.circm::before{display:none!important}
+html[data-season] #msgs .m::after,html[data-season] #msgs .m::before{pointer-events:none}
+
+/* --- Новый год: снежные шапки, ёлочные украшения, огоньки --- */
+html[data-season="ny"] #chat{background:
+  radial-gradient(circle at 12% 18%,rgba(255,196,92,.35) 0,transparent 9%),radial-gradient(circle at 82% 30%,rgba(255,96,96,.28) 0,transparent 8%),
+  radial-gradient(circle at 30% 62%,rgba(120,220,140,.22) 0,transparent 8%),radial-gradient(circle at 88% 74%,rgba(255,206,120,.3) 0,transparent 9%),
+  linear-gradient(180deg,#e7f1ff 0%,#f4f8ff 70%,#ffffff 100%)!important}
+html[data-season="ny"][data-theme="dark"] #chat{background:
+  radial-gradient(circle at 12% 18%,rgba(255,190,80,.22) 0,transparent 10%),radial-gradient(circle at 82% 30%,rgba(255,80,80,.18) 0,transparent 9%),
+  radial-gradient(circle at 30% 62%,rgba(90,220,140,.14) 0,transparent 9%),radial-gradient(circle at 88% 74%,rgba(255,200,110,.2) 0,transparent 10%),
+  linear-gradient(180deg,#0c2233 0%,#0e2a2a 55%,#1a1f33 100%)!important}
+html[data-season="ny"] {--mgrad:linear-gradient(135deg,#c81d3a,#e8344f 50%,#f25c54);--mglow:rgba(232,52,79,.35)}
+html[data-season="ny"] #msgs .m:not(.me):not(.mm):not(.jmb):not(.stk){background:#fffdf8!important;box-shadow:0 2px 8px rgba(30,60,90,.12),inset 0 0 0 1px rgba(214,169,94,.25)!important}
+html[data-season="ny"][data-theme="dark"] #msgs .m:not(.me):not(.mm):not(.jmb):not(.stk){background:linear-gradient(180deg,#1d3a3a,#173030)!important;box-shadow:0 2px 10px rgba(0,0,0,.3),inset 0 0 0 1px rgba(214,169,94,.22)!important}
+html[data-season="ny"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm)::before{content:'';position:absolute;top:-5px;left:10px;right:10px;height:11px;border-radius:6px 6px 0 0;
+  background:linear-gradient(#fff,#eef5ff) 0 0/100% 5px no-repeat,radial-gradient(circle at 50% 0,#fff 4.5px,transparent 5px) 0 3px/11px 7px repeat-x;filter:drop-shadow(0 1px 1px rgba(80,120,170,.25));z-index:2}
+html[data-season="ny"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(3n)::after{content:'🎄';position:absolute;top:-14px;right:-8px;font-size:19px;transform:rotate(12deg);z-index:3;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+html[data-season="ny"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(5n+1)::after{content:'🎁';position:absolute;top:-13px;right:-8px;font-size:17px;transform:rotate(-10deg);z-index:3}
+html[data-season="ny"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(7n+2)::after{content:'⭐';position:absolute;top:-12px;right:-6px;font-size:15px;z-index:3;animation:nyTwinkle 2.4s ease-in-out infinite}
+html[data-season="ny"] #msgs .m.me:not(.mm):not(.jmb):not(.stk):not(.circm)::after{right:auto!important;left:-8px}
+@keyframes nyTwinkle{50%{transform:scale(1.25) rotate(15deg);filter:drop-shadow(0 0 6px #ffd166)}}
+html[data-season="ny"] #form{position:relative}
+html[data-season="ny"] #form::before{content:'';position:absolute;left:24px;right:24px;top:-6px;height:12px;z-index:3;pointer-events:none;
+  background:radial-gradient(circle,#ff4d6d 0 3px,transparent 4px) 0 50%/42px 12px repeat-x,radial-gradient(circle,#ffd166 0 3px,transparent 4px) 14px 50%/42px 12px repeat-x,radial-gradient(circle,#4ade80 0 3px,transparent 4px) 28px 50%/42px 12px repeat-x;
+  filter:drop-shadow(0 0 4px rgba(255,209,102,.9));animation:nyBlink 1.6s steps(2) infinite}
+html[data-season="ny"] .day{background:linear-gradient(135deg,#c81d3a,#a3122a)!important;color:#fff!important;box-shadow:0 2px 8px rgba(200,29,58,.3)}
+html[data-season="ny"] .day::before{content:'❄ '}html[data-season="ny"] .day::after{content:' ❄'}
+
+/* --- Хэллоуин: паутинки, пауки, тыквы, свечи и туман --- */
+html[data-season="hw"] #chat{background:
+  radial-gradient(circle at 86% 9%,rgba(255,244,214,.95) 0,rgba(255,236,190,.55) 4%,rgba(255,200,120,.12) 9%,transparent 16%),
+  radial-gradient(ellipse at 50% 108%,rgba(255,255,255,.45) 0,transparent 45%),
+  radial-gradient(circle at 15% 70%,rgba(255,140,0,.18) 0,transparent 12%),
+  linear-gradient(180deg,#fdf2e6 0%,#f6e3f0 60%,#ece7fb 100%)!important}
+html[data-season="hw"][data-theme="dark"] #chat{background:
+  radial-gradient(circle at 86% 9%,rgba(255,240,200,.9) 0,rgba(255,220,150,.35) 3.5%,rgba(255,160,60,.1) 9%,transparent 16%),
+  radial-gradient(ellipse at 50% 110%,rgba(200,190,255,.18) 0,transparent 45%),
+  radial-gradient(circle at 15% 70%,rgba(255,120,0,.16) 0,transparent 12%),
+  linear-gradient(180deg,#130a22 0%,#1d0f2e 55%,#1b0d12 100%)!important}
+html[data-season="hw"] {--mgrad:linear-gradient(135deg,#ff7a00,#e8590c 45%,#7c3aed);--mglow:rgba(255,122,0,.4)}
+html[data-season="hw"][data-theme="dark"] #msgs .m:not(.me):not(.mm):not(.jmb):not(.stk){background:linear-gradient(180deg,#2a1840,#21122f)!important;box-shadow:0 2px 12px rgba(0,0,0,.35),0 0 0 1px rgba(255,140,0,.15)!important}
+html[data-season="hw"] #msgs .m:not(.me):not(.mm):not(.jmb):not(.stk):not(.circm)::before{content:'';position:absolute;top:-4px;left:-4px;width:24px;height:24px;z-index:2;opacity:.45;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='white' stroke-opacity='.75' stroke-width='1'%3E%3Cpath d='M0 0 L40 40 M0 0 L20 40 M0 0 L40 20 M0 0 L0 40 M0 0 L40 0'/%3E%3Cpath d='M0 10 Q6 8 8 3 M0 18 Q11 15 15 6 M0 26 Q16 22 22 9 M0 34 Q21 29 29 12 M2 40 Q26 35 36 15'/%3E%3C/g%3E%3C/svg%3E") 0 0/24px 24px no-repeat;filter:invert(1)}
+html[data-season="hw"][data-theme="dark"] #msgs .m:not(.me):not(.mm):not(.jmb):not(.stk):not(.circm)::before{filter:none;opacity:.5}
+html[data-season="hw"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(4n)::after{content:'🕷';position:absolute;top:-30px;right:16px;font-size:19px;z-index:3;line-height:1;padding-top:18px;
+  background:linear-gradient(currentColor,currentColor) 50% 0/1px 18px no-repeat;color:rgba(150,140,175,.9);animation:hwSpider 3.2s ease-in-out infinite;transform-origin:50% 0}
+html[data-season="hw"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(5n+2)::after{content:'🎃';position:absolute;top:-13px;right:-8px;font-size:19px;transform:rotate(10deg);z-index:3;filter:drop-shadow(0 0 6px rgba(255,140,0,.6))}
+html[data-season="hw"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(7n+3)::after{content:'🍬';position:absolute;top:-12px;right:-6px;font-size:15px;transform:rotate(-20deg);z-index:3}
+html[data-season="hw"] #msgs .m.me:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(5n+2)::after,html[data-season="hw"] #msgs .m.me:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(7n+3)::after{right:auto;left:-8px}
+@keyframes hwSpider{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+html[data-season="hw"] #msgs .m.me:not(.mm):not(.jmb):not(.stk){box-shadow:0 4px 18px rgba(255,122,0,.45),inset 0 -3px 0 rgba(0,0,0,.12)!important}
+html[data-season="hw"] .day{background:linear-gradient(135deg,#ff7a00,#7c3aed)!important;color:#fff!important}
+html[data-season="hw"] .day::before{content:'🎃 '}html[data-season="hw"] .day::after{content:' 🦇'}
+
+/* --- Лето: закат над морем, волны, цветы и коктейли --- */
+html[data-season="su"] #chat{background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0 60 Q150 20 300 60 T600 60 T900 60 T1200 60 V120 H0Z' fill='%252306b6d4' fill-opacity='.22'/%3E%3Cpath d='M0 80 Q150 45 300 80 T600 80 T900 80 T1200 80 V120 H0Z' fill='%25230ea5e9' fill-opacity='.22'/%3E%3C/svg%3E") 0 100%/100% 140px no-repeat,
+  radial-gradient(circle at 88% 8%,rgba(255,230,140,.95) 0,rgba(255,200,90,.4) 6%,transparent 18%),
+  linear-gradient(180deg,#ffe8cc 0%,#ffd9e0 30%,#e5f6ff 65%,#c9f0fb 100%)!important}
+html[data-season="su"][data-theme="dark"] #chat{background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0 60 Q150 20 300 60 T600 60 T900 60 T1200 60 V120 H0Z' fill='%252306b6d4' fill-opacity='.22'/%3E%3Cpath d='M0 80 Q150 45 300 80 T600 80 T900 80 T1200 80 V120 H0Z' fill='%25230ea5e9' fill-opacity='.22'/%3E%3C/svg%3E") 0 100%/100% 140px no-repeat,
+  radial-gradient(circle at 88% 8%,rgba(255,170,80,.55) 0,rgba(255,120,60,.2) 6%,transparent 18%),
+  linear-gradient(180deg,#2b1530 0%,#1d1b3a 35%,#0b2c3a 75%,#06333b 100%)!important}
+html[data-season="su"] {--mgrad:linear-gradient(135deg,#06b6d4,#0ea5e9 50%,#f59e0b);--mglow:rgba(6,182,212,.38)}
+html[data-season="su"] #msgs .m:not(.me):not(.mm):not(.jmb):not(.stk){background:#fffaf0!important;box-shadow:0 2px 10px rgba(240,150,60,.15)!important}
+html[data-season="su"][data-theme="dark"] #msgs .m:not(.me):not(.mm):not(.jmb):not(.stk){background:linear-gradient(180deg,#14344a,#102a3c)!important;box-shadow:0 2px 10px rgba(0,0,0,.3)!important}
+html[data-season="su"] #msgs .m.me:not(.mm):not(.jmb):not(.stk):not(.circm)::before{content:'';position:absolute;left:0;right:0;bottom:0;height:10px;border-radius:0 0 inherit inherit;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 12' preserveAspectRatio='none'%3E%3Cpath d='M0 6 Q15 0 30 6 T60 6 T90 6 T120 6 V12 H0Z' fill='white' fill-opacity='.28'/%3E%3C/svg%3E") 0 100%/40px 10px repeat-x;animation:suWave 3s linear infinite;z-index:1;border-bottom-left-radius:inherit;border-bottom-right-radius:inherit}
+@keyframes suWave{to{background-position:40px 100%}}
+html[data-season="su"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(3n)::after{content:'🌺';position:absolute;top:-12px;right:-8px;font-size:18px;transform:rotate(15deg);z-index:3}
+html[data-season="su"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(5n+1)::after{content:'🍹';position:absolute;top:-14px;right:-7px;font-size:17px;transform:rotate(-10deg);z-index:3}
+html[data-season="su"] #msgs .m:not(.mm):not(.jmb):not(.stk):not(.circm):nth-child(7n+2)::after{content:'🐚';position:absolute;top:-11px;right:-6px;font-size:15px;z-index:3}
+html[data-season="su"] #msgs .m.me:not(.mm):not(.jmb):not(.stk):not(.circm)::after{right:auto!important;left:-8px}
+html[data-season="su"] .day{background:linear-gradient(135deg,#ffb703,#fb8500)!important;color:#fff!important}
+html[data-season="su"] .day::before{content:'☀️ '}html[data-season="su"] .day::after{content:' 🌴'}
+html[data-anim="off"] #msgs .m::after,html[data-anim="off"] #msgs .m::before{animation:none!important}
 </style>
 <script>
 // ===================================================================
@@ -8695,59 +8887,8 @@ window.sgPendingQL = new URLSearchParams(location.search).get('qrlogin');
 </script>
 <script>
 // ===================================================================
-//  Saimon AI (клиент) + аукцион NFT
+//  Аукцион NFT (клиент)
 // ===================================================================
-const AI_UID = 103;
-// --- Ответы ИИ: лёгкая разметка (жирный, курсив, код, блоки кода, списки)
-function aiInline(s) {
-  let h = linkify(s);
-  h = h.replace(/`([^`\n]+)`/g, '<code class="aic">$1</code>')
-    .replace(/\*\*([^*\n][^\n]*?)\*\*/g, '<b>$1</b>')
-    .replace(/(^|[\s(«])\*(?!\s)([^*\n]+?)\*(?=[\s.,:;!?)»]|$)/gm, '$1<i>$2</i>')
-    .replace(/^#{1,6}\s+(.+)$/gm, '<b>$1</b>')
-    .replace(/^(\s*)[-*•]\s+/gm, '$1• ');
-  return h;
-}
-function aiMd(t) {
-  const segs = String(t || '').split('```');
-  return segs.map((b, i) => i % 2 ? b : b.replace(i > 0 ? /^\n+/ : /^/, '').replace(i < segs.length - 1 ? /\n+$/ : /$/, '')).map((b, i) => i % 2
-    ? `<pre class="aipre"><button type="button" class="aicopy" data-aicopy>Копировать</button><code>${esc(b.replace(/^[\w+#-]*\n/, '').replace(/\n$/, ''))}</code></pre>`
-    : aiInline(b)).join('');
-}
-function aiHtml(m) {
-  const busy = m.ai && m.ai.busy;
-  if (!m.text && busy) return `<span class="tx aitx">${m.ai.status === 'search' ? '<span class="aist">🔎 Ищу в интернете…</span>' : '<span class="aidots"><i></i><i></i><i></i></span>'}</span>`;
-  return `<span class="tx aitx">${aiMd(m.text)}${busy ? '<span class="aicaret"></span>' : ''}</span>`;
-}
-// --- Перевод сообщения (видит только тот, кто попросил)
-const aiTr = new Map(); // id → {busy, text, err}
-function aiTrHtml(m) {
-  const t = aiTr.get(m.id); if (!t) return '';
-  if (t.busy) return '<div class="aitr busy"><span class="aidots"><i></i><i></i><i></i></span> Перевожу…</div>';
-  if (t.err) return `<div class="aitr err">⚠️ ${esc(t.err)}</div>`;
-  return `<div class="aitr"><small>🌍 Перевод · ИИ</small>${linkify(t.text)}</div>`;
-}
-function aiRepaint(id) {
-  const l = msgs.get(cur), i = l ? l.findIndex(x => x.id === id) : -1, c = chats.get(cur), el = bubbleEl(id);
-  if (i >= 0 && c && el) { el.outerHTML = bubbleHtml(c, l, i); }
-}
-async function aiTranslate(id) {
-  const ru = /[а-яё]/i.test(((msgs.get(cur) || []).find(x => x.id === id) || {}).text || '');
-  aiTr.set(id, { busy: true }); aiRepaint(id);
-  try { const r = await api('/api/ai/translate', 'POST', { messageId: id, to: ru ? 'английский' : 'русский' }); aiTr.set(id, { text: r.text }); }
-  catch (x) { aiTr.set(id, { err: x.message }); }
-  aiRepaint(id);
-}
-// --- Пересказ чата
-async function aiSummary(chatId) {
-  const sh = sgSheet(`<div class="aisum"><div class="aisum-h"><span class="aisum-ic">✨</span><div><b>Пересказ чата</b><small>Saimon AI · видите только вы</small></div></div><div class="aisum-b"><span class="aidots"><i></i><i></i><i></i></span> Читаю переписку…</div></div>`);
-  try {
-    const r = await api('/api/ai/summary', 'POST', { chatId, count: 150 });
-    const b = sh.querySelector('.aisum-b'); if (b) b.innerHTML = aiMd(r.text) + `<small class="aisum-n">по последним ${r.count} сообщениям</small>`;
-  } catch (x) { const b = sh.querySelector('.aisum-b'); if (b) b.innerHTML = '⚠️ ' + esc(x.message); }
-}
-function aiOpen() { closeModal(); openUser(AI_UID); }
-
 // ===== Аукцион =====
 const aucLeft = ms => {
   if (ms <= 0) return 'завершается…';
@@ -8853,35 +8994,262 @@ function aucStartSheet(g, done) {
   };
 }
 
-// --- Подключение к интерфейсу
+
+</script>
+<script>
+// ===================================================================
+//  Сезонные стили: Новый год, Хэллоуин, Лето (+ «Авто по дате»)
+// ===================================================================
+const SEASONS = {
+  off: { name: 'Обычный', ic: '💬', sub: 'Без украшений', bg: 'linear-gradient(135deg,#4f8dff,#7b5cff)' },
+  auto: { name: 'Авто', ic: '📅', sub: 'Сам меняется по дате', bg: 'linear-gradient(135deg,#1fd1a5,#4f8dff 50%,#ff7a00)' },
+  ny: { name: 'Новый год', ic: '🎄', sub: 'Снег, гирлянда, ёлочки', bg: 'linear-gradient(135deg,#0b2a5b,#1d4ed8 55%,#e11d48)' },
+  hw: { name: 'Хэллоуин', ic: '🎃', sub: 'Летучие мыши, тыквы', bg: 'linear-gradient(135deg,#1a0b2e,#5b21b6 50%,#ff7a00)' },
+  su: { name: 'Лето', ic: '🌴', sub: 'Солнце, море, пузыри', bg: 'linear-gradient(135deg,#00b4d8,#48cae4 50%,#ffd166)' },
+};
+// Какой сезон сейчас по календарю
+function seasonByDate(d = new Date()) {
+  const m = d.getMonth() + 1, day = d.getDate();
+  if ((m === 12) || (m === 1 && day <= 15)) return 'ny';
+  if ((m === 10 && day >= 15) || (m === 11 && day <= 2)) return 'hw';
+  if (m >= 6 && m <= 8) return 'su';
+  return 'off';
+}
+const seasonNow = () => { const p = sgPref('season', 'off'); return p === 'auto' ? seasonByDate() : (SEASONS[p] && p !== 'auto' ? p : 'off'); };
+
+// --- Частицы (снег / летучие мыши и листья / пузыри и солнечные блики)
+const sfx = { cv: null, ctx: null, parts: [], kind: null, raf: 0, last: 0, w: 0, h: 0, dpr: 1 };
+function sfxCanRun() {
+  if (!sgPref('sfx', true) || sgPref('anim', 'full') === 'off') return false;
+  try { if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false; } catch {}
+  return true;
+}
+function sfxResize() {
+  if (!sfx.cv) return;
+  sfx.dpr = Math.min(2, window.devicePixelRatio || 1);
+  sfx.w = innerWidth; sfx.h = innerHeight;
+  sfx.cv.width = sfx.w * sfx.dpr; sfx.cv.height = sfx.h * sfx.dpr;
+  sfx.ctx.setTransform(sfx.dpr, 0, 0, sfx.dpr, 0, 0);
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+function sfxSpawn(kind, init) {
+  const w = sfx.w, h = sfx.h;
+  if (kind === 'ny') return { t: 'snow', x: rnd(0, w), y: init ? rnd(-h, h) : rnd(-40, -10), r: rnd(1.2, 3.6), vy: rnd(18, 55), sway: rnd(10, 30), ph: rnd(0, 6.3), a: rnd(.45, .95), flake: Math.random() < .14 };
+  if (kind === 'hw') {
+    if (Math.random() < .35) { const dir = Math.random() < .5 ? 1 : -1; return { t: 'bat', x: dir > 0 ? rnd(-80, -30) : w + rnd(30, 80), y: rnd(h * .05, h * .6), vx: dir * rnd(35, 70), dir, ph: rnd(0, 6.3), s: rnd(18, 30), wob: rnd(10, 26) }; }
+    return { t: 'leaf', x: rnd(0, w), y: init ? rnd(-h, h) : rnd(-40, -10), vy: rnd(22, 45), sway: rnd(20, 50), ph: rnd(0, 6.3), rot: rnd(0, 6.3), vr: rnd(-1.5, 1.5), s: rnd(14, 22), e: Math.random() < .5 ? '🍂' : '🍁' };
+  }
+  if (kind === 'su') {
+    if (Math.random() < .12) return { t: 'petal', x: rnd(0, w), y: init ? rnd(0, h) : h + 20, vy: -rnd(14, 28), sway: rnd(14, 30), ph: rnd(0, 6.3), s: rnd(14, 20), e: ['🌸', '🫧', '🦋'][Math.floor(rnd(0, 3))] };
+    return { t: 'orb', x: rnd(0, w), y: init ? rnd(0, h) : h + rnd(10, 40), vy: -rnd(10, 30), sway: rnd(8, 22), ph: rnd(0, 6.3), r: rnd(3, 10), hue: Math.random() < .5 ? 190 : 45, a: rnd(.18, .45) };
+  }
+}
+function sfxCount(kind) { const base = Math.round(Math.min(1, (sfx.w * sfx.h) / (1280 * 800)) * 60); return kind === 'ny' ? Math.max(26, base) : kind === 'hw' ? Math.max(10, Math.round(base * .3)) : Math.max(16, Math.round(base * .5)); }
+function sfxFrame(ts) {
+  sfx.raf = 0;
+  if (!sfx.kind || document.hidden) return;
+  const dt = Math.min(.05, (ts - (sfx.last || ts)) / 1000); sfx.last = ts;
+  const g = sfx.ctx, w = sfx.w, h = sfx.h, time = ts / 1000;
+  const snowC = document.documentElement.dataset.theme === 'dark' ? '#fff' : '#8fb8ef';
+  g.clearRect(0, 0, w, h);
+  for (let i = 0; i < sfx.parts.length; i++) {
+    let p = sfx.parts[i];
+    if (p.t === 'snow') {
+      p.y += p.vy * dt; const x = p.x + Math.sin(time * .8 + p.ph) * p.sway;
+      if (p.flake) { g.globalAlpha = p.a; g.fillStyle = snowC; g.font = `${p.r * 5}px sans-serif`; g.fillText('❄', x, p.y); }
+      else { g.globalAlpha = p.a; g.fillStyle = snowC; g.beginPath(); g.arc(x, p.y, p.r, 0, 6.283); g.fill(); }
+      if (p.y > h + 10) sfx.parts[i] = sfxSpawn(sfx.kind);
+    } else if (p.t === 'bat') {
+      p.x += p.vx * dt; const y = p.y + Math.sin(time * 2 + p.ph) * p.wob, flap = .55 + .45 * Math.abs(Math.sin(time * 9 + p.ph));
+      g.save(); g.globalAlpha = .9; g.translate(p.x, y); g.scale(p.dir, flap); g.font = `${p.s}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦇', 0, 0); g.restore();
+      if ((p.dir > 0 && p.x > w + 60) || (p.dir < 0 && p.x < -60)) sfx.parts[i] = sfxSpawn(sfx.kind);
+    } else if (p.t === 'leaf') {
+      p.y += p.vy * dt; p.rot += p.vr * dt; const x = p.x + Math.sin(time * .9 + p.ph) * p.sway;
+      g.save(); g.globalAlpha = .85; g.translate(x, p.y); g.rotate(p.rot); g.font = `${p.s}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(p.e, 0, 0); g.restore();
+      if (p.y > h + 20) sfx.parts[i] = sfxSpawn(sfx.kind);
+    } else if (p.t === 'orb') {
+      p.y += p.vy * dt; const x = p.x + Math.sin(time * .7 + p.ph) * p.sway;
+      const gr = g.createRadialGradient(x, p.y, 0, x, p.y, p.r);
+      gr.addColorStop(0, `hsla(${p.hue},100%,85%,${p.a})`); gr.addColorStop(1, `hsla(${p.hue},100%,70%,0)`);
+      g.globalAlpha = 1; g.fillStyle = gr; g.beginPath(); g.arc(x, p.y, p.r, 0, 6.283); g.fill();
+      if (p.y < -20) sfx.parts[i] = sfxSpawn(sfx.kind);
+    } else if (p.t === 'petal') {
+      p.y += p.vy * dt; const x = p.x + Math.sin(time + p.ph) * p.sway;
+      g.globalAlpha = .8; g.font = `${p.s}px sans-serif`; g.textAlign = 'center'; g.fillText(p.e, x, p.y);
+      if (p.y < -30) sfx.parts[i] = sfxSpawn(sfx.kind);
+    }
+  }
+  g.globalAlpha = 1;
+  sfx.raf = requestAnimationFrame(sfxFrame);
+}
+function sfxStart(kind) {
+  sfxStop();
+  if (!kind || kind === 'off' || !sfxCanRun()) return;
+  if (!sfx.cv) {
+    sfx.cv = document.createElement('canvas'); sfx.cv.id = 'seasonFx'; sfx.cv.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(sfx.cv); sfx.ctx = sfx.cv.getContext('2d');
+    addEventListener('resize', () => { if (sfx.kind) { sfxResize(); } });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && sfx.kind && !sfx.raf) { sfx.last = 0; sfx.raf = requestAnimationFrame(sfxFrame); } });
+  }
+  sfx.cv.hidden = false; sfxResize();
+  sfx.kind = kind; sfx.parts = Array.from({ length: sfxCount(kind) }, () => sfxSpawn(kind, true));
+  sfx.last = 0; sfx.raf = requestAnimationFrame(sfxFrame);
+}
+function sfxStop() {
+  if (sfx.raf) cancelAnimationFrame(sfx.raf);
+  sfx.raf = 0; sfx.kind = null; sfx.parts = [];
+  if (sfx.cv) { sfx.ctx.clearRect(0, 0, sfx.w, sfx.h); sfx.cv.hidden = true; }
+}
+// Применить стиль
+function seasonApply() {
+  const s = seasonNow(), root = document.documentElement;
+  if (s === 'off') root.removeAttribute('data-season'); else root.dataset.season = s;
+  sfxStart(s);
+}
+// Выбор стиля
+function seasonPicker() {
+  const cur = sgPref('season', 'off');
+  const card = k => { const v = SEASONS[k]; return `<button type="button" class="sn-card${cur === k ? ' on' : ''}" data-sn="${k}"><span class="sn-pv sn-pv-${k}" style="background:${v.bg}"><span>${v.ic}</span></span><b>${v.name}</b><small>${k === 'auto' ? 'Сейчас: ' + SEASONS[seasonByDate()].name.toLowerCase() : v.sub}</small></button>`; };
+  const sh = sgSheet(`<div class="sn-grid">${['off', 'auto', 'ny', 'hw', 'su'].map(card).join('')}</div>
+<div class="tgp-card" style="margin:12px 0 4px">${sgRow({ ic: '❄️', bg: '#4f8dff', t: 'Падающие снежинки и частицы', sub: 'Выключите, если телефон слабый', right: sgTg(sgPref('sfx', true)), attr: 'data-snfx' })}</div>
+<div class="sg-note">«Авто» включает Новый год с 1 декабря по 15 января, Хэллоуин — с 15 октября по 2 ноября, Лето — в июне, июле и августе.</div>`, { title: 'Сезонный стиль' });
+  sh.querySelectorAll('[data-sn]').forEach(b => b.onclick = () => {
+    sgSetPref('season', b.dataset.sn); seasonApply();
+    sh.querySelectorAll('[data-sn]').forEach(x => x.classList.toggle('on', x === b));
+    const row = document.querySelector('[data-season-pick] small'); if (row) row.textContent = SEASONS[b.dataset.sn].name;
+  });
+  sh.querySelector('[data-snfx]').onclick = e => { const on = !sgPref('sfx', true); sgSetPref('sfx', on); e.currentTarget.querySelector('.sg-tg').classList.toggle('on', on); seasonApply(); };
+}
 (() => {
-  // кнопка ✨ в шапке списка чатов
-  const ng = $('#newGroup');
-  if (ng && !$('#aiBtn')) { const b = document.createElement('button'); b.className = 'ib ai-ib'; b.id = 'aiBtn'; b.title = 'Saimon AI'; b.type = 'button'; b.innerHTML = '✨'; b.onclick = aiOpen; ng.before(b); }
-  // меню чата: пересказ
-  const ca = window.chatAction;
-  if (typeof ca === 'function') window.chatAction = function (c, a) { if (a === 'aisum') { closeModal(); return aiSummary(c.id); } return ca.apply(this, arguments); };
-  // группа: быстро добавить ИИ
-  const gi = window.groupInfo;
-  if (typeof gi === 'function') window.groupInfo = function (id) {
-    const r = gi.apply(this, arguments);
-    try {
-      const c = chats.get(id), gb = $('#gbot');
-      if (c && gb && !(c.members || []).some(u => (u.id || u) === AI_UID)) {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn g'; b.id = 'gaiadd'; b.style.margin = '0 0 6px'; b.textContent = '✨ Добавить Saimon AI';
-        b.onclick = async () => { try { const g = await api('/api/groups/' + encodeURIComponent(id) + '/bots', 'POST', { handle: 'saimon_ai' }); if (typeof putChat === 'function') putChat(g); toast('✨ Saimon AI в группе — пишите @saimon_ai'); window.groupInfo(id); } catch (x) { toast(x.message); } };
-        gb.after(b);
-      }
-    } catch {}
-    return r;
+  seasonApply();
+  // раз в час проверяем дату (для «Авто»)
+  setInterval(() => { if (sgPref('season', 'off') === 'auto') seasonApply(); }, 3600000);
+  // настройки анимации могли поменяться — перезапускаем частицы
+  const ap = window.sgApplyUi;
+  if (typeof ap === 'function') window.sgApplyUi = function () { const r = ap.apply(this, arguments); try { seasonApply(); } catch {} return r; };
+})();
+</script>
+<script>
+// ===================================================================
+//  Админ: статистика сервера и рассылка от SAIMON-CHAT
+// ===================================================================
+const admQ = () => 'pin=' + encodeURIComponent(adminPin || '');
+const admNum = n => Number(n || 0).toLocaleString('ru-RU');
+const admUp = s => { const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return d ? `${d} д ${h} ч` : h ? `${h} ч ${m} мин` : `${m} мин`; };
+function admBars(days, vals, label) {
+  const W = 340, H = 150, pad = { l: 6, r: 6, t: 22, b: 22 }, n = vals.length;
+  const max = Math.max(1, ...vals), bw = (W - pad.l - pad.r) / n, inner = Math.max(4, bw - 6);
+  const y = v => pad.t + (H - pad.t - pad.b) * (1 - v / max);
+  const day = d => { const [, m, dd] = d.split('-'); return `${+dd}.${m}`; };
+  const iMax = vals.indexOf(Math.max(...vals));
+  let g = `<line x1="${pad.l}" x2="${W - pad.r}" y1="${H - pad.b}" y2="${H - pad.b}" class="adm-ax"/>`;
+  vals.forEach((v, i) => {
+    const x = pad.l + i * bw + (bw - inner) / 2, top = y(v), h = Math.max(v ? 3 : 0, H - pad.b - top), last = i === n - 1;
+    g += `<g class="adm-bar${last ? ' today' : ''}" data-tip="${day(days[i])}: ${admNum(v)} ${label}"><rect x="${pad.l + i * bw}" y="${pad.t - 6}" width="${bw}" height="${H - pad.t - pad.b + 6}" fill="transparent"/>`
+      + (h ? `<path d="M${x},${H - pad.b} V${top + Math.min(4, h)} q0,-4 4,-4 h${inner - 8} q4,0 4,4 V${H - pad.b} Z"/>` : '') + '</g>';
+    if (last || i === iMax) g += `<text x="${x + inner / 2}" y="${top - 6}" class="adm-vl">${admNum(v)}</text>`;
+    if (i % 2 === (n - 1) % 2) g += `<text x="${x + inner / 2}" y="${H - 6}" class="adm-xl">${last ? 'сегодня' : day(days[i])}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" class="adm-chart" role="img" aria-label="${label} за 14 дней">${g}</svg>`;
+}
+async function adminStats() {
+  modal('<div class="sec" style="padding:0">Загрузка статистики…</div>');
+  let d;
+  try { d = await api('/api/admin/stats?tz=' + (-new Date().getTimezoneOffset()) + '&' + admQ()); }
+  catch (x) { if (x.message === 'Неверный пароль админ-панели') adminPin = null; modal(`<div class="err">${esc(x.message)}</div><div class="row"><button type="button" class="btn g" id="admBk">← Назад</button></div>`); $('#admBk').onclick = adminPanel; return; }
+  const tile = (ic, v, t, sub = '') => `<div class="adm-tile"><span>${ic}</span><b>${v}</b><small>${t}</small>${sub ? `<i>${sub}</i>` : ''}</div>`;
+  const series = { msgs: [d.msgs, 'сообщ.', 'Сообщения в день'], active: [d.active, 'чел.', 'Писали сообщения'], regs: [d.regs, 'рег.', 'Новые регистрации'] };
+  modal(`<div class="adm-top"><button type="button" class="tgp-back" id="admBk" aria-label="Назад">‹</button><h2>📊 Статистика</h2><button type="button" class="adm-rf" id="admRf" aria-label="Обновить">↻</button></div>
+<div class="adm-live"><span class="adm-dot"></span><b>${admNum(d.online.now)}</b> онлайн сейчас<small>${admNum(d.online.active)} с открытой вкладкой</small></div>
+<div class="adm-tiles">
+${tile('👥', admNum(d.users.total), 'пользователей', `+${admNum(d.users.today)} сегодня · +${admNum(d.users.week)} за 7 дн.`)}
+${tile('🔥', admNum(d.online.day), 'заходили за сутки', `${admNum(d.online.week)} за неделю · ${admNum(d.online.month)} за месяц`)}
+${tile('💬', admNum(d.messages.today), 'сообщений сегодня', `${admNum(d.messages.week)} за 7 дн. · всего ${admNum(d.messages.total)}`)}
+${tile('📞', admNum(d.messages.calls), 'звонков сегодня', `${admNum(d.messages.media)} фото/видео/голосовых`)}
+</div>
+<div class="adm-card"><div class="sg-seg adm-seg" id="admSeg">${Object.entries(series).map(([k, [, , t]], i) => `<button type="button" data-k="${k}" class="${i ? '' : 'on'}">${t.split(' ')[0]}</button>`).join('')}</div>
+<div class="adm-ct" id="admCt"></div><div id="admChart"></div><div class="adm-tip" id="admTip">Нажмите на столбик, чтобы увидеть число</div></div>
+<div class="adm-grid2">
+<div class="adm-card"><div class="adm-h">Чаты</div>${[['Личные', d.chats.direct], ['Группы', d.chats.groups], ['Каналы', d.chats.channels]].map(([t, v]) => `<div class="adm-kv"><span>${t}</span><b>${admNum(v)}</b></div>`).join('')}</div>
+<div class="adm-card"><div class="adm-h">Экономика</div>${[['Mars у людей', d.economy.mars], ['Подарков', d.economy.gifts], ['На рынке', d.economy.lots], ['Аукционов', d.economy.auctions]].map(([t, v]) => `<div class="adm-kv"><span>${t}</span><b>${admNum(v)}</b></div>`).join('')}</div>
+</div>
+<div class="adm-card"><div class="adm-h">Самые активные за 7 дней</div>${d.topSenders.length ? d.topSenders.map((u, i) => `<div class="adm-kv"><span>${i + 1}. ${esc(u.username)}${u.handle ? ` <small>@${esc(u.handle)}</small>` : ''}</span><b>${admNum(u.n)}</b></div>`).join('') : '<div class="adm-kv"><span>Пока пусто</span></div>'}</div>
+<div class="adm-card"><div class="adm-h">Топ каналов</div>${d.topChannels.length ? d.topChannels.map((c, i) => `<div class="adm-kv"><span>${i + 1}. ${esc(c.name)}${c.handle ? ` <small>@${esc(c.handle)}</small>` : ''}</span><b>${admNum(c.subs)}</b></div>`).join('') : '<div class="adm-kv"><span>Каналов нет</span></div>'}</div>
+<div class="adm-card"><div class="adm-h">Сервер</div>${[['Работает без перезапуска', admUp(d.server.uptime)], ['Память', d.server.rss + ' МБ'], ['Хранилище', d.server.storage], ['Заблокировано', admNum(d.users.banned)], ['С премиумом', admNum(d.users.premium)]].map(([t, v]) => `<div class="adm-kv"><span>${t}</span><b>${esc(String(v))}</b></div>`).join('')}</div>`);
+  const draw = k => {
+    const [vals, unit, title] = series[k];
+    $('#admCt').innerHTML = `<b>${title}</b><small>за 14 дней · всего ${admNum(vals.reduce((a, b) => a + b, 0))}</small>`;
+    $('#admChart').innerHTML = admBars(d.days, vals, unit);
+    $('#admTip').textContent = 'Нажмите на столбик, чтобы увидеть число';
   };
-  // копирование кода из ответа ИИ
-  msgsEl.addEventListener('click', e => {
-    const b = e.target.closest('[data-aicopy]'); if (!b) return;
-    e.stopPropagation();
-    const code = b.parentElement.querySelector('code');
-    navigator.clipboard && navigator.clipboard.writeText(code.textContent).then(() => { b.textContent = 'Скопировано ✓'; setTimeout(() => { b.textContent = 'Копировать'; }, 1500); }).catch(() => toast('Не удалось скопировать'));
-  }, true);
+  draw('msgs');
+  $('#admSeg').querySelectorAll('[data-k]').forEach(b => b.onclick = () => { $('#admSeg').querySelectorAll('[data-k]').forEach(x => x.classList.toggle('on', x === b)); draw(b.dataset.k); });
+  $('#admChart').addEventListener('pointerover', e => { const g = e.target.closest('[data-tip]'); if (g) { $('#admTip').textContent = g.dataset.tip; $('#admChart').querySelectorAll('.adm-bar').forEach(x => x.classList.toggle('hl', x === g)); } });
+  $('#admChart').addEventListener('click', e => { const g = e.target.closest('[data-tip]'); if (g) { $('#admTip').textContent = g.dataset.tip; $('#admChart').querySelectorAll('.adm-bar').forEach(x => x.classList.toggle('hl', x === g)); } });
+  $('#admBk').onclick = adminPanel;
+  $('#admRf').onclick = adminStats;
+}
+async function adminBroadcast() {
+  let info = { history: [], all: 0, active: 0 };
+  try { info = await api('/api/admin/broadcasts?' + admQ()); }
+  catch (x) { if (x.message === 'Неверный пароль админ-панели') adminPin = null; toast(x.message); return adminPanel(); }
+  const draft = (() => { try { return localStorage.getItem('sg_bcast_draft') || ''; } catch { return ''; } })();
+  modal(`<div class="adm-top"><button type="button" class="tgp-back" id="admBk" aria-label="Назад">‹</button><h2>📢 Рассылка</h2><span></span></div>
+<div class="adm-note">Сообщение придёт всем от <b>SAIMON-CHAT</b>. Ссылки станут синими и кликабельными.</div>
+<textarea id="bcT" class="adm-ta" maxlength="3000" rows="6" placeholder="Например: 🎉 Встречайте аукционы NFT! Загляните в Настройки → Подарки и Mars">${esc(draft)}</textarea>
+<div class="adm-len"><span id="bcN">${draft.length}</span>/3000</div>
+<div class="adm-h" style="margin-top:6px">Кому</div>
+<div class="sg-seg adm-seg" id="bcA"><button type="button" data-v="all" class="on">Всем · ${admNum(info.all)}</button><button type="button" data-v="active">Активным за 30 дн. · ${admNum(info.active)}</button></div>
+<label class="adm-chk"><input type="checkbox" id="bcP" checked> Отправить push-уведомление</label>
+<div class="adm-h" style="margin-top:10px">Как это увидят</div>
+<div class="adm-pv"><div class="adm-pv-h"><span class="adm-pv-av">S</span><b>SAIMON-CHAT</b></div><div class="adm-pv-b" id="bcPv"></div></div>
+<div class="err" id="bcE"></div>
+<div class="row"><button type="button" class="btn adm-send" id="bcGo">📢 Отправить</button></div>
+${info.history.length ? `<div class="adm-h" style="margin-top:14px">Прошлые рассылки</div>${info.history.map(h => `<div class="adm-hist"><div>${esc(h.text)}</div><small>${new Date(h.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${admNum(h.count)} получателей${h.audience === 'active' ? ' (активные)' : ''}</small></div>`).join('')}` : ''}`);
+  let aud = 'all';
+  const ta = $('#bcT'), pv = () => { $('#bcPv').innerHTML = ta.value.trim() ? linkify(ta.value) : '<span style="opacity:.5">Текст рассылки…</span>'; $('#bcN').textContent = ta.value.length; try { localStorage.setItem('sg_bcast_draft', ta.value); } catch {} };
+  ta.oninput = pv; pv();
+  $('#bcA').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { aud = b.dataset.v; $('#bcA').querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); });
+  $('#admBk').onclick = adminPanel;
+  $('#bcGo').onclick = async () => {
+    const text = ta.value.trim(), n = aud === 'active' ? info.active : info.all;
+    if (text.length < 2) { $('#bcE').textContent = 'Напишите текст рассылки'; return; }
+    if (!confirm(`Отправить рассылку ${admNum(n)} пользователям?\n\nОтменить после отправки нельзя.`)) return;
+    const b = $('#bcGo'); b.disabled = true; b.textContent = 'Отправляю…';
+    try {
+      const r = await api('/api/admin/broadcast?' + admQ(), 'POST', { text, audience: aud, push: $('#bcP').checked });
+      try { localStorage.removeItem('sg_bcast_draft'); } catch {}
+      toast(`📢 Отправлено: ${admNum(r.sent)}`); adminBroadcast();
+    } catch (x) { $('#bcE').textContent = x.message; b.disabled = false; b.textContent = '📢 Отправить'; }
+  };
+}
+</script>
+<script>
+
+// ===== Жидкое стекло: чат прокручивается под прозрачной шапкой и полем ввода =====
+const G_TOP = ['.rh', '#pbar', '#sbar'], G_BOT = ['#editbar', '#replybar', '#pend', '#recbar', '#emobar', '#form', '#rdonly'];
+let glassRO = null;
+function glassLayout() {
+  const room = document.getElementById('room'), root = document.documentElement;
+  if (!room) return;
+  if (!root.dataset.glass) { room.style.removeProperty('--g-top'); room.style.removeProperty('--g-bot'); return; }
+  const kids = [...room.children], mi = kids.indexOf(msgsEl);
+  const vis = el => el && !el.hidden && getComputedStyle(el).display !== 'none' && el.offsetHeight > 0;
+  const outer = el => { const cs = getComputedStyle(el); return el.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom); };
+  let top = 0, bot = 0;
+  kids.slice(0, mi).forEach(el => { if (G_TOP.some(q => el.matches(q)) && vis(el)) top += outer(el); });
+  kids.slice(mi + 1).forEach(el => { if (G_BOT.some(q => el.matches(q)) && vis(el) && getComputedStyle(el).position !== 'absolute' && getComputedStyle(el).position !== 'fixed') bot += outer(el); });
+  const stick = msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight < 40;
+  room.style.setProperty('--g-top', top + 'px'); room.style.setProperty('--g-bot', bot + 'px');
+  if (stick) msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+(() => {
+  const room = document.getElementById('room'); if (!room || typeof ResizeObserver === 'undefined') return;
+  glassRO = new ResizeObserver(() => glassLayout());
+  [...room.children].forEach(el => { if (el !== msgsEl) glassRO.observe(el); });
+  new MutationObserver(() => glassLayout()).observe(room, { subtree: false, childList: true, attributes: true, attributeFilter: ['hidden'] });
+  [...room.children].forEach(el => new MutationObserver(() => glassLayout()).observe(el, { attributes: true, attributeFilter: ['hidden', 'style', 'class'] }));
+  glassLayout();
 })();
 </script>
 </body>
