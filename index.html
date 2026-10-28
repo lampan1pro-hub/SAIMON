@@ -1505,7 +1505,12 @@ const msgsEl = $('#msgs');
 
 const setHtml = (el, html) => { if (el._h !== html) { el._h = html; el.innerHTML = html; } }; // не трогаем DOM, если ничего не изменилось
 // Подарок-аксессуар рядом с ником; по тапу показывается название и номер
-const accH = a => { if (!a) return ''; const k = kindInfo(a.kind); return `<span class="acc" data-acc="${esc(a.kind)}|${a.serial}" style="background:${giftBg(a, k)}">${k.emoji}</span>`; };
+// Картинки подарков (3D-иллюстрации вместо эмодзи); для неизвестных видов — эмодзи
+function gPic(k) {
+  if (!k || !/^(heart|star|flower|coffee|pizza|bear|cat|balloon|rocket|gamepad|rose|cake|ghost|diamond|unicorn|trophy|fire|crown|moon|alien|ufo|dragon|planet|phoenix|infinity)$/.test(k.kind || '')) return (k && k.emoji) || '🎁';
+  return `<img class="gpic" src="/gift-img/${k.kind}.webp" alt="${esc(k.emoji || '')}" draggable="false" decoding="async" onerror="this.replaceWith(this.alt)">`;
+}
+const accH = a => { if (!a) return ''; const k = kindInfo(a.kind); return `<span class="acc" data-acc="${esc(a.kind)}|${a.serial}" style="background:${giftBg(a, k)}">${gPic(k)}</span>`; };
 const PREM_IC = '<span class="prem-ic" title="Премиум">💎</span>';
 const ngStyle = ng => ng ? ` ng" style="background-image:linear-gradient(90deg,${ng[0]},${ng[1]})` : '';
 const nmH = (name, v, extra = '', acc = null, ng = null, prem = false) => `<span class="nm"><span class="nt${ngStyle(ng)}">${esc(name)}${extra}</span>${v ? BADGE : ''}${prem ? PREM_IC : ''}${accH(acc)}</span>`;
@@ -2260,6 +2265,7 @@ function connect() {
     opened = true;
     if (pendingChat) { const id = pendingChat; pendingChat = null; history.replaceState(null, '', '/'); goChat(id); } // открыли по нажатию на уведомление
     if (window.sgPendingU) { const h = sgPendingU; window.sgPendingU = null; history.replaceState(null, '', '/'); openByHandle(String(h).toLowerCase()); } // открыли QR-код профиля
+    if (window.sgPendingQL) { const q = sgPendingQL; window.sgPendingQL = null; history.replaceState(null, '', '/'); sgQrApprove(q); } // открыли QR-код входа на компьютере
   };
   ws.onmessage = e => onWs(JSON.parse(e.data));
   ws.onclose = () => { $('#conn').hidden = false; if (me) setTimeout(connect, 2000); };
@@ -2381,6 +2387,15 @@ async function onWs(m) {
       l[i].buttons = d.buttons;
       const c = chats.get(d.chatId), el = cur === d.chatId && bubbleEl(d.messageId);
       if (el && c) el.outerHTML = bubbleHtml(c, l, i);
+    }
+  } else if (m.type === 'emojiTap') {
+    aeRemoteTap(d);
+  } else if (m.type === 'msgPreview') {
+    const l = msgs.get(d.chatId), i = l ? l.findIndex(x => x.id === d.messageId) : -1;
+    if (i >= 0) {
+      if (d.preview) l[i].preview = d.preview; else delete l[i].preview;
+      const c = chats.get(d.chatId), el = cur === d.chatId && bubbleEl(d.messageId);
+      if (el && c) { const keep = stick; el.outerHTML = bubbleHtml(c, l, i); if (keep) { msgsEl.scrollTop = msgsEl.scrollHeight; } }
     }
   } else if (m.type === 'messageDeleted') {
     removeMsg(d.chatId, d.messageId);
@@ -2729,6 +2744,98 @@ function grpCls(l, i) {
   const sp = same(l[i - 1], l[i]), sn = same(l[i], l[i + 1]);
   return sp && sn ? 'gm' : sp ? 'gl' : sn ? 'gf' : '';
 }
+// ===== Анимированные эмодзи: сообщение из 1–3 эмодзи — крупно и «живое» =====
+const AE_GROUPS = {
+  beat: '❤🧡💛💚💙💜🖤🤍🤎💖💗💓💞💕💘💝❣💟♥',
+  broken: '💔',
+  laugh: '😂🤣😆😹😁😄😅',
+  flame: '🔥',
+  party: '🎉🥳🎊🎈🎁',
+  wave: '👋🤚✋🖐',
+  thumb: '👍👎👏🙏💪🤝👌✌🤞🫶',
+  cry: '😭😢🥲😿🥺',
+  angry: '😡🤬😤👿😠',
+  love: '😍🥰😘😻💋😚',
+  wow: '😮😱🤯😲😳🙀',
+  spin: '⭐🌟✨💫🌀🎡🌍🌎🌏',
+  think: '🤔🧐🤨',
+  cool: '😎🤩🤑',
+  rocket: '🚀✈🛸',
+  ghost: '👻💀☠🎃👽🤖',
+  sleep: '😴💤🥱',
+  money: '💰💸💵💎🪙',
+};
+const AE_MAP = new Map();
+for (const [k, s] of Object.entries(AE_GROUPS)) for (const ch of s) AE_MAP.set(ch, k);
+const AE_SEG = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+const AE_PIC = /\p{Extended_Pictographic}|\p{Regional_Indicator}|⃣/u;
+const AE_SHOW = /\p{Emoji_Presentation}|️|\p{Regional_Indicator}|⃣|‍/u;
+const AE_ONE = /(?:\p{Regional_Indicator}{2}|[#*0-9]️?⃣|\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?(?:‍\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?)*)/gu;
+// Список эмодзи, если сообщение состоит только из них (1–3 штуки), иначе null
+function aeOnly(text) {
+  const t = String(text || '').replace(/\s+/g, '');
+  if (!t || t.length > 40) return null;
+  let segs;
+  if (AE_SEG) segs = [...AE_SEG.segment(t)].map(x => x.segment);
+  else { segs = t.match(AE_ONE) || []; if (segs.join('') !== t) return null; }
+  if (!segs.length || segs.length > 3) return null;
+  return segs.every(g => AE_PIC.test(g) && AE_SHOW.test(g)) ? segs : null;
+}
+const aeKind = g => AE_MAP.get([...g.replace(/[️\u{1F3FB}-\u{1F3FF}]/gu, '')][0]) || 'bounce';
+const aeHtml = segs => segs.map(g => `<span class="aem go" data-a="${aeKind(g)}" data-e="${esc(g)}">${esc(g)}</span>`).join('');
+
+// Повторить анимацию эмодзи
+function aeReplay(el) {
+  el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+}
+// Салют из эмодзи вокруг элемента
+function aeBurst(el, emoji, small) {
+  if (sgPref('anim', 'full') === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (document.querySelectorAll('.aep').length > 60) return;
+  const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const kind = aeKind(emoji), up = kind === 'beat' || kind === 'love' || kind === 'rocket' || kind === 'party';
+  const n = small ? 7 : 12;
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('span');
+    p.className = 'aep'; p.textContent = kind === 'love' ? '❤️' : emoji;
+    const fs = (small ? 18 : 22) + Math.random() * (small ? 12 : 22);
+    p.style.cssText = `left:${cx}px;top:${cy}px;font-size:${fs}px`;
+    document.body.appendChild(p);
+    const ang = up ? (-Math.PI / 2 + (Math.random() - .5) * 1.6) : Math.random() * Math.PI * 2;
+    const dist = (small ? 70 : 110) + Math.random() * (small ? 90 : 170);
+    const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist - (up ? 60 : 0);
+    const rot = (Math.random() - .5) * 120, dur = 900 + Math.random() * 700;
+    const a = p.animate([
+      { transform: 'translate(-50%,-50%) scale(.3) rotate(0deg)', opacity: 0 },
+      { transform: `translate(calc(-50% + ${dx * .45}px),calc(-50% + ${dy * .45}px)) scale(1.1) rotate(${rot / 2}deg)`, opacity: 1, offset: .3 },
+      { transform: `translate(calc(-50% + ${dx}px),calc(-50% + ${dy + (up ? 0 : 80)}px)) scale(.8) rotate(${rot}deg)`, opacity: 0 },
+    ], { duration: dur, delay: Math.random() * 120, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'both' });
+    a.onfinish = () => p.remove();
+    setTimeout(() => p.remove(), dur + 400);
+  }
+}
+let aeLastSend = 0;
+function aeTap(el) {
+  const m = el.closest('.m'), emoji = el.dataset.e;
+  aeReplay(el); aeBurst(el, emoji);
+  try { navigator.vibrate && navigator.vibrate(12); } catch {}
+  const now = Date.now();
+  if (m && m.dataset.id && now - aeLastSend > 800 && typeof ws !== 'undefined' && ws && ws.readyState === 1) {
+    aeLastSend = now;
+    ws.send(JSON.stringify({ type: 'emoji_tap', chatId: cur, messageId: m.dataset.id, emoji }));
+  }
+}
+// Собеседник нажал на эмодзи — показываем эффект, если чат открыт
+function aeRemoteTap(d) {
+  if (cur !== d.chatId) return;
+  const b = bubbleEl(d.messageId); if (!b) return;
+  const el = [...b.querySelectorAll('.aem')].find(x => x.dataset.e === d.emoji) || b.querySelector('.aem');
+  if (!el) return;
+  const r = el.getBoundingClientRect(), mr = msgsEl.getBoundingClientRect();
+  if (r.bottom < mr.top || r.top > mr.bottom) return;
+  aeReplay(el); aeBurst(el, d.emoji, true);
+}
+
 function bubbleHtml(c, l, i) {
   const m = l[i], prev = l[i - 1], mine = m.senderId === me.id, ch = c.type === 'channel' && !c.open;
   if (m.sys) return `<div class="day sys" data-id="${esc(m.id)}">${esc(m.text)}</div>`; // ch — лента канала (посты); текстовый канал выглядит как группа
@@ -2743,11 +2850,31 @@ function bubbleHtml(c, l, i) {
   // само сообщение (как в Telegram), а не отдельной кнопкой с тремя точками — см. msgsEl touch-обработчики.
   const fwdH = m.fwd ? `<div class="fwd">↪️ Переслано от <b>${esc(m.fwd.name)}</b></div>` : '';
   const rpH = m.reply ? `<div class="rp" data-r="${esc(m.reply.id)}"><b>${esc(m.reply.name)}</b><span>${m.reply.mk === 'circle' ? '⭕ Видеосообщение' : m.reply.mk === 'voice' ? '🎤 Голосовое сообщение' : m.reply.mk === 'sticker' ? '🎭 Стикер' : m.reply.mk === 'image' ? '📷 Фото' : m.reply.mk === 'video' ? '🎥 Видео' : m.reply.mk === 'gift' ? '🎁 Подарок' : esc(m.reply.text || '')}</span></div>` : '';
-  return `<div class="m ${mine && !ch ? 'me' : ''} ${ch ? '' : grpCls(l, i)} ${m.media || m.gift ? 'mm' : ''} ${ch ? 'ch' : ''} ${m.pending ? 'pending' : ''} ${m.media && m.media.sticker ? 'stk' : ''} ${m.media && m.media.circle ? 'circm' : ''} ${m.mentions && m.mentions.includes(me.id) ? 'ment' : ''}" data-id="${esc(m.id)}"${m.cid ? ` data-cid="${esc(m.cid)}"` : ''}>${who}${fwdH}${rpH}${m.call ? callBubble(m.call, mine) : ''}${m.gift ? giftBubble(m.gift, mine, m.text) : ''}${m.prem ? premBubble(m.prem, mine) : ''}${m.media ? mediaHtml(m.media) : ''}${sgTrHtml(m)}${m.text && !m.gift ? `<span class="tx">${linkify(m.text)}</span>` : ''}${btnsHtml(m)}${rxHtml(m)}<time>${ch && m.views != null ? `<span class="vw" data-vw>👁 ${fmtViews(m.views)}</span>` : ''}${m.edited ? 'изм. ' : ''}${hm(m.timestamp)}${st}</time>${ch ? cmRow(m) : ''}</div>`;
+  const ae = !m.media && !m.gift && !m.call && !m.prem && !m.preview && !(m.buttons && m.buttons.length) && aeOnly(m.text);
+  return `<div class="m ${ae ? 'jmb jmb' + ae.length : ''} ${mine && !ch ? 'me' : ''} ${ch ? '' : grpCls(l, i)} ${m.media || m.gift ? 'mm' : ''} ${ch ? 'ch' : ''} ${m.pending ? 'pending' : ''} ${m.media && m.media.sticker ? 'stk' : ''} ${m.media && m.media.circle ? 'circm' : ''} ${m.mentions && m.mentions.includes(me.id) ? 'ment' : ''}" data-id="${esc(m.id)}"${m.cid ? ` data-cid="${esc(m.cid)}"` : ''}>${who}${fwdH}${rpH}${m.call ? callBubble(m.call, mine) : ''}${m.gift ? giftBubble(m.gift, mine, m.text) : ''}${m.prem ? premBubble(m.prem, mine) : ''}${m.media ? mediaHtml(m.media) : ''}${sgTrHtml(m)}${ae ? `<span class="tx">${aeHtml(ae)}</span>` : m.text && !m.gift ? `<span class="tx">${linkify(m.text)}</span>` : ''}${m.preview && !m.gift ? lpCard(m.preview) : ''}${btnsHtml(m)}${rxHtml(m)}<time>${ch && m.views != null ? `<span class="vw" data-vw>👁 ${fmtViews(m.views)}</span>` : ''}${m.edited ? 'изм. ' : ''}${hm(m.timestamp)}${st}</time>${ch ? cmRow(m) : ''}</div>`;
 }
 // @юзернеймы в тексте — кликабельные (ищут и «второстепенные» handles)
 const HNDL_RE = /(^|[^a-zA-Z0-9_])@([a-z0-9_]{3,20})/g;
-const linkify = t => esc(t).replace(HNDL_RE, (m, p, h) => `${p}<a class="hndl" data-h="${h}">@${h}</a>`);
+const linkHandles = t => esc(t).replace(HNDL_RE, (m, p, h) => `${p}<a class="hndl" data-h="${h}">@${h}</a>`);
+// Ссылки http(s):// и www. — синие, открываются по нажатию (только безопасные http/https)
+const URL_RE = /(^|[^@\w.\/])((?:https?:\/\/|www\.)[^\s<>"'«»]+[^\s<>"'«».,;:!?)\]]|(?:[a-z0-9а-яё-]+\.)+(?:ru|com|org|net|io|me|dev|app|su|ua|by|kz|uz|info|xyz|tv|gg|co|site|online|store|shop|pro|рф|ai|tech|art|link|live|top|club|blog|news|edu|gov|eu|de|uk|us)(?![a-zа-яё0-9-])(?:\/[^\s<>"'«»]*[^\s<>"'«».,;:!?)\]])?)/gi;
+const linkify = t => {
+  const s = String(t || ''); let out = '', last = 0;
+  for (const m of s.matchAll(URL_RE)) {
+    const raw = m[2], at = m.index + m[1].length, href = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
+    out += linkHandles(s.slice(last, at));
+    out += `<a class="lnk-url" href="${esc(href)}" target="_blank" rel="noopener noreferrer nofollow">${esc(raw.length > 64 ? raw.slice(0, 61) + '…' : raw)}</a>`;
+    last = at + raw.length;
+  }
+  return out + linkHandles(s.slice(last));
+};
+// Карточка превью под сообщением
+const lpCard = p => {
+  if (!p || !p.url || !/^https?:\/\//i.test(p.url)) return '';
+  const img = p.img && p.img.startsWith('/lp/img?') ? p.img : '';
+  return `<a class="lpc${img && p.big ? ' big' : ''}" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer nofollow">
+<span class="lpb"><span class="lps">${esc(p.site || '')}</span>${p.title ? `<b>${esc(p.title)}</b>` : ''}${p.desc ? `<span class="lpd">${esc(p.desc)}</span>` : ''}</span>${img ? `<img class="lpi" src="${esc(img)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</a>`;
+};
 async function openByHandle(h) {
   try { userProfile(await api('/api/users/by-handle?h=' + encodeURIComponent(h))); }
   catch (x) { toast(x.message); }
@@ -2779,6 +2906,8 @@ function rerender() {
   if (!was) msgsEl.scrollTop = top;
 }
 msgsEl.onclick = async e => {
+  const aem = e.target.closest('.aem');
+  if (aem) { aeTap(aem); return; }
   if (e.target.closest('[data-callm]')) { onCallBubbleClick(e.target.closest('.m')); return; }
   const trb = e.target.closest('[data-trb]');
   if (trb) { const mm = trb.closest('.m'); if (mm && mm.dataset.id) sgTranscribe(mm.dataset.id); return; }
@@ -2792,6 +2921,11 @@ msgsEl.onclick = async e => {
   if (vc) { toggleVoice(vc); return; }
   const hl = e.target.closest('a.hndl');
   if (hl) { e.preventDefault(); openByHandle(hl.dataset.h); return; }
+  const lk = e.target.closest('a.lnk-url, a.lpc');
+  if (lk) { // ссылки на профиль внутри Saimongram открываем прямо в приложении, остальные — в новой вкладке
+    try { const u = new URL(lk.href); if (u.origin === location.origin && u.searchParams.get('u')) { e.preventDefault(); openByHandle(u.searchParams.get('u').toLowerCase()); } } catch {}
+    return;
+  }
   const bb = e.target.closest('.bbtn');
   if (bb) {
     const row = bb.closest('.m');
@@ -4041,7 +4175,7 @@ ${c.description ? `<p style="margin-top:12px">${esc(c.description)}</p>` : ''}
       el.innerHTML = gifts.map(g => {
         const k = kindInfo(g.kind);
         return `<div class="gc" style="background:${gradient(k)};position:relative">
-          <div class="ge">${k.emoji}</div>
+          <div class="ge">${gPic(k)}</div>
           <div class="gn">${esc(k.name)}</div>
           <div class="gs">#${g.serial}</div>
         </div>`;
@@ -4103,7 +4237,7 @@ ${c.description ? `<p style="margin-top:12px">${esc(c.description)}</p>` : ''}
       el.innerHTML = gifts.map(g => {
         const k = kindInfo(g.kind);
         return `<div class="gc" style="background:${gradient(k)};position:relative;cursor:pointer" data-claimgift="${esc(g.id)}">
-          <div class="ge">${k.emoji}</div>
+          <div class="ge">${gPic(k)}</div>
           <div class="gn">${esc(k.name)}</div>
           <div class="gs">#${g.serial}</div>
           <div style="position:absolute;bottom:4px;right:4px;font-size:10px;background:rgba(0,0,0,.5);color:#fff;border-radius:6px;padding:2px 5px">Забрать</div>
@@ -4190,7 +4324,7 @@ function pinnedNftHtml(u) {
   if (!pn) return '';
   const k = kindInfo(pn.kind);
   const bg = (() => { const b = backdrops.get(pn.bd); return b ? `linear-gradient(150deg,${b.c[0]},${b.c[1]})` : `linear-gradient(135deg,${k.bg?k.bg[0]:'#c9ced6'},${k.bg?k.bg[1]:'#9aa3b0'})`; })();
-  return `<div class="tgp-nft-wrap"><div class="tgp-nft-label">📌 Закреплённый NFT</div><button type="button" class="tgp-nft-card" id="openPinnedNft"><div class="tgp-nft-thumb" style="background:${bg}"><span>${k.emoji}</span></div><div class="tgp-nft-info"><div class="tgp-nft-name">${esc(k.name)}</div><div class="tgp-nft-sub">#${pn.serial} · ${esc(rarityName(k.rarity))}</div></div></button></div>`;
+  return `<div class="tgp-nft-wrap"><div class="tgp-nft-label">📌 Закреплённый NFT</div><button type="button" class="tgp-nft-card" id="openPinnedNft"><div class="tgp-nft-thumb" style="background:${bg}"><span>${gPic(k)}</span></div><div class="tgp-nft-info"><div class="tgp-nft-name">${esc(k.name)}</div><div class="tgp-nft-sub">#${pn.serial} · ${esc(rarityName(k.rarity))}</div></div></button></div>`;
 }
 
 function setMars(n, unlimited) {
@@ -4266,7 +4400,7 @@ async function loadCatalog() {
 
 const lotCard = g => {
   const k = kindInfo(g.kind), b = bdOf(g);
-  return `<div class="gc r-${k.rarity}" data-l="${esc(g.id)}" style="background:${giftBg(g, k)}">${patOverlay(g)}${patTag(g)}<div class="gi">${k.emoji}</div><div class="gn">${esc(k.name)}</div><div class="gs">#${g.serial}</div><div class="gs">👽 ${g.listing.price}</div>${b ? `<div class="gp">${pctTxt(b.pct)}</div>` : ''}</div>`;
+  return `<div class="gc r-${k.rarity}" data-l="${esc(g.id)}" style="background:${giftBg(g, k)}">${patOverlay(g)}${patTag(g)}<div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)}</div><div class="gs">#${g.serial}</div><div class="gs">👽 ${g.listing.price}</div>${b ? `<div class="gp">${pctTxt(b.pct)}</div>` : ''}</div>`;
 };
 // -------- Рынок юзернеймов --------
 // Мини SVG QR-иконка (декоративная, как в Telegram Fragment)
@@ -4444,7 +4578,7 @@ function lotInfo(g, back) {
   if (!g) return;
   const k = kindInfo(g.kind), bd = bdOf(g), own = g.seller && g.seller.id === me.id, price = g.listing.price;
   const row = (a, v) => `<div class="gr"><div class="gk">${a}</div><div class="gv">${v}</div></div>`;
-  modal(`<div class="gc big" style="background:${giftBg(g, k)}"><div class="gi">${k.emoji}</div><div class="gn">${esc(k.name)}</div></div>
+  modal(`<div class="gc big" style="background:${giftBg(g, k)}"><div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)}</div></div>
 <div class="gh2">👽 ${price} Mars</div>
 <div class="gtab">
 ${g.seller ? row('Продавец', `${esc(g.seller.username)} <span style="color:var(--t2)">@${esc(g.seller.handle)}</span>`) : ''}
@@ -4494,7 +4628,7 @@ function askPrice(g, k, back) {
 const giftCard = g => {
   const k = kindInfo(g.kind);
   const b = bdOf(g);
-  return `<div class="gc r-${k.rarity}" data-g="${esc(g.id)}" style="background:${giftBg(g, k)}">${patOverlay(g)}${patTag(g)}<div class="gi">${k.emoji}</div><div class="gn">${esc(k.name)}</div><div class="gs">#${g.serial}</div>${b ? `<div class="gp">${pctTxt(b.pct)}</div>` : ''}${g.note ? '<div class="gnote" title="Есть комментарий">💬</div>' : ''}${me.acc && me.acc.gid === g.id ? '<div class="gworn" title="Рядом с ником">✨</div>' : ''}${g.listing ? `<div class="glot">💰 ${g.listing.price}</div>` : ''}</div>`;
+  return `<div class="gc r-${k.rarity}" data-g="${esc(g.id)}" style="background:${giftBg(g, k)}">${patOverlay(g)}${patTag(g)}<div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)}</div><div class="gs">#${g.serial}</div>${b ? `<div class="gp">${pctTxt(b.pct)}</div>` : ''}${g.note ? '<div class="gnote" title="Есть комментарий">💬</div>' : ''}${me.acc && me.acc.gid === g.id ? '<div class="gworn" title="Рядом с ником">✨</div>' : ''}${g.listing ? `<div class="glot">💰 ${g.listing.price}</div>` : ''}</div>`;
 };
 // Подарок в переписке
 // Сообщение о подаренной подписке SAIMONPREMIYM
@@ -4502,7 +4636,7 @@ const PREM_NAME = { day: '1 день', month: '1 месяц', year: '1 год', 
 const premBubble = (p, mine) => `<div class="prem-msg"><div class="pm-t">💎 ${mine ? 'Вы подарили' : 'Вам подарили'} подписку SAIMONPREMIYM</div><div class="pm-s">${esc(PREM_NAME[p.plan] || '')}</div></div>`;
 const giftBubble = (g, mine, text) => {
   const k = kindInfo(g.kind);
-  return `<div class="gb" style="background:${giftBg(g, k)}">${patOverlay(g)}<div class="gt">🎁 ${mine ? 'Вы отправили подарок' : 'Подарок для вас'}</div><div class="gi">${k.emoji}</div><div class="gn">${esc(k.name)}</div><div class="gt">#${g.serial}${k.supply ? ' из ' + k.supply : ''}</div>${bdOf(g) ? `<div class="gt">${bdLine(g)}</div>` : ''}${text ? `<div class="gq">${esc(text)}</div>` : ''}</div>`;
+  return `<div class="gb" style="background:${giftBg(g, k)}">${patOverlay(g)}<div class="gt">🎁 ${mine ? 'Вы отправили подарок' : 'Подарок для вас'}</div><div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)}</div><div class="gt">#${g.serial}${k.supply ? ' из ' + k.supply : ''}</div>${bdOf(g) ? `<div class="gt">${bdLine(g)}</div>` : ''}${text ? `<div class="gq">${esc(text)}</div>` : ''}</div>`;
 };
 // Подарок из переписки открывается в том же окне, что и в профиле
 function openGiftMsg(id) {
@@ -4514,7 +4648,7 @@ function openGiftMsg(id) {
 // Выпадение фона при покупке: рулетка из фонов, останавливается на настоящем
 function revealGift(g, k, to, done) {
   const list = [...backdrops.values()], fin = bdOf(g);
-  modal(`<div class="gc big" id="rvg" style="background:${gradient(k)}"><div class="gi">${k.emoji}</div><div class="gn">${esc(k.name)}</div></div>
+  modal(`<div class="gc big" id="rvg" style="background:${gradient(k)}"><div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)}</div></div>
 <div class="gh2" id="rvt">🎲 Выбираем фон…</div>
 <div class="bdl" id="rvs" style="min-height:20px">${to ? 'Подарок для ' + esc(to.username) : ''}</div>
 <div class="row"><button class="btn gok" id="rvok" disabled>OK</button></div>`);
@@ -4558,7 +4692,7 @@ function giftInfo(g, mine, back) {
   const k = kindInfo(g.kind), bd = bdOf(g), price = g.price != null ? g.price : k.price;
   const row = (a, v) => `<div class="gr"><div class="gk">${a}</div><div class="gv">${v}</div></div>`;
   const when = new Date(g.at).toLocaleString('ru-RU', {day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}).replace(' г.,', ' в');
-  modal(`<div class="gc big" style="background:${giftBg(g, k)}"><div class="gi">${k.emoji}</div><div class="gn">${esc(k.name)}</div></div>
+  modal(`<div class="gc big" style="background:${giftBg(g, k)}"><div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)}</div></div>
 <div class="gh2">Подарок</div>
 <div class="gtab">
 ${g.from ? row('От', `${esc(g.from.username)} <span style="color:var(--t2)">@${esc(g.from.handle)}</span>`) : ''}
@@ -4611,7 +4745,7 @@ ${g.listing ? '<div class="row"><button class="btn r gok" id="gun">Снять с
     const bd2 = bdOf(g), pt2 = patterns.get(g.pt);
     const oldBd = bd2 ? bd2.name : '—';
     const oldPt = pt2 ? pt2.name : '—';
-    modal(`<div class="gc big" style="background:${giftBg(g, k2)}"><div class="gi">${k2.emoji}</div><div class="gn">${k2.name}</div></div>
+    modal(`<div class="gc big" style="background:${giftBg(g, k2)}"><div class="gi">${gPic(k2)}</div><div class="gn">${k2.name}</div></div>
 <h2 style="margin-top:12px">🎲 Улучшение модели</h2>
 <p style="color:var(--t2);font-size:14px;text-align:center">Случайный новый фон и узор заменят текущие.<br>Шанс получить редкий — такой же, как при покупке.<br>Текущие: <b>${esc(oldBd)}</b> / <b>${esc(oldPt)}</b></p>
 <div class="err" id="ge"></div>
@@ -4629,7 +4763,7 @@ ${g.listing ? '<div class="row"><button class="btn r gok" id="gun">Снять с
         const newBd = r.bdName, newPt = r.ptName;
         const isRareBd = (backdrops.get(g.bd)?.pct || 99) < 5;
         const isRarePt = (patterns.get(g.pt)?.pct || 99) < 5;
-        modal(`<div class="gc big" style="background:${giftBg(g, k2)};animation:popIn .4s var(--ease-out) both"><div class="gi">${k2.emoji}</div><div class="gn">${k2.name}</div></div>
+        modal(`<div class="gc big" style="background:${giftBg(g, k2)};animation:popIn .4s var(--ease-out) both"><div class="gi">${gPic(k2)}</div><div class="gn">${k2.name}</div></div>
 <h2 style="margin-top:12px;text-align:center">✨ Новая модель!</h2>
 <div style="text-align:center;margin:12px 0">
   <div style="font-size:18px;margin-bottom:6px"><b>${esc(newBd)}</b>${isRareBd ? ' 🔥' : ''}</div>
@@ -4692,7 +4826,7 @@ ${RARITY.map(([r, title]) => {
     const items = d.catalog.filter(c => c.rarity === r);
     return items.length ? `<div class="sec" style="padding:10px 0 6px">${title}</div><div class="gg">${items.map(c => {
       const left = c.supply - c.sold;
-      return `<div class="gc r-${c.rarity} ${left ? '' : 'off'}" data-k="${c.kind}" style="background:${gradient(c)}"><div class="gi">${c.emoji}</div><div class="gn">${esc(c.name)}</div><div class="gs">👽 ${c.price}</div><div class="gs">${left ? 'осталось ' + left : 'распродано'}</div></div>`;
+      return `<div class="gc r-${c.rarity} ${left ? '' : 'off'}" data-k="${c.kind}" style="background:${gradient(c)}"><div class="gi">${gPic(c)}</div><div class="gn">${esc(c.name)}</div><div class="gs">👽 ${c.price}</div><div class="gs">${left ? 'осталось ' + left : 'распродано'}</div></div>`;
     }).join('')}</div>` : '';
   }).join('')}
 <div class="row"><button type="button" class="btn g" data-x>Закрыть</button></div>`);
@@ -4719,7 +4853,7 @@ ${RARITY.map(([r, title]) => {
     const items = d.catalog.filter(c => c.rarity === r);
     return items.length ? `<div class="sec" style="padding:10px 0 6px">${title}</div><div class="gg">${items.map(c => {
       const left = c.supply - c.sold;
-      return `<div class="gc r-${c.rarity} ${left ? '' : 'off'}" data-k="${c.kind}" style="background:${gradient(c)}"><div class="gi">${c.emoji}</div><div class="gn">${esc(c.name)}</div><div class="gs">👽 ${c.price}</div><div class="gs">${left ? 'осталось ' + left : 'распродано'}</div></div>`;
+      return `<div class="gc r-${c.rarity} ${left ? '' : 'off'}" data-k="${c.kind}" style="background:${gradient(c)}"><div class="gi">${gPic(c)}</div><div class="gn">${esc(c.name)}</div><div class="gs">👽 ${c.price}</div><div class="gs">${left ? 'осталось ' + left : 'распродано'}</div></div>`;
     }).join('')}</div>` : '';
   }).join('')}
 <div class="row"><button type="button" class="btn g" data-x>Закрыть</button></div>`);
@@ -4731,7 +4865,7 @@ ${RARITY.map(([r, title]) => {
 
 function giftBuyForChannel(kind, chatId, channelName) {
   const k = kindInfo(kind);
-  modal(`<div class="gc big" style="background:${gradient(k)}"><div class="gi">${k.emoji}</div><div class="gn">${esc(k.name)}</div></div>
+  modal(`<div class="gc big" style="background:${gradient(k)}"><div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)}</div></div>
 <div style="text-align:center;margin-top:12px;font-weight:600">👽 ${k.price} Mars</div>
 <div style="text-align:center;color:var(--t2);font-size:13px">Подарок каналу «${esc(channelName)}»</div>
 <div class="f" style="margin-top:12px"><label>Сообщение (необязательно)</label><input id="gmsg" maxlength="120"></div>
@@ -4752,7 +4886,7 @@ function giftBuyForChannel(kind, chatId, channelName) {
 
 function giftBuy(kind, to) {
   const k = kindInfo(kind);
-  modal(`<div class="gc big" style="background:${gradient(k)}"><div class="gi">${k.emoji}</div><div class="gn">${esc(k.name)}</div></div>
+  modal(`<div class="gc big" style="background:${gradient(k)}"><div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)}</div></div>
 <div style="text-align:center;margin-top:12px;font-weight:600">👽 ${k.price} Mars</div>
 <div style="text-align:center;color:var(--t2);font-size:13px">${rarityName(k.rarity)} · осталось ${k.supply - k.sold} из ${k.supply} · у вас 👽 <span class="mars-n">${me.unlimited ? '∞' : (me.mars || 0)}</span></div>
 <div class="bdl" style="margin-top:10px">🎲 Фон выпадает случайно</div>
@@ -5046,6 +5180,7 @@ function chatMenu(id) {
   if (!(c.peer && c.peer.bot) && (c.type !== 'channel' || c.creator === me.id)) items.unshift(['ttl', `⏳ Автоудаление: ${ttlName}`, 'g']);
   items.unshift(['hide', sgIsHidden(c.id) ? '👁 Вернуть в список чатов' : '🙈 Скрыть чат (по код-паролю)', 'g']);
   if (c.type !== 'saved') items.unshift(['arch', ((me.archived || []).includes(c.id)) ? '📤 Вернуть из архива' : '🗄 В архив', 'g']);
+  items.unshift(['media', '🖼 Медиа, ссылки и голосовые', 'g']);
   modal(`<h2 style="margin-bottom:6px">${esc(title(c))}</h2>${items.map(([k, t, cls]) =>
     `<div class="row"><button class="btn ${cls}" data-a="${k}">${t}</button></div>`).join('')}
 <div class="row"><button type="button" class="btn g" data-x>Отмена</button></div>`);
@@ -6358,7 +6493,7 @@ async function sgLoadSessions() {
   const row = s => sgRow({ ic: ico(s), bg: col(s), t: esc(s.name), sub: `${s.ip ? 'IP ' + esc(s.ip) + ' · ' : ''}${s.current ? '<span style="color:#34c77b">это устройство</span>' : when(s.seen)}`, right: s.current ? '' : `<span class="val" style="color:#ff5a50;font-size:20px" data-kill="${s.id}">✕</span>` });
   const curS = list.filter(s => s.current), other = list.filter(s => !s.current);
   if (!$('#sgSess')) return;
-  box.innerHTML = `<div class="sg-sec">Это устройство</div><div class="tgp-card">${curS.map(row).join('')}</div>
+  box.innerHTML = `<button type="button" class="sg-btn ql-link" id="sgLinkDev">💻 Подключить устройство по QR-коду</button><div class="sg-sec">Это устройство</div><div class="tgp-card">${curS.map(row).join('')}</div>
 ${other.length ? `<button type="button" class="sg-btn red" id="sgKillAll">Завершить все другие сеансы</button>
 <div class="sg-sec">Другие сеансы · ${other.length}</div><div class="tgp-card">${other.map(row).join('')}</div>` : '<div class="sg-note" style="text-align:center;padding-top:14px">Других сеансов нет — аккаунт открыт только здесь 👍</div>'}
 <div class="sg-note">Если видите незнакомое устройство — завершите сеанс и смените пароль.</div>`;
@@ -6366,6 +6501,7 @@ ${other.length ? `<button type="button" class="sg-btn red" id="sgKillAll">Зав
     if (!confirm('Завершить этот сеанс? На том устройстве произойдёт выход из аккаунта.')) return;
     try { await api('/api/sessions/' + b.dataset.kill, 'DELETE'); toast('Сеанс завершён'); sgLoadSessions(); } catch (x) { toast(x.message); }
   });
+  if ($('#sgLinkDev')) $('#sgLinkDev').onclick = () => { sgSheetClose && sgSheetClose(); closeModal(); sgScanQR(); };
   const ka = $('#sgKillAll');
   if (ka) ka.onclick = async () => {
     if (!confirm('Выйти из аккаунта на всех других устройствах?')) return;
@@ -7845,6 +7981,209 @@ html[data-theme="dark"] #hbPay .hp-card{background:#16212d}
 .hc-d{color:var(--t2);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .g-botrm{border:0;background:rgba(255,69,58,.14);color:#ff5a50;border-radius:12px;padding:6px 10px;font:600 12.5px/1 inherit;cursor:pointer;margin-left:auto}
 
+
+/* ===== Ссылки и превью ===== */
+#msgs .tx a.lnk-url{color:#3d8bff;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;word-break:break-all;font-weight:500}
+html[data-theme="dark"] #msgs .tx a.lnk-url{color:#6ab0ff}
+#msgs .m.me .tx a.lnk-url{color:#cfe6ff;text-decoration-color:rgba(255,255,255,.6)}
+#msgs a.lnk-url:active{opacity:.6}
+.lpc{display:flex;gap:10px;margin:8px 0 2px;padding:9px 10px 9px 13px;border-radius:14px;position:relative;overflow:hidden;
+  background:rgba(61,139,255,.1);color:inherit!important;text-decoration:none!important;max-width:340px;transition:transform .15s}
+.lpc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:#3d8bff}
+#msgs .m.me .lpc{background:rgba(255,255,255,.16)}
+#msgs .m.me .lpc::before{background:#fff}
+.lpc:active{transform:scale(.98)}
+.lpb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.lps{font-size:13px;font-weight:700;color:#3d8bff}
+html[data-theme="dark"] .lps{color:#6ab0ff}
+#msgs .m.me .lps{color:#fff}
+.lpc b{color:inherit!important;font-weight:700;font-size:14px!important;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lpd{font-size:13px;line-height:1.35;opacity:.85;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.lpi{width:60px;height:60px;border-radius:10px;object-fit:cover;flex:none;background:rgba(127,140,160,.2)}
+.lpc.big{flex-direction:column}
+.lpc.big .lpi{width:100%;height:auto;max-height:220px;aspect-ratio:1.91/1;border-radius:12px;order:2;margin-top:4px}
+
+/* ===== Анимированные эмодзи ===== */
+html #msgs .m.jmb.jmb:not(#_){background:transparent!important;box-shadow:none!important;border:0!important;padding:2px 2px 0!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+html #msgs .m.jmb.jmb:not(#_)::before,html #msgs .m.jmb.jmb:not(#_)::after{display:none!important}
+#msgs .m.jmb .tx{display:block;line-height:1.12;white-space:nowrap}
+#msgs .m.jmb time{float:none;display:table;margin:2px 0 2px auto!important;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,.32);color:#fff!important;font-size:11px}
+#msgs .m.jmb time *{color:#fff!important}
+html #msgs .m.jmb.jmb:not(#_) .rp{background:rgba(0,0,0,.38)!important;border-radius:12px;padding:4px 8px;margin-bottom:4px}
+html #msgs .m.jmb.jmb:not(#_) .rp *{color:#fff!important}
+html #msgs .m.jmb.jmb:not(#_) .rp b{color:#9fd0ff!important}
+.aem{display:inline-block;cursor:pointer;user-select:none;-webkit-user-select:none;transform-origin:50% 65%;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;will-change:transform}
+.jmb1 .aem{font-size:78px}.jmb2 .aem{font-size:58px}.jmb3 .aem{font-size:46px}
+.jmb .aem+.aem{margin-left:2px}
+.aem.go{animation:aeBounce 1.1s ease-in-out 2}
+.aem.go[data-a=beat]{animation:aeBeat 1.1s ease-in-out 2}
+.aem.go[data-a=broken]{animation:aeBroken 1.2s ease-in-out 1}
+.aem.go[data-a=laugh]{animation:aeLaugh .9s ease-in-out 2}
+.aem.go[data-a=flame]{animation:aeFlame .7s ease-in-out 3;transform-origin:50% 100%}
+.aem.go[data-a=party]{animation:aeParty 1.1s cubic-bezier(.3,1.6,.5,1) 2;transform-origin:30% 90%}
+.aem.go[data-a=wave]{animation:aeWave 1.1s ease-in-out 2;transform-origin:70% 90%}
+.aem.go[data-a=thumb]{animation:aeThumb 1s cubic-bezier(.3,1.5,.5,1) 2;transform-origin:50% 90%}
+.aem.go[data-a=cry]{animation:aeCry 1s ease-in-out 2;transform-origin:50% 100%}
+.aem.go[data-a=angry]{animation:aeAngry .8s linear 2}
+.aem.go[data-a=love]{animation:aeLove 1.1s ease-in-out 2}
+.aem.go[data-a=wow]{animation:aeWow 1s cubic-bezier(.3,1.6,.5,1) 2}
+.aem.go[data-a=spin]{animation:aeSpin 1.2s cubic-bezier(.4,0,.2,1) 2;transform-origin:50% 50%}
+.aem.go[data-a=think]{animation:aeThink 1.4s ease-in-out 2}
+.aem.go[data-a=cool]{animation:aeCool 1.1s ease-in-out 2}
+.aem.go[data-a=rocket]{animation:aeRocket 1.2s ease-in-out 2}
+.aem.go[data-a=ghost]{animation:aeGhost 1.4s ease-in-out 2}
+.aem.go[data-a=sleep]{animation:aeSleep 2s ease-in-out 2}
+.aem.go[data-a=money]{animation:aeMoney 1.1s ease-in-out 2}
+@keyframes aeBounce{0%,100%{transform:none}25%{transform:translateY(-14%) scale(1.05,.95)}45%{transform:translateY(0) scale(1.08,.9)}60%{transform:translateY(-5%)}80%{transform:none}}
+@keyframes aeBeat{0%,60%,100%{transform:scale(1)}12%{transform:scale(1.24)}24%{transform:scale(.96)}36%{transform:scale(1.16)}48%{transform:scale(1)}}
+@keyframes aeBroken{0%,100%{transform:none}15%{transform:scale(1.15)}30%{transform:rotate(-8deg) translateX(-4%)}45%{transform:rotate(8deg) translateX(4%)}60%{transform:rotate(-4deg) translateY(6%)}80%{transform:translateY(3%)}}
+@keyframes aeLaugh{0%,100%{transform:none}15%{transform:rotate(-12deg) translateY(-6%)}30%{transform:rotate(10deg) translateY(2%)}45%{transform:rotate(-10deg) translateY(-6%)}60%{transform:rotate(8deg)}80%{transform:rotate(-3deg)}}
+@keyframes aeFlame{0%,100%{transform:scale(1,1) skewX(0);filter:brightness(1)}25%{transform:scale(.95,1.12) skewX(-4deg);filter:brightness(1.2)}50%{transform:scale(1.04,.96) skewX(3deg)}75%{transform:scale(.97,1.08) skewX(-2deg);filter:brightness(1.15)}}
+@keyframes aeParty{0%,100%{transform:none}20%{transform:rotate(-18deg) scale(1.1)}40%{transform:rotate(14deg) scale(1.22)}60%{transform:rotate(-6deg) scale(1.05)}}
+@keyframes aeWave{0%,100%{transform:none}15%{transform:rotate(22deg)}30%{transform:rotate(-12deg)}45%{transform:rotate(22deg)}60%{transform:rotate(-8deg)}75%{transform:rotate(12deg)}}
+@keyframes aeThumb{0%,100%{transform:none}20%{transform:translateY(-16%) rotate(-14deg) scale(1.12)}45%{transform:translateY(0) rotate(4deg) scale(.96)}65%{transform:rotate(-3deg)}}
+@keyframes aeCry{0%,100%{transform:none}20%{transform:scale(1.06,.9)}40%{transform:scale(.96,1.05) translateX(-3%)}60%{transform:scale(1.04,.93) translateX(3%)}80%{transform:scale(1,.97)}}
+@keyframes aeAngry{0%,100%{transform:none;filter:none}10%,30%,50%,70%{transform:translateX(-5%) rotate(-3deg);filter:drop-shadow(0 0 10px rgba(255,40,40,.6))}20%,40%,60%,80%{transform:translateX(5%) rotate(3deg)}}
+@keyframes aeLove{0%,100%{transform:none}20%{transform:scale(1.18) rotate(-8deg)}40%{transform:scale(1.05) rotate(6deg)}60%{transform:scale(1.14) rotate(-4deg)}}
+@keyframes aeWow{0%,100%{transform:none}15%{transform:scale(.82)}35%{transform:scale(1.28)}55%{transform:scale(.97)}75%{transform:scale(1.05)}}
+@keyframes aeSpin{0%{transform:rotate(0) scale(1)}50%{transform:rotate(200deg) scale(1.2)}100%{transform:rotate(360deg) scale(1)}}
+@keyframes aeThink{0%,100%{transform:none}30%{transform:rotate(-10deg) translateX(-3%)}60%{transform:rotate(-10deg) translateX(-3%) translateY(-4%)}}
+@keyframes aeCool{0%,100%{transform:none}30%{transform:rotate(-8deg) translateY(-6%) scale(1.06)}55%{transform:rotate(6deg) translateY(-2%)}}
+@keyframes aeRocket{0%,100%{transform:none}25%{transform:translate(-4%,4%) rotate(-4deg)}55%{transform:translate(14%,-18%) scale(1.08)}75%{transform:translate(4%,-4%)}}
+@keyframes aeGhost{0%,100%{transform:none;opacity:1}30%{transform:translateY(-10%) rotate(-8deg);opacity:.75}60%{transform:translateY(-4%) rotate(8deg);opacity:.9}}
+@keyframes aeSleep{0%,100%{transform:none}50%{transform:scale(1.07,.94) translateY(3%)}}
+@keyframes aeMoney{0%,100%{transform:none}25%{transform:translateY(-14%) rotateY(180deg)}50%{transform:translateY(0) rotateY(360deg)}70%{transform:translateY(-5%)}}
+.aep{position:fixed;z-index:99999;pointer-events:none;line-height:1;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;will-change:transform,opacity}
+html[data-anim="min"] .aem.go{animation-iteration-count:1!important}
+@media (prefers-reduced-motion:reduce){.aem.go{animation:none!important}}
+
+/* ===== Медиа, ссылки и голосовые ===== */
+.shs{margin:12px 0;border-radius:22px;background:var(--sg-card,rgba(127,127,127,.1));overflow:hidden;text-align:left}
+.tgp .shs{margin:12px 16px}
+.shs-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:2px 2px 0}
+.shs-th{position:relative;aspect-ratio:1;border:0;padding:0;overflow:hidden;background:#0002;cursor:pointer}
+.shs-th:first-child{border-top-left-radius:20px}.shs-th:last-child{border-top-right-radius:20px}
+.shs-th img,.shs-th video{width:100%;height:100%;object-fit:cover;display:block}
+.shs-th .shp-dur{font-size:10px;padding:1px 5px}
+.shs-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;border:0;background:none;color:inherit;font:inherit;font-size:15px;cursor:pointer;text-align:left}
+.shs-row+.shs-row{border-top:1px solid rgba(127,127,127,.14)}
+.shs-row:active{background:rgba(127,127,127,.12)}
+.shs-ic{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;font-size:16px;flex:none}
+.shs-media{background:linear-gradient(135deg,#4f8dff,#7b5cff)}.shs-links{background:linear-gradient(135deg,#22c1c3,#1f8fff)}.shs-voice{background:linear-gradient(135deg,#ff7a59,#ff3d8b)}
+.shs-t{flex:1}.shs-row b{font-weight:600;opacity:.6}.shs-row i{font-style:normal;opacity:.4;font-size:20px;margin-left:4px}
+
+#shp{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;background:var(--bg,#fff);color:var(--t,#111);transform:translateX(100%);transition:transform .22s cubic-bezier(.3,.7,.3,1)}
+html[data-theme="dark"] #shp{background:#0e1621;color:#f2f5f8}
+#shp.on{transform:none}
+#shp[hidden]{display:none!important}
+.shp-top{display:flex;align-items:center;gap:6px;padding:calc(10px + env(safe-area-inset-top)) 10px 6px}
+.shp-back{width:42px;height:42px;border:0;border-radius:50%;background:rgba(127,127,127,.14);color:inherit;font-size:28px;line-height:1;cursor:pointer;padding-bottom:4px}
+.shp-ttl{min-width:0;padding-left:6px}.shp-ttl b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.shp-ttl small{opacity:.55;font-size:13px}
+.shp-tabs{display:flex;gap:6px;margin:6px 12px 8px;padding:4px;border-radius:18px;background:rgba(127,127,127,.13)}
+.shp-tabs button{flex:1;border:0;border-radius:14px;padding:9px 4px;background:none;color:inherit;font-family:inherit;font-weight:600;font-size:14px;line-height:1.1;opacity:.65;cursor:pointer;transition:background .2s,opacity .2s}
+.shp-tabs button span{margin-left:5px;font-weight:500;opacity:.7;font-size:12px}
+.shp-tabs button.on{opacity:1;background:var(--bg,#fff);box-shadow:0 2px 10px rgba(0,0,0,.12)}
+html[data-theme="dark"] .shp-tabs button.on{background:#24364a}
+.shp-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 0 calc(16px + env(safe-area-inset-bottom))}
+.shp-mo{position:sticky;top:0;z-index:2;padding:8px 16px;font-size:13px;font-weight:600;opacity:.75;background:inherit;backdrop-filter:blur(10px)}
+#shp .shp-mo{background:color-mix(in srgb,var(--bg,#fff) 85%,transparent)}
+html[data-theme="dark"] #shp .shp-mo{background:rgba(14,22,33,.85)}
+.shp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:0 2px}
+.shp-cell{position:relative;aspect-ratio:1;border:0;padding:0;overflow:hidden;background:rgba(127,127,127,.15);cursor:pointer}
+.shp-cell img,.shp-cell video{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s}
+.shp-cell:active img,.shp-cell:active video{transform:scale(.96)}
+.shp-dur{position:absolute;left:5px;bottom:5px;padding:2px 7px;border-radius:9px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:600}
+.shp-sk{aspect-ratio:1;background:linear-gradient(90deg,rgba(127,127,127,.12),rgba(127,127,127,.22),rgba(127,127,127,.12));background-size:200% 100%;animation:shSk 1.2s linear infinite}
+@keyframes shSk{to{background-position:-200% 0}}
+.shp-empty{padding:90px 30px;text-align:center;opacity:.6;font-size:15px;line-height:1.4}.shp-empty b{display:block;font-size:54px;margin-bottom:10px}
+.shp-more{padding:16px;text-align:center;opacity:.5;font-size:13px}
+.shp-link,.shp-vo{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;cursor:pointer}
+.shp-link:active,.shp-vo:active{background:rgba(127,127,127,.1)}
+.shp-li{width:52px;height:52px;flex:none;border-radius:14px;overflow:hidden;display:grid;place-items:center;font-size:22px;font-weight:700;color:#fff;background:linear-gradient(135deg,#22c1c3,#1f8fff)}
+.shp-li img{width:100%;height:100%;object-fit:cover}
+.shp-lt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.shp-lt b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shp-lt small{font-size:13px;opacity:.65;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.shp-url{font-size:13px;color:#3d8bff;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-theme="dark"] .shp-url{color:#6ab0ff}
+.shp-lt em,.shp-vt small{font-style:normal;font-size:12px;opacity:.5}
+.shp-go{width:34px;height:34px;flex:none;border:0;border-radius:50%;background:rgba(127,127,127,.13);color:inherit;font-size:15px;cursor:pointer;opacity:.7}
+.shp-play{width:46px;height:46px;flex:none;border:0;border-radius:50%;color:#fff;font-size:16px;cursor:pointer;background:linear-gradient(135deg,#ff7a59,#ff3d8b);box-shadow:0 4px 14px rgba(255,61,139,.35)}
+.shp-circ{width:46px;height:46px;flex:none;border:2px solid #ff3d8b;border-radius:50%;padding:0;overflow:hidden;background:#000;cursor:pointer}
+.shp-circ video{width:100%;height:100%;object-fit:cover;display:block}
+.shp-vt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.shp-vt b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shp-pb{display:block;height:3px;border-radius:2px;background:rgba(127,127,127,.2);overflow:hidden;margin-top:4px}
+.shp-pb>i{display:block;height:100%;width:0;background:#ff3d8b;transition:width .2s linear}
+.shp-vd{font-size:13px;opacity:.6;font-variant-numeric:tabular-nums;min-width:32px;text-align:right}
+
+#shv{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.94);color:#fff;display:flex;align-items:center;justify-content:center}
+#shv[hidden]{display:none!important}
+.shv-top{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;background:linear-gradient(rgba(0,0,0,.6),transparent);z-index:2}
+.shv-x{width:40px;height:40px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:17px;cursor:pointer}
+.shv-who{flex:1;min-width:0}.shv-who b{display:block;font-size:15px}.shv-who small{opacity:.7;font-size:12px}
+.shv-go{border:0;border-radius:16px;padding:9px 14px;background:rgba(255,255,255,.16);color:#fff;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer}
+.shv-st{max-width:100%;max-height:100%;display:flex;align-items:center;justify-content:center}
+.shv-st img,.shv-st video{max-width:100vw;max-height:84vh;display:block}
+.shv-st video.shv-circ{width:min(78vw,380px);height:min(78vw,380px);border-radius:50%;object-fit:cover}
+.shv-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:28px;line-height:1;cursor:pointer;padding-bottom:4px}
+.shv-nav[hidden]{display:none}
+.shv-p{left:10px}.shv-n{right:10px}
+.shv-cap{position:absolute;left:0;right:0;bottom:0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.7));font-size:14px;text-align:center}
+.shv-cap:empty{display:none}
+@media (hover:none){.shv-nav{display:none}}
+
+/* ===== Картинки подарков ===== */
+.gpic{display:block;width:1.3em;height:1.3em;object-fit:contain;margin:0 auto;-webkit-user-drag:none;user-select:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.28))}
+.gc .gi .gpic{width:1.65em;height:1.65em;margin:-4px auto -2px}
+.gc.big .gi .gpic{width:1.6em;height:1.6em;animation:gFloat 3.2s ease-in-out infinite}
+.gb .gi .gpic{width:1.5em;height:1.5em;animation:gFloat 3.2s ease-in-out infinite}
+.ge .gpic{width:44px;height:44px}
+.acc .gpic{width:16px;height:16px;filter:none}
+h2 .acc .gpic{width:21px;height:21px}
+.tgp-nft-thumb .gpic{width:80%;height:80%}
+.tgp-nft-thumb span{display:grid;place-items:center;width:100%;height:100%}
+@keyframes gFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-6%) rotate(2deg)}}
+html[data-anim="off"] .gpic{animation:none!important}
+
+/* ===== Вход по QR ===== */
+.ql-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:14px;padding:13px;border-radius:18px;border:1.5px solid rgba(127,127,127,.25);background:transparent;color:inherit;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s,border-color .2s}
+.ql-btn:hover{background:rgba(127,127,127,.08);border-color:rgba(127,127,127,.4)}
+.ql-btn[hidden]{display:none}
+#qlOv{position:fixed;inset:0;z-index:9800;display:grid;place-items:center;padding:16px;background:rgba(6,10,18,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;transition:opacity .2s}
+#qlOv.on{opacity:1}
+#qlOv[hidden]{display:none!important}
+.ql-card{position:relative;display:flex;gap:30px;align-items:center;max-width:760px;width:100%;padding:34px;border-radius:32px;background:var(--bg,#fff);color:var(--t,#111);box-shadow:0 30px 80px rgba(0,0,0,.35);transform:translateY(12px) scale(.98);transition:transform .25s cubic-bezier(.3,1.3,.5,1)}
+html[data-theme="dark"] .ql-card{background:#17212b;color:#f2f5f8}
+#qlOv.on .ql-card{transform:none}
+.ql-x{position:absolute;top:14px;right:14px;width:38px;height:38px;border:0;border-radius:50%;background:rgba(127,127,127,.14);color:inherit;font-size:16px;cursor:pointer}
+.ql-qr{position:relative;flex:none;width:270px;height:270px;border-radius:26px;background:#fff;padding:12px;box-sizing:border-box;box-shadow:0 10px 30px rgba(79,141,255,.25),0 0 0 1px rgba(0,0,0,.05)}
+.ql-box{width:100%;height:100%;transition:filter .3s,opacity .3s}
+.ql-box canvas{width:100%;height:100%;display:block;border-radius:14px}
+.ql-box.dim{filter:blur(6px);opacity:.35}
+.ql-sk{width:100%;height:100%;border-radius:14px}
+.ql-done{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#111;font-weight:700;font-size:16px;text-align:center}
+.ql-done b{font-size:54px;animation:qlBob 1.4s ease-in-out infinite}
+.ql-done[hidden]{display:none}
+@keyframes qlBob{50%{transform:translateY(-6px) rotate(-6deg)}}
+.ql-txt{flex:1;min-width:0}
+.ql-txt h2{margin:0 0 14px;font-size:24px}
+.ql-txt ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px;font-size:15.5px;line-height:1.35}
+.ql-txt ol small{opacity:.6;font-size:13px}
+.ql-st{margin-top:18px;min-height:20px;font-size:14px;opacity:.85;display:flex;align-items:center;gap:8px}
+.ql-dot{width:8px;height:8px;border-radius:50%;background:#4f8dff;box-shadow:0 0 0 0 rgba(79,141,255,.6);animation:qlPulse 1.4s infinite}
+@keyframes qlPulse{70%{box-shadow:0 0 0 8px rgba(79,141,255,0)}100%{box-shadow:0 0 0 0 rgba(79,141,255,0)}}
+.ql-pw{margin-top:18px;border:0;background:none;color:#3d8bff;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;padding:0}
+@media (max-width:640px){.ql-card{flex-direction:column;gap:20px;padding:26px 20px;text-align:left}.ql-qr{width:240px;height:240px}}
+.ql-ask{text-align:center;padding:4px 6px 6px}
+.ql-ask-ic{width:72px;height:72px;margin:4px auto 10px;border-radius:24px;display:grid;place-items:center;font-size:38px;background:linear-gradient(135deg,#4f8dff,#7b5cff);box-shadow:0 10px 24px rgba(79,141,255,.35)}
+.ql-ask h3{margin:0 0 10px;font-size:19px}
+.ql-ask-dev{display:flex;flex-direction:column;gap:2px;padding:12px;border-radius:18px;background:rgba(127,127,127,.1);margin-bottom:12px}
+.ql-ask-dev small{opacity:.6}
+.ql-warn{font-size:13px;line-height:1.4;text-align:left;padding:10px 12px;border-radius:14px;background:rgba(255,170,0,.12);margin-bottom:12px}
+.ql-ask .ql-yes{background:linear-gradient(135deg,#4f8dff,#7b5cff)!important;color:#fff!important}
+.ql-ask .sg-btn{width:100%;margin:6px 0 0}
+.ql-ask .ql-no{background:rgba(127,127,127,.16)!important;color:inherit!important;box-shadow:none!important}
 </style>
 <script>
 // ===================================================================
@@ -7948,5 +8287,312 @@ inp.addEventListener('keydown', e => {
 hbCmdBox.addEventListener('pointerdown', e => e.preventDefault());
 hbCmdBox.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) hbCmdPick(+b.dataset.i); });
 
+</script>
+<script>
+// ===================================================================
+//  Медиа, ссылки и голосовые чата — как шторка в профиле Telegram
+// ===================================================================
+const SH_TABS = [['media', 'Медиа'], ['links', 'Ссылки'], ['voice', 'Голосовые']];
+const SH_EMPTY = { media: ['🖼', 'Здесь появятся фото и видео из этого чата'], links: ['🔗', 'Здесь появятся ссылки из этого чата'], voice: ['🎤', 'Здесь появятся голосовые и кружки'] };
+const shDirectOf = u => u && [...chats.values()].find(c => c.type === 'direct' && c.peer && c.peer.id === u.id);
+const shMonth = ts => { const d = new Date(ts); const s = d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).replace(/\s*г\.?$/, ''); return s[0].toUpperCase() + s.slice(1); };
+const shDate = ts => new Date(ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ', ' + hm(ts);
+const shName = f => f.id ? (cnames[f.id] || f.name) : f.name;
+const shHost = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+const shUrlOk = u => /^https?:\/\//i.test(u);
+const shImgOk = u => typeof u === 'string' && (u.startsWith('/lp/img?') || u.startsWith('/uploads/') || u.startsWith('/api/'));
+
+let sh = null; // состояние открытой шторки
+
+// --- Короткая сводка в профиле: «Медиа 12 · Ссылки 4 · Голосовые 3» + последние фото
+async function sgSharedSummary(chatId) {
+  const card = $('#card'); if (!card || !chatId) return;
+  const key = chatId + ':' + Date.now(); card.dataset.shk = key;
+  let r; try { r = await api('/api/chats/' + encodeURIComponent(chatId) + '/shared?tab=media&limit=8'); } catch { return; }
+  if (!r || !r.counts || !Array.isArray(r.items) || card.dataset.shk !== key || $('#modal').hidden) return;
+  const n = r.counts, total = n.media + n.links + n.voice;
+  if (!total) return;
+  const thumbs = r.items.filter(x => x.kind === 'image' || x.kind === 'video').slice(0, 4);
+  const box = document.createElement('div');
+  box.className = 'shs';
+  box.innerHTML = `${thumbs.length ? `<div class="shs-strip">${thumbs.map(x => `<button type="button" class="shs-th" data-sht="media">${shThumb(x)}</button>`).join('')}</div>` : ''}
+<div class="shs-rows">${SH_TABS.filter(([k]) => n[k]).map(([k, t]) => `<button type="button" class="shs-row" data-sht="${k}"><span class="shs-ic shs-${k}">${{ media: '🖼', links: '🔗', voice: '🎤' }[k]}</span><span class="shs-t">${t}</span><b>${n[k]}</b><i>›</i></button>`).join('')}</div>`;
+  const root = card.querySelector('.tgp') || card;
+  const anchor = root.querySelector('.tgp-sec') || [...root.children].reverse().find(el => el.classList && el.classList.contains('row') && el.querySelector('[data-x]'));
+  if (anchor) anchor.parentNode.insertBefore(box, anchor); else root.appendChild(box);
+  box.querySelectorAll('[data-sht]').forEach(b => b.onclick = () => sgSharedOpen(chatId, b.dataset.sht));
+}
+
+// --- Полноэкранная шторка
+function sgSharedOpen(chatId, tab) {
+  const c = chats.get(chatId);
+  let el = $('#shp');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'shp';
+    el.innerHTML = `<div class="shp-top"><button type="button" class="shp-back" aria-label="Назад">‹</button><div class="shp-ttl"><b></b><small>Медиа, ссылки и голосовые</small></div></div>
+<div class="shp-tabs" role="tablist"></div><div class="shp-body"></div>`;
+    document.body.appendChild(el);
+    el.querySelector('.shp-back').onclick = sgSharedClose;
+    el.querySelector('.shp-body').addEventListener('scroll', e => { const b = e.target; if (sh && sh.more && !sh.busy && b.scrollTop + b.clientHeight > b.scrollHeight - 400) shLoad(); }, { passive: true });
+    el.querySelector('.shp-body').onclick = shBodyClick;
+  }
+  el.querySelector('.shp-ttl b').textContent = c ? title(c) : 'Чат';
+  sh = { chatId, tab: tab || 'media', items: [], more: true, next: null, busy: false, counts: null, audio: null };
+  el.hidden = false; requestAnimationFrame(() => el.classList.add('on'));
+  shRenderTabs(); shLoad(true);
+}
+function sgSharedClose() {
+  const el = $('#shp'); if (!el) return;
+  if (sh && sh.audio) sh.audio.pause();
+  el.classList.remove('on'); setTimeout(() => { el.hidden = true; }, 220);
+  sh = null;
+}
+function shRenderTabs() {
+  const t = $('#shp .shp-tabs'), n = sh.counts;
+  t.innerHTML = SH_TABS.map(([k, name]) => `<button type="button" role="tab" class="${sh.tab === k ? 'on' : ''}" data-tab="${k}">${name}${n ? `<span>${n[k]}</span>` : ''}</button>`).join('');
+  t.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { if (sh.tab === b.dataset.tab) return; if (sh.audio) sh.audio.pause(); Object.assign(sh, { tab: b.dataset.tab, items: [], more: true, next: null }); shRenderTabs(); shLoad(true); });
+}
+async function shLoad(first) {
+  if (!sh || sh.busy || !sh.more) return;
+  const s = sh, body = $('#shp .shp-body');
+  s.busy = true;
+  if (first) body.innerHTML = `<div class="shp-grid">${'<i class="shp-sk"></i>'.repeat(12)}</div>`;
+  try {
+    const r = await api(`/api/chats/${encodeURIComponent(s.chatId)}/shared?tab=${s.tab}&limit=60${s.next ? '&before=' + encodeURIComponent(s.next) : ''}`);
+    if (sh !== s || !r || r.tab !== s.tab || !r.counts || !Array.isArray(r.items)) return;
+    const firstCounts = !s.counts; s.counts = r.counts; s.more = r.more; s.next = r.next;
+    // открыли без явной вкладки, а она пустая — переключаемся на первую непустую
+    if (first && !r.items.length && firstCounts) { const alt = SH_TABS.find(([k]) => r.counts[k]); if (alt && alt[0] !== s.tab) { s.busy = false; s.tab = alt[0]; s.more = true; s.next = null; shRenderTabs(); return shLoad(true); } }
+    s.items.push(...r.items);
+    if (firstCounts) shRenderTabs();
+    shRenderBody();
+  } catch (x) { if (sh === s) body.innerHTML = `<div class="shp-empty"><b>⚠️</b>${esc(x.message || 'Не удалось загрузить')}</div>`; }
+  finally { s.busy = false; }
+}
+function shThumb(x) {
+  if (x.kind === 'video') return `<video src="${esc(x.url)}#t=0.1" muted playsinline preload="metadata"></video><span class="shp-dur">▶ ${x.dur ? fmtDur(x.dur) : ''}</span>`;
+  return `<img src="${esc(x.url)}" alt="" loading="lazy" decoding="async">`;
+}
+function shRenderBody() {
+  const body = $('#shp .shp-body'), s = sh;
+  if (!s.items.length) { const [ic, t] = SH_EMPTY[s.tab]; body.innerHTML = `<div class="shp-empty"><b>${ic}</b>${t}</div>`; return; }
+  const groups = []; let last = '';
+  s.items.forEach((x, i) => { const mo = shMonth(x.at); if (mo !== last) { groups.push({ mo, list: [] }); last = mo; } groups[groups.length - 1].list.push([x, i]); });
+  let h = '';
+  for (const g of groups) {
+    h += `<div class="shp-mo">${esc(g.mo)}</div>`;
+    if (s.tab === 'media') h += `<div class="shp-grid">${g.list.map(([x, i]) => `<button type="button" class="shp-cell" data-i="${i}">${shThumb(x)}</button>`).join('')}</div>`;
+    else if (s.tab === 'links') h += g.list.map(([x, i]) => {
+      const p = x.preview || {}, host = shHost(x.url), img = p.img && shImgOk(p.img) ? p.img : '';
+      return `<div class="shp-link" data-i="${i}"><span class="shp-li">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : esc((host[0] || '?').toUpperCase())}</span>
+<span class="shp-lt"><b>${esc(p.title || host)}</b>${p.desc ? `<small>${esc(p.desc)}</small>` : ''}<a class="shp-url" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(x.url.replace(/^https?:\/\//i, ''))}</a><em>${esc(shName(x.from))} · ${esc(shDate(x.at))}</em></span>
+<button type="button" class="shp-go" data-go="${i}" aria-label="Перейти к сообщению">↩</button></div>`;
+    }).join('');
+    else h += g.list.map(([x, i]) => `<div class="shp-vo" data-i="${i}">
+${x.kind === 'circle' ? `<button type="button" class="shp-circ" data-play="${i}"><video src="${esc(x.url)}#t=0.1" muted playsinline preload="metadata"></video></button>` : `<button type="button" class="shp-play" data-play="${i}">▶</button>`}
+<span class="shp-vt"><b>${esc(shName(x.from))}</b><small>${x.kind === 'circle' ? '⭕ Видеосообщение' : '🎤 Голосовое'} · ${esc(shDate(x.at))}</small><i class="shp-pb"><i></i></i></span>
+<span class="shp-vd">${x.dur ? fmtDur(x.dur) : ''}</span><button type="button" class="shp-go" data-go="${i}" aria-label="Перейти к сообщению">↩</button></div>`).join('');
+  }
+  if (s.more) h += '<div class="shp-more">Загрузка…</div>';
+  const top = body.scrollTop; body.innerHTML = h; body.scrollTop = top;
+  // если всё влезло на экран, а есть ещё — догружаем
+  if (s.more && body.scrollHeight <= body.clientHeight + 50) setTimeout(shLoad, 50);
+}
+function shBodyClick(e) {
+  if (!sh) return;
+  const go = e.target.closest('[data-go]');
+  if (go) return shGoto(sh.items[+go.dataset.go]);
+  const pl = e.target.closest('[data-play]');
+  if (pl) { const x = sh.items[+pl.dataset.play]; return x.kind === 'circle' ? shView(+pl.dataset.play) : shPlay(+pl.dataset.play, pl); }
+  const cell = e.target.closest('.shp-cell');
+  if (cell) return shView(+cell.dataset.i);
+  const a = e.target.closest('a.shp-url');
+  const row = e.target.closest('.shp-link');
+  if (row && !a) { const x = sh.items[+row.dataset.i]; return shOpenUrl(x.url); }
+  if (a) { e.preventDefault(); shOpenUrl(a.getAttribute('href')); }
+}
+function shOpenUrl(url) {
+  if (!shUrlOk(url)) return;
+  try { const u = new URL(url); if (u.origin === location.origin && u.searchParams.get('u')) { sgSharedClose(); closeModal(); return openByHandle(u.searchParams.get('u').toLowerCase()); } } catch {}
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+function shGoto(x) {
+  if (!x || !sh) return;
+  const chatId = sh.chatId; sgSharedClose(); closeModal(); $('#shv') && ($('#shv').hidden = true);
+  const go = () => jumpToMsg(x.id);
+  if (cur !== chatId) { openChat(chatId); setTimeout(go, 700); } else go();
+}
+// Голосовые: проигрываем прямо в списке
+function shPlay(i, btn) {
+  const x = sh.items[i], row = btn.closest('.shp-vo');
+  if (sh.audio && sh.playing === i) { if (sh.audio.paused) { sh.audio.play().catch(() => {}); btn.textContent = '⏸'; } else { sh.audio.pause(); btn.textContent = '▶'; } return; }
+  if (sh.audio) { sh.audio.pause(); $('#shp').querySelectorAll('.shp-play').forEach(b => b.textContent = '▶'); $('#shp').querySelectorAll('.shp-pb>i').forEach(b => b.style.width = '0'); }
+  if (vcAudio && !vcAudio.paused) vcAudio.pause();
+  const a = sh.audio = new Audio(x.url); sh.playing = i;
+  btn.textContent = '⏸';
+  const bar = row.querySelector('.shp-pb>i'), dur = row.querySelector('.shp-vd');
+  a.ontimeupdate = () => { bar.style.width = (a.currentTime / (a.duration || x.dur || 1) * 100) + '%'; dur.textContent = fmtDur(a.currentTime); };
+  a.onended = () => { btn.textContent = '▶'; bar.style.width = '0'; dur.textContent = x.dur ? fmtDur(x.dur) : ''; if (sh) sh.playing = -1; };
+  a.onerror = () => { btn.textContent = '▶'; toast('Голосовое не загрузилось'); };
+  a.play().catch(() => {});
+}
+// Просмотр фото/видео с листанием
+function shView(i) {
+  let v = $('#shv');
+  if (!v) {
+    v = document.createElement('div'); v.id = 'shv';
+    v.innerHTML = `<div class="shv-top"><button type="button" class="shv-x" aria-label="Закрыть">✕</button><span class="shv-who"><b></b><small></small></span><button type="button" class="shv-go">К сообщению</button></div>
+<div class="shv-st"></div><button type="button" class="shv-nav shv-p" aria-label="Назад">‹</button><button type="button" class="shv-nav shv-n" aria-label="Вперёд">›</button><div class="shv-cap"></div>`;
+    document.body.appendChild(v);
+    v.querySelector('.shv-x').onclick = () => { v.hidden = true; v.querySelector('.shv-st').innerHTML = ''; };
+    v.querySelector('.shv-p').onclick = () => shViewStep(-1);
+    v.querySelector('.shv-n').onclick = () => shViewStep(1);
+    v.querySelector('.shv-go').onclick = () => { const x = sh && sh.items[+v.dataset.i]; v.hidden = true; v.querySelector('.shv-st').innerHTML = ''; shGoto(x); };
+    let sx = null, sy = 0;
+    v.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+    v.addEventListener('touchend', e => { if (sx === null) return; const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; sx = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) shViewStep(dx < 0 ? 1 : -1); else if (dy > 90) v.querySelector('.shv-x').click(); }, { passive: true });
+    document.addEventListener('keydown', e => { if (v.hidden) return; if (e.key === 'ArrowLeft') shViewStep(-1); else if (e.key === 'ArrowRight') shViewStep(1); else if (e.key === 'Escape') v.querySelector('.shv-x').click(); });
+  }
+  const x = sh.items[i]; v.dataset.i = i; v.hidden = false;
+  const st = v.querySelector('.shv-st');
+  st.innerHTML = x.kind === 'image' ? `<img src="${esc(x.url)}" alt="">`
+    : `<video src="${esc(x.url)}" ${x.kind === 'circle' ? 'class="shv-circ" loop' : 'controls'} playsinline autoplay></video>`;
+  v.querySelector('.shv-who b').textContent = shName(x.from);
+  v.querySelector('.shv-who small').textContent = shDate(x.at);
+  v.querySelector('.shv-cap').textContent = x.text || '';
+  const list = shViewList();
+  const k = list.indexOf(i);
+  v.querySelector('.shv-p').hidden = k <= 0; v.querySelector('.shv-n').hidden = k < 0 || (k >= list.length - 1 && !sh.more);
+}
+const shViewList = () => sh ? sh.items.map((x, i) => (x.kind === 'image' || x.kind === 'video' || x.kind === 'circle') ? i : -1).filter(i => i >= 0) : [];
+async function shViewStep(d) {
+  const v = $('#shv'); if (!sh || !v || v.hidden) return;
+  let list = shViewList(), k = list.indexOf(+v.dataset.i) + d;
+  if (k >= list.length && sh.more) { await shLoad(); list = shViewList(); }
+  if (k < 0 || k >= list.length) return;
+  shView(list[k]);
+}
+
+// Подключаем сводку к профилям и пункт в меню чата
+(() => {
+  const wrap = (name, getId) => {
+    const orig = window[name]; if (typeof orig !== 'function') return;
+    window[name] = function (...a) { const r = orig.apply(this, a); try { const id = getId(...a); if (id) sgSharedSummary(id); } catch {} return r; };
+  };
+  wrap('userProfile', u => { const c = shDirectOf(u); return c && c.id; });
+  wrap('groupInfo', id => id);
+  wrap('channelInfo', id => id);
+  const ca = window.chatAction;
+  if (typeof ca === 'function') window.chatAction = function (c, a) { if (a === 'media') return (closeModal(), sgSharedOpen(c.id)); return ca.apply(this, arguments); };
+})();
+</script>
+<script>
+// ===================================================================
+//  Вход по QR-коду: компьютер показывает код, телефон подтверждает
+// ===================================================================
+let qlState = null; // {id, secret, timer, until}
+function qlMountButton() {
+  const f = $('#authForm'); if (!f || $('#qlBtn')) return;
+  const b = document.createElement('button');
+  b.type = 'button'; b.id = 'qlBtn'; b.className = 'ql-btn';
+  b.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 14v.01M14 21h7v-4M17 21v-.01"/></svg><span>Войти по QR-коду</span>';
+  b.onclick = qlOpen;
+  const foot = f.querySelector('.a-foot');
+  (foot && foot.parentNode === f ? foot : f.lastElementChild).after(b);
+  qlSync();
+}
+function qlSync() { const b = $('#qlBtn'); if (b) b.hidden = typeof reg !== 'undefined' && !!reg; }
+
+function qlOpen() {
+  let ov = $('#qlOv');
+  if (!ov) {
+    ov = document.createElement('div'); ov.id = 'qlOv';
+    ov.innerHTML = `<div class="ql-card">
+<button type="button" class="ql-x" aria-label="Закрыть">✕</button>
+<div class="ql-qr"><div class="ql-box"></div><div class="ql-done" hidden><b>📱</b><span>Подтвердите вход<br>на телефоне</span></div></div>
+<div class="ql-txt"><h2>Вход по QR-коду</h2>
+<ol><li>Откройте <b>SAIMON</b> на телефоне</li><li>Настройки → <b>Активные сеансы</b> → <b>Подключить устройство</b><br><small>или нажмите «Сканировать QR» в меню</small></li><li>Наведите камеру на этот код</li></ol>
+<div class="ql-st"></div>
+<button type="button" class="ql-pw">Войти по паролю</button></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.ql-x').onclick = qlClose;
+    ov.querySelector('.ql-pw').onclick = qlClose;
+    ov.addEventListener('click', e => { if (e.target === ov) qlClose(); });
+  }
+  ov.hidden = false; requestAnimationFrame(() => ov.classList.add('on'));
+  qlNew();
+}
+function qlClose() {
+  const ov = $('#qlOv'); if (ov) { ov.classList.remove('on'); setTimeout(() => { ov.hidden = true; }, 200); }
+  if (qlState) clearTimeout(qlState.timer);
+  qlState = null;
+}
+async function qlNew() {
+  if (qlState) clearTimeout(qlState.timer);
+  const ov = $('#qlOv'), box = ov.querySelector('.ql-box'), st = ov.querySelector('.ql-st');
+  ov.querySelector('.ql-done').hidden = true; box.classList.remove('dim');
+  box.innerHTML = '<div class="sgsk ql-sk"></div>'; st.textContent = '';
+  let r;
+  try { r = await fetch('/api/qrlogin/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(x => x.json()); }
+  catch { st.textContent = 'Нет соединения с сервером'; return; }
+  if (!r || !r.id) { st.textContent = (r && r.error) || 'Не удалось получить код'; return; }
+  const s = qlState = { id: r.id, secret: r.secret, until: Date.now() + (r.ttl || 120000) - 3000, timer: 0 };
+  const cv = sgQRCanvas(location.origin + '/?qrlogin=' + r.id, { px: 560, letter: 'S' });
+  box.innerHTML = ''; box.appendChild(cv);
+  st.innerHTML = '<span class="ql-dot"></span>Ждём сканирования…';
+  const poll = async () => {
+    if (qlState !== s) return;
+    if (Date.now() > s.until) return qlNew(); // код устарел — сразу показываем новый
+    let d = null;
+    try { d = await fetch('/api/qrlogin/' + s.id + '/poll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret: s.secret }) }).then(x => x.json()); } catch {}
+    if (qlState !== s) return;
+    if (d && d.status === 'ok' && d.token) {
+      st.innerHTML = '✅ Вход подтверждён';
+      me = normMe({ ...d.user, token: d.token }); save();
+      setTimeout(() => { qlClose(); boot(); }, 400);
+      return;
+    }
+    if (d && d.status === 'scanned') { box.classList.add('dim'); ov.querySelector('.ql-done').hidden = false; st.innerHTML = '<span class="ql-dot"></span>Код отсканирован — подтвердите на телефоне'; }
+    if (d && d.status === 'denied') { st.textContent = '⛔ Вход отклонён на телефоне'; setTimeout(() => { if (qlState === s) qlNew(); }, 2500); return; }
+    if (d && d.status === 'expired') return qlNew();
+    s.timer = setTimeout(poll, 1500);
+  };
+  s.timer = setTimeout(poll, 1500);
+}
+
+// --- Телефон: подтверждение входа
+async function sgQrApprove(id) {
+  if (!/^[a-f0-9]{32}$/.test(id || '')) return toast('Неверный QR-код входа');
+  let info;
+  try { info = await api('/api/qrlogin/' + id + '/scan', 'POST', {}); } catch (x) { return toast(x.message); }
+  const d = info.device || {}, ic = d.kind === 'phone' ? '📱' : d.kind === 'tablet' ? '📲' : '💻';
+  const sh = sgSheet(`<div class="ql-ask"><div class="ql-ask-ic">${ic}</div>
+<h3>Войти на этом устройстве?</h3>
+<div class="ql-ask-dev"><b>${esc(d.name || 'Неизвестное устройство')}</b><small>${info.ip ? 'IP ' + esc(info.ip) + ' · ' : ''}только что</small></div>
+<div class="ql-warn">⚠️ Подтверждайте, только если <b>вы сами</b> сейчас сканируете код со своего компьютера. Если код прислал кто-то другой — это мошенники, нажмите «Отмена».</div>
+<button type="button" class="sg-btn ql-yes">Войти</button><button type="button" class="sg-btn ql-no">Отмена</button></div>`);
+  let answered = false;
+  const send = async ok => {
+    if (answered) return; answered = true;
+    try { await api('/api/qrlogin/' + id + '/approve', 'POST', { ok }); sgSheetClose(); toast(ok ? '✅ Вход на устройстве подтверждён' : 'Вход отклонён'); }
+    catch (x) { sgSheetClose(); toast(x.message); }
+  };
+  sh.querySelector('.ql-yes').onclick = () => send(true);
+  sh.querySelector('.ql-no').onclick = () => send(false);
+}
+// Ссылка ?qrlogin=… (открыли код обычной камерой телефона)
+window.sgPendingQL = new URLSearchParams(location.search).get('qrlogin');
+// Сканер QR в приложении понимает коды входа
+(() => {
+  const orig = window.sgHandleScan;
+  if (typeof orig === 'function') window.sgHandleScan = function (text) {
+    try { const u = new URL(text); const q = u.searchParams.get('qrlogin'); if (q) { if (u.origin !== location.origin) { toast('Этот QR-код входа от другого сайта'); return true; } closeModal(); sgQrApprove(q); return true; } } catch {}
+    return orig.apply(this, arguments);
+  };
+  const au = window.authUI;
+  if (typeof au === 'function') window.authUI = function () { const r = au.apply(this, arguments); try { qlMountButton(); qlSync(); } catch {} return r; };
+  if (document.readyState !== 'loading') qlMountButton(); else document.addEventListener('DOMContentLoaded', qlMountButton);
+})();
 </script>
 </body>
