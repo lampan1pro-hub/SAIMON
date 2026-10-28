@@ -2266,6 +2266,7 @@ function connect() {
     if (pendingChat) { const id = pendingChat; pendingChat = null; history.replaceState(null, '', '/'); goChat(id); } // открыли по нажатию на уведомление
     if (window.sgPendingU) { const h = sgPendingU; window.sgPendingU = null; history.replaceState(null, '', '/'); openByHandle(String(h).toLowerCase()); } // открыли QR-код профиля
     if (window.sgPendingQL) { const q = sgPendingQL; window.sgPendingQL = null; history.replaceState(null, '', '/'); sgQrApprove(q); } // открыли QR-код входа на компьютере
+    if (window.sgPendingShare) { window.sgPendingShare = false; history.replaceState(null, '', '/'); setTimeout(sgShareOpen, 300); } // поделились из другого приложения
   };
   ws.onmessage = e => onWs(JSON.parse(e.data));
   ws.onclose = () => { $('#conn').hidden = false; if (me) setTimeout(connect, 2000); };
@@ -2339,8 +2340,9 @@ async function onWs(m) {
     renderList(); renderHead();
   } else if (m.type === 'typing') {
     clearTimeout(typing.get(d.chatId));
-    typing.set(d.chatId, setTimeout(() => { typing.delete(d.chatId); if (cur === d.chatId) renderHead(); }, 3000));
+    typing.set(d.chatId, setTimeout(() => { typing.delete(d.chatId); if (cur === d.chatId) renderHead(); if (typeof sgTypDots === 'function') sgTypDots(); }, 3000));
     if (cur === d.chatId) renderHead();
+    if (typeof sgTypDots === 'function') sgTypDots();
   } else if (m.type === 'chat') {
     loadChatsSoon();
   } else if (m.type === 'messageEdited') {
@@ -3883,7 +3885,7 @@ function adminPanel() {
     adminPin = p;
   }
   modal(`<div class="sec" style="padding:0 0 6px">🛠 Админ-панель</div>
-<div class="adm-entry"><button type="button" id="admSt"><span>📊</span><b>Статистика</b><small>онлайн, сообщения, рост</small></button><button type="button" id="admBc"><span>📢</span><b>Рассылка</b><small>сообщение всем</small></button></div>
+<div class="adm-entry"><button type="button" id="admSt"><span>📊</span><b>Статистика</b><small>онлайн, сообщения, рост</small></button><button type="button" id="admBc"><span>📢</span><b>Рассылка</b><small>сообщение всем</small></button><button type="button" id="admSp"><span>🧯</span><b>Антиспам</b><small>кто и за что приостановлен</small></button></div>
 <div class="sec" style="padding:8px 0 4px">Каналы</div><div id="admch" style="max-height:240px;overflow:auto"></div>
 <div class="sec" style="padding:12px 0 4px">Пользователи</div>
 <div class="f"><input id="admq" placeholder="Имя или @юзернейм" autocapitalize="off" autocomplete="off"></div>
@@ -3937,6 +3939,7 @@ function adminPanel() {
   let t; $('#admq').oninput = () => { clearTimeout(t); t = setTimeout(loadUs, 250); };
   $('#admSt').onclick = adminStats;
   $('#admBc').onclick = adminBroadcast;
+  $('#admSp').onclick = adminSpam;
   loadCh(); loadUs(); loadBan();
 }
 
@@ -8474,6 +8477,61 @@ html[data-season="su"] #msgs .m.me:not(.mm):not(.jmb):not(.stk):not(.circm)::aft
 html[data-season="su"] .day{background:linear-gradient(135deg,#ffb703,#fb8500)!important;color:#fff!important}
 html[data-season="su"] .day::before{content:'☀️ '}html[data-season="su"] .day::after{content:' 🌴'}
 html[data-anim="off"] #msgs .m::after,html[data-anim="off"] #msgs .m::before{animation:none!important}
+
+/* ===== Приложение (PWA) и «Поделиться» ===== */
+#pwaBar{display:flex;align-items:center;gap:10px;margin:6px 12px 4px;padding:10px 10px 10px 12px;border-radius:18px;background:linear-gradient(135deg,rgba(52,199,123,.16),rgba(14,165,233,.16));border:1px solid rgba(14,165,233,.25)}
+.pwa-ic img{width:36px;height:36px;border-radius:10px;display:block;box-shadow:0 3px 10px rgba(0,0,0,.2)}
+.pwa-t{flex:1;min-width:0}.pwa-t b{display:block;font-size:14.5px}.pwa-t small{display:block;font-size:12px;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pwa-go{border:0;border-radius:14px;padding:8px 12px;font-family:inherit;font-weight:700;font-size:13px;color:#fff;background:linear-gradient(135deg,#34c77b,#0ea5e9);cursor:pointer}
+.pwa-x{border:0;background:none;color:inherit;opacity:.5;font-size:15px;cursor:pointer;padding:4px}
+.pwa-how{text-align:center;padding:0 4px 8px}
+.pwa-how-ic img{width:72px;height:72px;border-radius:20px;box-shadow:0 8px 22px rgba(0,0,0,.25)}
+.pwa-how h3{margin:10px 0 8px;font-size:19px}
+.pwa-how ol{text-align:left;margin:0 0 10px;padding-left:22px;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.35}
+.pwa-k{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 4px;border-radius:7px;background:rgba(127,127,127,.18);font-size:13px}
+.shr{display:flex;flex-direction:column;gap:10px;max-height:70vh}
+.shr-pv{display:flex;gap:6px;overflow-x:auto;align-items:stretch}
+.shr-pv img,.shr-pv video{width:84px;height:84px;object-fit:cover;border-radius:14px;flex:none}
+.shr-tx{flex:1;min-width:160px;padding:10px 12px;border-radius:14px;background:rgba(127,127,127,.12);font-size:14px;white-space:pre-wrap;word-break:break-word;max-height:84px;overflow:hidden}
+.shr-q{width:100%;box-sizing:border-box;padding:11px 14px;border-radius:14px;border:1px solid rgba(127,127,127,.28);background:transparent;color:inherit;font:inherit;font-size:15px}
+.shr-list{overflow-y:auto;display:flex;flex-direction:column;gap:2px;min-height:120px}
+.shr-c{display:flex;align-items:center;gap:12px;padding:8px 6px;border:0;border-radius:14px;background:none;color:inherit;font-family:inherit;text-align:left;cursor:pointer}
+.shr-c:active{background:rgba(127,127,127,.12)}
+.shr-c[hidden]{display:none}
+.shr-c span{min-width:0}.shr-c b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.shr-c small{font-size:12px;opacity:.6}
+
+/* ===== Живая точка «в сети» и «печатает» на аватарке ===== */
+.av i::after{content:'';position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--on,#34c77b);opacity:0;animation:onPulse 2.6s ease-out infinite;pointer-events:none}
+@keyframes onPulse{0%{transform:scale(.7);opacity:.75}70%{transform:scale(1.9);opacity:0}100%{opacity:0}}
+html[data-anim="off"] .av i::after{display:none}
+.it.typing .av i,#hd.typing .av i{opacity:0;transform:scale(.4)}
+.it.typing .av::after,#hd.typing .av::after{content:'';position:absolute;right:-5px;bottom:-1px;width:24px;height:13px;border-radius:8px;z-index:2;
+  background-color:var(--on,#34c77b);border:2px solid #fff;
+  background-image:radial-gradient(circle,#fff 0 1.6px,transparent 2px),radial-gradient(circle,#fff 0 1.6px,transparent 2px),radial-gradient(circle,#fff 0 1.6px,transparent 2px);
+  background-size:5px 5px;background-repeat:no-repeat;background-position:3px 50%,9px 50%,15px 50%;
+  animation:typDots 1.1s ease-in-out infinite,typIn .25s cubic-bezier(.3,1.6,.5,1) both}
+html[data-theme="dark"] .it.typing .av::after,html[data-theme="dark"] #hd.typing .av::after{border-color:#17212b}
+#hd.typing .av::after{right:-6px;bottom:-2px;transform:scale(.85)}
+@keyframes typDots{0%,100%{background-position:3px 50%,9px 50%,15px 50%}20%{background-position:3px 15%,9px 50%,15px 50%}40%{background-position:3px 50%,9px 15%,15px 50%}60%{background-position:3px 50%,9px 50%,15px 15%}}
+@keyframes typIn{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.it.typing .lm>span{display:none}
+.it.typing .lm::before{content:'печатает…';color:var(--on,#34c77b);font-weight:500}
+html[data-anim="off"] .it.typing .av::after,html[data-anim="off"] #hd.typing .av::after{animation:none}
+
+/* ===== Меню сообщения: размытый фон, сообщение «всплывает» ===== */
+#sgSheetDim.sgblur{background:rgba(0,0,0,.28);-webkit-backdrop-filter:blur(12px) saturate(1.2);backdrop-filter:blur(12px) saturate(1.2)}
+html[data-theme="dark"] #sgSheetDim.sgblur{background:rgba(0,0,0,.42)}
+#msgs.sg-float-box{position:fixed!important;z-index:9000;right:auto!important;bottom:auto!important;margin:0!important;padding:0!important;display:block!important;overflow:visible!important;
+  height:auto!important;background:none!important;-webkit-mask-image:none!important;mask-image:none!important;pointer-events:none;transition:transform .32s cubic-bezier(.3,1.35,.5,1),opacity .2s}
+#msgs.sg-float-box .m{margin:0!important;max-width:none!important;width:100%;box-sizing:border-box;box-shadow:0 16px 40px rgba(0,0,0,.35)!important;animation:none!important}
+#msgs.sg-float-box .m::before,#msgs.sg-float-box .m::after{display:none!important}
+
+/* кружки, стикеры и крупные эмодзи — всегда без фона-пузыря */
+html #msgs .m.circm.circm:not(#_),html #msgs .m.stk.stk:not(#_){background:transparent!important;background-image:none!important;box-shadow:none!important;border:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+#admSp{grid-column:1/-1;background:linear-gradient(135deg,#34c77b,#0f9b8e);box-shadow:0 8px 20px rgba(15,155,142,.3)}
+.spm-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:14px;background:rgba(127,127,127,.08);margin-bottom:6px;font-size:14px}
+.spm-row div{flex:1;min-width:0}.spm-row b{display:block}.spm-row small{display:block;color:var(--t2);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spm-row button{border:0;border-radius:12px;padding:7px 10px;background:rgba(52,199,123,.18);color:#1f9d5c;font-family:inherit;font-weight:600;font-size:12.5px;cursor:pointer}
 </style>
 <script>
 // ===================================================================
@@ -9251,5 +9309,188 @@ function glassLayout() {
   [...room.children].forEach(el => new MutationObserver(() => glassLayout()).observe(el, { attributes: true, attributeFilter: ['hidden', 'style', 'class'] }));
   glassLayout();
 })();
+</script>
+<script>
+// ===================================================================
+//  Приложение на рабочий стол (PWA) + «Поделиться → SAIMON»
+// ===================================================================
+let pwaPrompt = null;
+const pwaStandalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch { return false; } };
+const pwaIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const pwaCan = () => !pwaStandalone() && (!!pwaPrompt || pwaIOS() || /Android/i.test(navigator.userAgent));
+function pwaDismissed() { try { return Date.now() - (+localStorage.getItem('sg_pwa_hide') || 0) < 14 * 864e5; } catch { return false; } }
+function pwaBanner() {
+  const list = $('#list'); if (!list) return;
+  let b = $('#pwaBar');
+  const show = pwaCan() && !pwaDismissed() && (pwaPrompt || pwaIOS());
+  if (!show) { if (b) b.remove(); return; }
+  if (b) return;
+  b = document.createElement('div'); b.id = 'pwaBar';
+  b.innerHTML = `<span class="pwa-ic"><img src="/icon-192.png" alt=""></span><div class="pwa-t"><b>Установите SAIMON</b><small>Иконка на экране, работает как приложение</small></div><button type="button" class="pwa-go">Установить</button><button type="button" class="pwa-x" aria-label="Скрыть">✕</button>`;
+  list.before(b);
+  b.querySelector('.pwa-go').onclick = pwaInstall;
+  b.querySelector('.pwa-x').onclick = () => { try { localStorage.setItem('sg_pwa_hide', String(Date.now())); } catch {} b.remove(); };
+}
+async function pwaInstall() {
+  if (pwaStandalone()) return toast('SAIMON уже установлен 👍');
+  if (pwaPrompt) {
+    const p = pwaPrompt; pwaPrompt = null;
+    try { p.prompt(); const r = await p.userChoice; if (r && r.outcome === 'accepted') { toast('📲 SAIMON устанавливается…'); $('#pwaBar')?.remove(); } } catch {}
+    return;
+  }
+  const ios = pwaIOS();
+  sgSheet(`<div class="pwa-how"><div class="pwa-how-ic"><img src="/icon-192.png" alt=""></div>
+<h3>Установить SAIMON</h3>
+${ios ? `<ol><li>Откройте сайт в <b>Safari</b></li><li>Нажмите кнопку <b>«Поделиться»</b> <span class="pwa-k">⬆︎</span> внизу экрана</li><li>Выберите <b>«На экран „Домой“»</b> <span class="pwa-k">＋</span></li><li>Нажмите <b>«Добавить»</b></li></ol>`
+  : `<ol><li>Откройте меню браузера <span class="pwa-k">⋮</span></li><li>Выберите <b>«Установить приложение»</b> или <b>«Добавить на главный экран»</b></li><li>Подтвердите установку</li></ol>`}
+<div class="sg-note">После установки SAIMON открывается с иконки, без адресной строки, и приходят уведомления.${ios ? '' : ' А в галерее появится «Поделиться → SAIMON».'}</div></div>`);
+}
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); pwaPrompt = e; pwaBanner(); });
+addEventListener('appinstalled', () => { pwaPrompt = null; $('#pwaBar')?.remove(); toast('✅ SAIMON установлен'); });
+
+// --- Поделиться из других приложений
+window.sgPendingShare = new URLSearchParams(location.search).get('share') === '1';
+async function sgShareRead() {
+  if (!('caches' in window)) return null;
+  const c = await caches.open('sg-share');
+  const mr = await c.match('/__share/meta'); if (!mr) return null;
+  const meta = await mr.json().catch(() => null); if (!meta) return null;
+  const files = [];
+  for (let i = 0; i < (meta.n || 0); i++) {
+    const r = await c.match('/__share/' + i); if (!r) continue;
+    const blob = await r.blob(); const name = decodeURIComponent(r.headers.get('x-name') || 'file');
+    files.push(new File([blob], name, { type: blob.type || r.headers.get('content-type') || '' }));
+  }
+  return { meta, files, clear: async () => { for (const k of await c.keys()) await c.delete(k); } };
+}
+async function sgShareOpen() {
+  let sh;
+  try { sh = await sgShareRead(); } catch { sh = null; }
+  if (!sh || (!sh.files.length && !sh.meta.text && !sh.meta.url && !sh.meta.title)) return;
+  const m = sh.meta;
+  let text = m.text || m.title || '';
+  if (m.url && !text.includes(m.url)) text = (text ? text + '\n' : '') + m.url;
+  const files = sh.files.filter(f => /^(image|video)\//.test(f.type));
+  const urls = files.map(f => URL.createObjectURL(f));
+  const canWrite = c => !(c.peer && c.peer.bot) && (c.type !== 'channel' || c.creator === me.id || c.open);
+  const list = [...chats.values()].filter(canWrite).sort((a, b) => ((b.last && b.last.timestamp) || '').localeCompare((a.last && a.last.timestamp) || ''));
+  const row = c => `<button type="button" class="shr-c" data-c="${esc(c.id)}">${c.type === 'direct' && c.peer ? uav(c.peer, 's') : cav(c, 's')}<span><b>${esc(c.type === 'saved' ? 'Избранное' : title(c))}</b><small>${c.type === 'saved' ? 'заметки для себя' : c.type === 'group' ? 'группа' : c.type === 'channel' ? 'канал' : 'личный чат'}</small></span></button>`;
+  const s = sgSheet(`<div class="shr"><div class="shr-pv">${urls.map((u, i) => files[i].type.startsWith('video/') ? `<video src="${u}#t=0.1" muted playsinline></video>` : `<img src="${u}" alt="">`).join('')}${text ? `<div class="shr-tx">${esc(text.slice(0, 300))}</div>` : ''}</div>
+<input class="shr-q" placeholder="Найти чат…" autocomplete="off">
+<div class="shr-list">${list.map(row).join('') || '<div class="sg-note">Чатов пока нет</div>'}</div></div>`, { title: 'Отправить в…' });
+  s.querySelector('.shr-q').oninput = e => { const q = e.target.value.trim().toLowerCase(); s.querySelectorAll('[data-c]').forEach(b => { b.hidden = q && !b.textContent.toLowerCase().includes(q); }); };
+  s.querySelectorAll('[data-c]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.c; sgSheetClose(); urls.forEach(u => URL.revokeObjectURL(u));
+    openChat(id);
+    await new Promise(r => setTimeout(r, 450));
+    if (text) { inp.value = text; try { fit(); paintSendMic(); } catch {} }
+    let ok = 0;
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i], isV = f.type.startsWith('video/');
+      try {
+        if (isV && f.size > 50 * 1024 * 1024) { toast(`${f.name}: видео больше 50 МБ`); continue; }
+        toast(`Отправляю ${i + 1} из ${files.length}…`);
+        let blob = f, dims;
+        if (isV) dims = await videoDims(URL.createObjectURL(f)); else { const r = await prepImage(f, 1600, .85); blob = r.blob; dims = r; }
+        const up = await upload(blob, 'media');
+        if (cur !== id) break;
+        sendNow('', { kind: isV ? 'video' : 'image', url: up.url, w: dims.w, h: dims.h }); ok++;
+      } catch (x) { toast(`${f.name}: ${x.message}`); }
+    }
+    if (files.length) toast(ok ? `✅ Отправлено: ${ok}` : 'Не удалось отправить файлы');
+    if (text) toast(files.length ? 'Текст в поле ввода — нажмите «Отправить»' : 'Проверьте текст и нажмите «Отправить»');
+    sh.clear().catch(() => {});
+  });
+}
+(() => {
+  pwaBanner();
+  // пункт в «Инструментах»
+  const mp = window.myProfile;
+  if (typeof mp === 'function') window.myProfile = function (view) {
+    const r = mp.apply(this, arguments);
+    try {
+      if (view === 'tools' && !pwaStandalone()) {
+        const card = $('#card').querySelector('.tgp-card');
+        if (card && !card.querySelector('[data-pwa]')) {
+          card.insertAdjacentHTML('afterbegin', profRow('📲', 'linear-gradient(135deg,#34c77b,#0ea5e9)', 'Установить приложение', 'Иконка на экране и «Поделиться → SAIMON»', 'data-pwa'));
+          card.querySelector('[data-pwa]').onclick = pwaInstall;
+        }
+      }
+    } catch {}
+    return r;
+  };
+})();
+</script>
+<script>
+
+// ===== «Печатает» на аватарках в списке и в шапке =====
+function sgTypDots() {
+  document.querySelectorAll('#list .it[data-c]').forEach(el => el.classList.toggle('typing', typing.has(el.dataset.c)));
+  const hd = document.getElementById('hd'); if (hd) hd.classList.toggle('typing', !!cur && typing.has(cur));
+}
+(() => {
+  const rl = window.renderListNow; if (typeof rl === 'function') window.renderListNow = function () { const r = rl.apply(this, arguments); try { sgTypDots(); } catch {} return r; };
+  const rh = window.renderHead; if (typeof rh === 'function') window.renderHead = function () { const r = rh.apply(this, arguments); try { sgTypDots(); } catch {} return r; };
+})();
+
+// ===== Меню сообщения: фон размывается, выбранное сообщение всплывает над ним =====
+let sgFloat = null;
+function sgFocusEnd(instant) {
+  const f = sgFloat; if (!f) return; sgFloat = null;
+  clearInterval(f.watch);
+  const dim = document.getElementById('sgSheetDim'); if (dim) dim.classList.remove('sgblur');
+  const done = () => { f.box.remove(); if (f.orig) f.orig.style.visibility = ''; };
+  if (instant) return done();
+  f.box.style.transform = 'translateY(0)'; f.box.style.opacity = '.0';
+  setTimeout(done, 220);
+}
+function sgFocusMsg(id) {
+  sgFocusEnd(true);
+  const el = bubbleEl(id), sh = document.getElementById('sgSheet'), dim = document.getElementById('sgSheetDim');
+  if (!el || !sh || !dim) return;
+  const rc = el.getBoundingClientRect();
+  if (rc.bottom < 0 || rc.top > innerHeight) return;
+  dim.classList.add('sgblur');
+  const box = document.createElement('div');
+  box.id = 'msgs'; box.className = msgsEl.className + ' sg-float-box';
+  const cl = el.cloneNode(true); cl.classList.remove('sel', 'new', 'flash'); cl.removeAttribute('data-id');
+  box.appendChild(cl);
+  box.style.setProperty('left', rc.left + 'px', 'important'); box.style.setProperty('top', rc.top + 'px', 'important'); box.style.setProperty('width', rc.width + 'px', 'important');
+  dim.after(box);
+  el.style.visibility = 'hidden';
+  const f = sgFloat = { box, orig: el };
+  // поднимаем сообщение, чтобы его не закрывала панель снизу
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (sgFloat !== f) return;
+    const sheetTop = innerHeight - sh.offsetHeight, h = box.offsetHeight;
+    const target = Math.max(12, Math.min(rc.top, sheetTop - h - 14));
+    box.style.transform = `translateY(${target - rc.top}px) scale(1.02)`;
+  }));
+  f.sh = sh;
+  f.watch = setInterval(() => { if (sgFloat !== f) return clearInterval(f.watch); if (!sh.isConnected) return sgFocusEnd(); if (sh.classList.contains('on')) f.seen = true; else if (f.seen) sgFocusEnd(); }, 120);
+}
+(() => {
+  const mm = window.msgMenu; if (typeof mm === 'function') window.msgMenu = function (id) { const r = mm.apply(this, arguments); try { if (sgPref('anim', 'full') !== 'off') sgFocusMsg(id); } catch {} return r; };
+  const sc = window.sgSheetClose; if (typeof sc === 'function') window.sgSheetClose = function () { sgFocusEnd(); return sc.apply(this, arguments); };
+})();
+</script>
+<script>
+
+// ===== Админ: антиспам =====
+async function adminSpam() {
+  let d;
+  try { d = await api('/api/admin/spam?' + admQ()); }
+  catch (x) { if (x.message === 'Неверный пароль админ-панели') adminPin = null; toast(x.message); return adminPanel(); }
+  const left = ms => ms >= 3600000 ? Math.round(ms / 3600000) + ' ч' : ms >= 60000 ? Math.round(ms / 60000) + ' мин' : Math.ceil(ms / 1000) + ' сек';
+  modal(`<div class="adm-top"><button type="button" class="tgp-back" id="admBk" aria-label="Назад">‹</button><h2>🧯 Антиспам</h2><button type="button" class="adm-rf" id="spRf" aria-label="Обновить">↻</button></div>
+<div class="adm-note">Сервер сам притормаживает флуд (больше 8 сообщений за 10 сек), одинаковые сообщения (5 раз за 2 мин) и рассылку одной ссылки по 4+ чатам. Пауза растёт: 30 сек → 2 мин → 10 мин → 1 час.</div>
+<div class="adm-h">Сейчас на паузе · ${d.active.length}</div>
+${d.active.length ? d.active.map(a => `<div class="spm-row"><div><b>${esc(a.name)}${a.handle ? ` <small style="display:inline">@${esc(a.handle)}</small>` : ''}</b><small>осталось ${left(a.left)} · нарушение №${a.strikes}</small></div><button type="button" data-um="${a.uid}">Снять</button></div>`).join('') : '<div class="adm-note">Никого — всё спокойно 👍</div>'}
+<div class="adm-h" style="margin-top:10px">Журнал</div>
+${d.log.length ? d.log.map(l => `<div class="spm-row"><div><b>${esc(l.name)}${l.handle ? ` <small style="display:inline">@${esc(l.handle)}</small>` : ''}</b><small>${esc(l.reason)} · ${left(l.dur)} · ${new Date(l.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>${l.sample ? `<small>«${esc(l.sample)}»</small>` : ''}</div></div>`).join('') : '<div class="adm-note">Нарушений пока не было</div>'}`);
+  $('#admBk').onclick = adminPanel;
+  $('#spRf').onclick = adminSpam;
+  $('#card').querySelectorAll('[data-um]').forEach(b => b.onclick = async () => { try { await api('/api/admin/spam/' + b.dataset.um + '/unmute?' + admQ(), 'POST'); toast('Пауза снята'); adminSpam(); } catch (x) { toast(x.message); } });
+}
 </script>
 </body>
