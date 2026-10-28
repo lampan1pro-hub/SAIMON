@@ -50,7 +50,8 @@ const F = {
     gifts: path.join(DIR, 'gifts.json'),
     sessions: path.join(DIR, 'sessions.json'),
     blocks: path.join(DIR, 'blocks.json'),
-    stickerPacks: path.join(DIR, 'sticker_packs.json')
+    stickerPacks: path.join(DIR, 'sticker_packs.json'),
+    bots: path.join(DIR, 'bots.json')
 };
 
 // ---- Хранение ----
@@ -384,7 +385,7 @@ const pub = u => ({
     // юзернеймы, если локальный кэш в браузере когда-то сохранился без них, и их станет не продать.
     handles: u.handles && u.handles.length ? u.handles : [u.handle],
     ...((u.handles || [u.handle]).length > 1 ? { others: u.handles.filter(h => h !== u.handle) } : {}),
-    avatar: privOk(u, 'privPhoto', viewerId()) ? (u.avatar || '') : '', createdAt: u.createdAt, ...(u.handleBuys && Object.keys(u.handleBuys).length ? { buys: u.handleBuys } : {}), online: sockets.has(u.id), ...(!sockets.has(u.id) && u.lastSeen && u.lastSeenMode !== 'nobody' ? { lastSeen: u.lastSeen } : {}), ...(u.bot && { bot: true }), ...(u.acc && { acc: u.acc }), ...(u.banned && { banned: true }), ...(u.rainbowBorder && premiumOn(u) && { rainbowBorder: true }), ...(u.rbColors && u.rainbowBorder ? { rbColors: u.rbColors } : {}), ...(u.pinnedNft && { pinnedNft: u.pinnedNft }), ...(u.pinnedChannel && { pinnedChannel: u.pinnedChannel, pinnedChannelData: (() => { const _ch = read(F.chats).find(c => c.id === u.pinnedChannel && c.type === 'channel'); return _ch ? { id: _ch.id, name: _ch.name, handle: _ch.handle || '', avatar: _ch.avatar || '', subscribers: _ch.members ? _ch.members.length : 0 } : null; })() }), ...(premiumOn(u) && { premium: u.premium, ...(u.nickGrad && { ng: u.nickGrad }) })
+    avatar: privOk(u, 'privPhoto', viewerId()) ? (u.avatar || '') : '', createdAt: u.createdAt, ...(u.handleBuys && Object.keys(u.handleBuys).length ? { buys: u.handleBuys } : {}), online: sockets.has(u.id), ...(!sockets.has(u.id) && u.lastSeen && u.lastSeenMode !== 'nobody' ? { lastSeen: u.lastSeen } : {}), ...(u.bot && { bot: true }), ...(u.custom && { custom: true, ownerId: u.ownerId, ...(u.botApp && { app: u.botApp }) }), ...(u.acc && { acc: u.acc }), ...(u.banned && { banned: true }), ...(u.rainbowBorder && premiumOn(u) && { rainbowBorder: true }), ...(u.rbColors && u.rainbowBorder ? { rbColors: u.rbColors } : {}), ...(u.pinnedNft && { pinnedNft: u.pinnedNft }), ...(u.pinnedChannel && { pinnedChannel: u.pinnedChannel, pinnedChannelData: (() => { const _ch = read(F.chats).find(c => c.id === u.pinnedChannel && c.type === 'channel'); return _ch ? { id: _ch.id, name: _ch.name, handle: _ch.handle || '', avatar: _ch.avatar || '', subscribers: _ch.members ? _ch.members.length : 0 } : null; })() }), ...(premiumOn(u) && { premium: u.premium, ...(u.nickGrad && { ng: u.nickGrad }) })
 });
 const self = u => ({ ...pub(u), avatar: u.avatar || '', email: u.email, ...walletOf(u), lastSeenMode: u.lastSeenMode || 'everybody', lastSeen: u.lastSeen || null,
     archived: u.archived || [],
@@ -547,7 +548,12 @@ app.post('/api/upload', express.raw({ type: () => true, limit: '50mb' }), async 
 });
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-app.get('/api/config', (req, res) => res.json({ vapidKey: vapid ? vapid.pub : '' }));
+// Расшифровка голосовых на сервере — если задан ключ Whisper-совместимого API (OpenAI, Groq и т.п.).
+// Без ключа расшифровка выполняется прямо в браузере получателя (модель Whisper скачивается один раз).
+const STT_KEY = process.env.STT_API_KEY || process.env.OPENAI_API_KEY || '';
+const STT_URL = process.env.STT_URL || 'https://api.openai.com/v1/audio/transcriptions';
+const STT_MODEL = process.env.STT_MODEL || 'whisper-1';
+app.get('/api/config', (req, res) => res.json({ vapidKey: vapid ? vapid.pub : '', stt: !!STT_KEY }));
 
 // ---------- Уведомления (Web Push, без внешних библиотек) ----------
 // Ключи VAPID создаются при первом запуске и хранятся рядом с остальными данными (meta).
@@ -1510,6 +1516,334 @@ app.post('/api/bot/click', async (req, res) => {
     res.json({ success: true });
 });
 
+// ===================================================================
+//  Hours_bot — конструктор ботов: свои боты, команды, кнопки,
+//  мини-приложения на HTML, рассылки, статистика, входящие
+// ===================================================================
+const HOURS_ID = 102;
+const HOURS_HANDLE = 'hours_bot';
+const HOURS_NAME = 'Hours';
+const HOURS_AVATAR = 'data:image/svg+xml;base64,' + Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d"/><stop offset=".5" stop-color="#ff3d8b"/><stop offset="1" stop-color="#7b5cff"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="50" cy="50" r="27" fill="none" stroke="#fff" stroke-width="7"/><path d="M50 34v17l11 7" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg>`).toString('base64');
+VERIFIED.add(HOURS_HANDLE);
+const BOT_HANDLE_RE = /^[a-z][a-z0-9_]{1,26}bot$/;
+const BTN_KINDS = ['cmd', 'url', 'app'];
+const hbLimit = u => premiumOn(u) ? 20 : 5;
+
+function ensureHoursBot() {
+    const users = read(F.users), old = users.find(u => u.id === HOURS_ID);
+    if (old) {
+        if (old.username !== HOURS_NAME || old.avatar !== HOURS_AVATAR) { old.username = HOURS_NAME; old.avatar = HOURS_AVATAR; write(F.users, users); }
+        return;
+    }
+    users.push({ id: HOURS_ID, username: HOURS_NAME, handle: HOURS_HANDLE, bot: true, bio: 'Создавайте своих ботов: команды, кнопки, мини-приложения на HTML, рассылки',
+        avatar: HOURS_AVATAR, mars: 0, password: 'x' + crypto.randomBytes(24).toString('hex'), createdAt: new Date().toISOString() });
+    write(F.users, users);
+}
+const botsDb = () => read(F.bots) || {};
+const isCustomBot = u => !!u && u.bot && u.custom;
+
+// Сообщение от любого бота пользователю (чат создаётся сам)
+function botPost(botId, uid, text, buttons, extra = {}) {
+    const chats = read(F.chats), id = directId(uid, botId);
+    let chat = chats.find(c => c.id === id);
+    if (!chat) {
+        chat = { id, type: 'direct', members: [uid, botId], reads: {}, createdAt: new Date().toISOString() };
+        chats.push(chat); write(F.chats, chats);
+        sendTo([uid], { type: 'chat' });
+    }
+    const msg = { id: crypto.randomUUID(), chatId: id, senderId: botId, text: String(text || '').slice(0, 4000), timestamp: new Date().toISOString(), ...(buttons && buttons.length && { buttons }), ...extra };
+    const msgs = read(F.messages); msgs.push(msg); write(F.messages, msgs);
+    const cs = read(F.chats), c = cs.find(x => x.id === id);
+    if (c) { c.reads = c.reads || {}; c.reads[botId] = msg.timestamp; write(F.chats, cs); }
+    sendTo([uid], { type: 'message', data: msg });
+    sendTo([uid], { type: 'read', data: { chatId: id, userId: botId, at: msg.timestamp } });
+    return msg;
+}
+const hoursSay = (uid, text, buttons) => botPost(HOURS_ID, uid, text, buttons);
+const hb = (t, act, v = '') => ({ t, hb: act, v: String(v) });
+
+function hoursWelcome(uid) {
+    hoursSay(uid, `👋 Привет! Я Hours — помогу создать своего бота.
+
+Что умеют боты:
+• отвечают на команды (/start, /help, /price…) и ключевые слова
+• показывают кнопки: команды, ссылки, мини-приложение
+• мини-приложение — ваша страница на HTML/CSS/JS прямо внутри Saimongram
+• пересылают вам сообщения пользователей, а вы отвечаете от имени бота
+• делают рассылки всем, кто запустил бота, и считают статистику`,
+    [[hb('➕ Создать бота', 'create')], [hb('🤖 Мои боты', 'list')], [hb('📖 Как это работает', 'help')]]);
+}
+
+// Очистка входных данных конструктора
+const clean = (v, n) => String(v == null ? '' : v).slice(0, n);
+function cleanButtons(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows.slice(0, 8).map(r => (Array.isArray(r) ? r : [r]).slice(0, 3).map(b => {
+        const k = BTN_KINDS.includes(b && b.k) ? b.k : 'cmd', t = clean(b && b.t, 40).trim();
+        let v = clean(b && b.v, 400).trim();
+        if (k === 'url' && !/^https?:\/\//i.test(v)) v = '';
+        if (k === 'cmd') v = v ? '/' + v.replace(/^\/+/, '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 32) : '';
+        return t && (k === 'app' || v) ? { t, k, v } : null;
+    }).filter(Boolean)).filter(r => r.length);
+}
+const cleanReply = r => ({ text: clean(r && r.text, 4000), buttons: cleanButtons(r && r.buttons) });
+function cleanCommands(list) {
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, 60).map(c => {
+        const cmd = c && c.cmd ? '/' + String(c.cmd).replace(/^\/+/, '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 32) : '';
+        const kw = String((c && c.kw) || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean).slice(0, 20).map(x => x.slice(0, 40));
+        const r = cleanReply(c);
+        return (cmd.length > 1 || kw.length) && (r.text || r.buttons.length) ? { id: clean(c.id, 40) || crypto.randomUUID(), cmd: cmd.length > 1 ? cmd : '', kw, desc: clean(c.desc, 80), ...r } : null;
+    }).filter(Boolean);
+}
+
+// Что бот отвечает на текст
+function botAnswer(cfg, text) {
+    const t = String(text || '').trim(), low = t.toLowerCase();
+    if (t.startsWith('/')) {
+        const cmd = low.split(/\s/)[0].replace(/@.*$/, '');
+        if (cmd === '/start') return cfg.start;
+        const c = cfg.commands.find(x => x.cmd === cmd);
+        if (c) return c;
+        if (cmd === '/help' && cfg.commands.length) return { text: '📋 Команды:\n' + cfg.commands.filter(x => x.cmd).map(x => `${x.cmd}${x.desc ? ' — ' + x.desc : ''}`).join('\n'), buttons: [] };
+    } else {
+        const c = cfg.commands.find(x => x.kw.some(k => low.includes(k)));
+        if (c) return c;
+    }
+    return cfg.fallback && cfg.fallback.text ? cfg.fallback : null;
+}
+function botSend(bot, cfg, uid, reply) {
+    if (!reply || !(reply.text || (reply.buttons || []).length)) return;
+    const fill = s => String(s || '').replace(/\{name\}/g, (read(F.users).find(u => u.id === uid) || {}).username || '');
+    setTimeout(() => { botPost(bot.id, uid, fill(reply.text) || '⬇️', reply.buttons || []); persist(); }, 250);
+}
+function trackUser(cfg, uid) { if (!cfg.stats.users.includes(uid)) cfg.stats.users.push(uid); }
+
+// Пользователь написал своему (кастомному) боту
+function onCustomBotMessage(chat, uid, msg) {
+    const other = chat.members.find(i => i !== uid);
+    const users = read(F.users), bot = users.find(u => u.id === other);
+    if (!isCustomBot(bot)) return;
+    const db = botsDb(), cfg = db[bot.id];
+    if (!cfg) return;
+    trackUser(cfg, uid); cfg.stats.msgs++;
+    write(F.bots, db);
+    botSend(bot, cfg, uid, botAnswer(cfg, msg.text));
+    // пересылаем владельцу всё, что не команда
+    if (cfg.forward && uid !== bot.ownerId && msg.text && !msg.text.trim().startsWith('/')) {
+        const u = users.find(x => x.id === uid) || {};
+        hoursSay(bot.ownerId, `💬 Сообщение для @${bot.handle}\nот ${u.username || 'пользователя'}${u.handle ? ' (@' + u.handle + ')' : ''}:\n\n${msg.text}`, [[hb('↩️ Ответить от имени бота', 'reply', `${bot.id}:${uid}`)]]);
+    }
+}
+
+const ownBot = (req, res) => {
+    const users = read(F.users), bot = users.find(u => u.id === Number(req.params.id));
+    if (!isCustomBot(bot) || bot.ownerId !== req.uid) { res.status(404).json({ error: 'Бот не найден' }); return null; }
+    return { users, bot, db: botsDb() };
+};
+const botOut = (bot, cfg, full) => ({
+    id: bot.id, name: bot.username, handle: bot.handle, avatar: bot.avatar || '', about: bot.bio || '', createdAt: bot.createdAt,
+    stats: { users: cfg.stats.users.length, msgs: cfg.stats.msgs, opens: cfg.stats.opens, broadcasts: cfg.stats.broadcasts || 0 },
+    hasApp: !!cfg.html, commands: cfg.commands.length,
+    ...(full && { start: cfg.start, fallback: cfg.fallback, commandsList: cfg.commands, html: cfg.html, appTitle: cfg.appTitle, appBtn: cfg.appBtn, forward: cfg.forward, inbox: (cfg.inbox || []).slice(-30).reverse() })
+});
+
+// ---------- Hours_bot: чат ----------
+// Сообщение от имени пользователя в чат с ботом (например, «/start»)
+function userSaysToBot(uid, botId, text) {
+    const chats = read(F.chats), cid = directId(uid, botId);
+    if (!chats.some(c => c.id === cid)) { chats.push({ id: cid, type: 'direct', members: [uid, botId], reads: {}, createdAt: new Date().toISOString() }); write(F.chats, chats); sendTo([uid], { type: 'chat' }); }
+    const msg = { id: crypto.randomUUID(), chatId: cid, senderId: uid, text, timestamp: new Date().toISOString() };
+    const msgs = read(F.messages); msgs.push(msg); write(F.messages, msgs);
+    sendTo([uid], { type: 'message', data: msg });
+    return msg;
+}
+app.post('/api/bots/:id/start', async (req, res) => {
+    const id = Number(req.params.id), uid = req.uid;
+    const bot = read(F.users).find(u => u.id === id);
+    if (!bot || !bot.bot) return res.status(404).json({ error: 'Бот не найден' });
+    if (id === HOURS_ID) {
+        userSaysToBot(uid, HOURS_ID, '/start');
+        hoursWelcome(uid);
+    } else if (isCustomBot(bot)) {
+        if (blockedEither(uid, bot.id)) return res.status(400).json({ error: 'Бот заблокирован' });
+        userSaysToBot(uid, bot.id, '/start');
+        const db = botsDb(), cfg = db[bot.id];
+        if (cfg) { trackUser(cfg, uid); write(F.bots, db); botSend(bot, cfg, uid, cfg.start); }
+    } else return res.status(400).json({ error: 'Этот бот запускается иначе' });
+    await persist();
+    res.json({ success: true });
+});
+
+// Нажатие кнопки-команды в сообщении своего бота
+app.post('/api/bots/:id/click', async (req, res) => {
+    const uid = req.uid, id = Number(req.params.id);
+    const bot = read(F.users).find(u => u.id === id);
+    if (!isCustomBot(bot)) return res.status(404).json({ error: 'Бот не найден' });
+    const msg = read(F.messages).find(m => m.id === String(req.body.messageId) && m.senderId === id && m.chatId === directId(uid, id));
+    const b = msg && msg.buttons && (msg.buttons[Number(req.body.row)] || [])[Number(req.body.col)];
+    if (!b || b.k !== 'cmd') return res.status(400).json({ error: 'Кнопка устарела' });
+    const db = botsDb(), cfg = db[id];
+    if (!cfg) return res.status(404).json({ error: 'Бот не настроен' });
+    cfg.stats.msgs++; trackUser(cfg, uid); write(F.bots, db);
+    botSend(bot, cfg, uid, botAnswer(cfg, b.v) || { text: 'Команда ' + b.v + ' пока не настроена', buttons: [] });
+    res.json({ success: true });
+});
+
+// ---------- Hours Studio: мои боты ----------
+app.get('/api/hours/bots', (req, res) => {
+    const db = botsDb();
+    res.json(read(F.users).filter(u => isCustomBot(u) && u.ownerId === req.uid && db[u.id]).map(u => botOut(u, db[u.id])));
+});
+app.get('/api/hours/bots/:id', (req, res) => {
+    const o = ownBot(req, res); if (!o) return;
+    res.json(botOut(o.bot, o.db[o.bot.id], true));
+});
+app.post('/api/hours/bots', async (req, res) => {
+    const users = read(F.users), me = users.find(u => u.id === req.uid);
+    if (!me) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    const name = clean(req.body.name, 40).trim();
+    const handle = String(req.body.handle || '').trim().replace(/^@/, '').toLowerCase();
+    if (!name) return res.status(400).json({ error: 'Придумайте имя бота' });
+    if (!BOT_HANDLE_RE.test(handle)) return res.status(400).json({ error: 'Юзернейм бота: латиница, цифры и _, 4–30 символов, должен заканчиваться на «bot» (например, weather_bot)' });
+    if (handleTaken(users, handle)) return res.status(400).json({ error: 'Этот юзернейм уже занят' });
+    if (users.filter(u => isCustomBot(u) && u.ownerId === me.id).length >= hbLimit(me)) return res.status(400).json({ error: `Можно создать до ${hbLimit(me)} ботов${premiumOn(me) ? '' : ' (с SAIMONPREMIYM — до 20)'}` });
+    const bot = { id: Date.now(), username: name, handle, bot: true, custom: true, ownerId: me.id, bio: '', avatar: '', mars: 0,
+        password: 'x' + crypto.randomBytes(24).toString('hex'), createdAt: new Date().toISOString() };
+    while (users.some(u => u.id === bot.id)) bot.id++;
+    users.push(bot); write(F.users, users);
+    const db = botsDb();
+    db[bot.id] = { start: { text: `👋 Привет, {name}! Я ${name}.\n\nНапишите /help, чтобы увидеть, что я умею.`, buttons: [] }, fallback: { text: '' }, commands: [],
+        html: '', appTitle: name, appBtn: 'Открыть', forward: true, stats: { users: [], msgs: 0, opens: 0, broadcasts: 0 }, inbox: [], storage: {} };
+    write(F.bots, db);
+    hoursSay(me.id, `✅ Бот ${name} (@${handle}) создан!\n\nДальше: настройте приветствие и команды, а при желании — мини-приложение на HTML.`, [[hb('⚙️ Настроить @' + handle, 'edit', bot.id)], [hb('💬 Открыть чат с ботом', 'chat', bot.id)]]);
+    broadcast({ type: 'chat' });
+    await persist();
+    res.json(botOut(bot, db[bot.id], true));
+});
+app.put('/api/hours/bots/:id', async (req, res) => {
+    const o = ownBot(req, res); if (!o) return;
+    const { users, bot, db } = o, cfg = db[bot.id], b = req.body;
+    if (b.name !== undefined) { const n = clean(b.name, 40).trim(); if (!n) return res.status(400).json({ error: 'Имя не может быть пустым' }); bot.username = n; }
+    if (b.about !== undefined) bot.bio = clean(b.about, 200);
+    if (b.avatar !== undefined) { if (b.avatar !== '' && !imageOk(b.avatar)) return res.status(400).json({ error: 'Некорректное фото' }); bot.avatar = b.avatar; }
+    if (b.start !== undefined) cfg.start = cleanReply(b.start);
+    if (b.fallback !== undefined) cfg.fallback = cleanReply(b.fallback);
+    if (b.commands !== undefined) cfg.commands = cleanCommands(b.commands);
+    if (b.forward !== undefined) cfg.forward = !!b.forward;
+    if (b.appTitle !== undefined) cfg.appTitle = clean(b.appTitle, 40);
+    if (b.appBtn !== undefined) cfg.appBtn = clean(b.appBtn, 24).trim() || 'Открыть';
+    if (b.html !== undefined) {
+        const h = String(b.html || '');
+        if (h.length > 300000) return res.status(400).json({ error: 'HTML слишком большой (максимум 300 КБ)' });
+        cfg.html = h;
+    }
+    bot.botApp = cfg.html ? cfg.appBtn : undefined;
+    write(F.users, users); write(F.bots, db);
+    broadcast({ type: 'chat' });
+    await persist();
+    res.json(botOut(bot, cfg, true));
+});
+app.delete('/api/hours/bots/:id', async (req, res) => {
+    const o = ownBot(req, res); if (!o) return;
+    const id = o.bot.id;
+    write(F.users, o.users.filter(u => u.id !== id));
+    delete o.db[id]; write(F.bots, o.db);
+    const chats = read(F.chats), gone = new Set(chats.filter(c => c.members.includes(id)).map(c => c.id));
+    write(F.chats, chats.filter(c => !gone.has(c.id)));
+    write(F.messages, read(F.messages).filter(m => !gone.has(m.chatId)));
+    broadcast({ type: 'chat' });
+    await persist();
+    res.json({ success: true });
+});
+// Рассылка всем, кто запускал бота
+const lastCast = new Map();
+app.post('/api/hours/bots/:id/broadcast', async (req, res) => {
+    const o = ownBot(req, res); if (!o) return;
+    const text = clean(req.body.text, 4000).trim();
+    const buttons = cleanButtons(req.body.buttons);
+    if (!text) return res.status(400).json({ error: 'Напишите текст рассылки' });
+    const wait = 60000 - (Date.now() - (lastCast.get(o.bot.id) || 0));
+    if (wait > 0) return res.status(429).json({ error: `Следующая рассылка — через ${Math.ceil(wait / 1000)} с` });
+    lastCast.set(o.bot.id, Date.now());
+    const cfg = o.db[o.bot.id];
+    const to = cfg.stats.users.filter(uid => o.users.some(u => u.id === uid) && !blockedEither(uid, o.bot.id));
+    to.forEach(uid => botPost(o.bot.id, uid, text, buttons));
+    cfg.stats.broadcasts = (cfg.stats.broadcasts || 0) + 1;
+    write(F.bots, o.db);
+    await persist();
+    res.json({ success: true, count: to.length });
+});
+// Ответ владельца пользователю от имени бота
+app.post('/api/hours/bots/:id/reply', async (req, res) => {
+    const o = ownBot(req, res); if (!o) return;
+    const to = Number(req.body.to), text = clean(req.body.text, 4000).trim();
+    if (!text) return res.status(400).json({ error: 'Напишите ответ' });
+    if (!read(F.chats).some(c => c.id === directId(to, o.bot.id))) return res.status(400).json({ error: 'Этот пользователь не писал боту' });
+    if (blockedEither(to, o.bot.id)) return res.status(400).json({ error: 'Пользователь заблокировал бота' });
+    botPost(o.bot.id, to, text);
+    await persist();
+    res.json({ success: true });
+});
+
+// ---------- Мини-приложения ----------
+const botForApp = (req, res) => {
+    const bot = read(F.users).find(u => u.id === Number(req.params.id)), db = botsDb(), cfg = bot && db[bot.id];
+    if (!isCustomBot(bot) || !cfg) { res.status(404).json({ error: 'Бот не найден' }); return null; }
+    return { bot, db, cfg };
+};
+app.get('/api/bots/:id/app', async (req, res) => {
+    const o = botForApp(req, res); if (!o) return;
+    if (!o.cfg.html) return res.status(404).json({ error: 'У бота нет приложения' });
+    o.cfg.stats.opens++; trackUser(o.cfg, req.uid); write(F.bots, o.db);
+    res.json({ html: o.cfg.html, title: o.cfg.appTitle || o.bot.username, name: o.bot.username, handle: o.bot.handle, avatar: o.bot.avatar || '' });
+});
+// Hours.sendData(...) — данные из приложения приходят владельцу
+const appRate = new Map();
+const rateOk = (key, ms) => { const t = appRate.get(key) || 0; if (Date.now() - t < ms) return false; appRate.set(key, Date.now()); return true; };
+app.post('/api/bots/:id/app/data', async (req, res) => {
+    const o = botForApp(req, res); if (!o) return;
+    if (!rateOk('d' + o.bot.id + ':' + req.uid, 1500)) return res.status(429).json({ error: 'Слишком часто' });
+    const data = clean(typeof req.body.data === 'string' ? req.body.data : JSON.stringify(req.body.data ?? ''), 4000);
+    const u = read(F.users).find(x => x.id === req.uid) || {};
+    o.cfg.inbox = [...(o.cfg.inbox || []), { from: req.uid, name: u.username || '', handle: u.handle || '', data, at: new Date().toISOString() }].slice(-200);
+    write(F.bots, o.db);
+    if (o.cfg.forward) hoursSay(o.bot.ownerId, `📦 Данные из приложения @${o.bot.handle}\nот ${u.username || 'пользователя'}${u.handle ? ' (@' + u.handle + ')' : ''}:\n\n${data}`, [[hb('↩️ Ответить от имени бота', 'reply', `${o.bot.id}:${req.uid}`)]]);
+    await persist();
+    res.json({ success: true });
+});
+// Hours.sendMessage(text) — бот пишет пользователю в чат
+app.post('/api/bots/:id/app/message', async (req, res) => {
+    const o = botForApp(req, res); if (!o) return;
+    if (!rateOk('m' + o.bot.id + ':' + req.uid, 1000)) return res.status(429).json({ error: 'Слишком часто' });
+    const text = clean(req.body.text, 2000).trim();
+    if (!text) return res.status(400).json({ error: 'Пустое сообщение' });
+    if (blockedEither(req.uid, o.bot.id)) return res.status(400).json({ error: 'Бот заблокирован' });
+    trackUser(o.cfg, req.uid); write(F.bots, o.db);
+    botPost(o.bot.id, req.uid, text, cleanButtons(req.body.buttons));
+    await persist();
+    res.json({ success: true });
+});
+// Hours.storage — личное хранилище пользователя в приложении бота
+app.get('/api/bots/:id/app/storage', (req, res) => {
+    const o = botForApp(req, res); if (!o) return;
+    res.json(((o.cfg.storage || {})[req.uid]) || {});
+});
+app.put('/api/bots/:id/app/storage', async (req, res) => {
+    const o = botForApp(req, res); if (!o) return;
+    const key = clean(req.body.key, 64).trim();
+    if (!key) return res.status(400).json({ error: 'Нужен ключ' });
+    const st = o.cfg.storage = o.cfg.storage || {}, mine = st[req.uid] = st[req.uid] || {};
+    if (req.body.value === null || req.body.value === undefined) delete mine[key];
+    else {
+        const v = clean(typeof req.body.value === 'string' ? req.body.value : JSON.stringify(req.body.value), 4000);
+        if (!(key in mine) && Object.keys(mine).length >= 100) return res.status(400).json({ error: 'Максимум 100 ключей' });
+        mine[key] = v;
+    }
+    write(F.bots, o.db);
+    res.json({ success: true });
+});
+
 // ---------- Блокировка пользователей ----------
 const blocksOf = uid => read(F.blocks)[uid] || [];
 const iBlocked = (a, b) => blocksOf(a).includes(b);            // a заблокировал b
@@ -2127,6 +2461,58 @@ app.get('/api/messages/:messageId/comments', (req, res) => {
     const ix = lazyIdx(), list = p.msg.comments || [];
     res.json({ count: list.length, comments: list.slice(-200).map(c => cmOut(c, ix)) });
 });
+// ---------- Расшифровка голосовых и кружков ----------
+function trTarget(req, res) {
+    const msgs = read(F.messages), m = msgs.find(x => x.id === req.params.messageId);
+    const chat = m && read(F.chats).find(c => c.id === m.chatId);
+    if (!m || !chat || !chat.members.includes(req.uid)) { res.status(404).json({ error: 'Сообщение не найдено' }); return null; }
+    if (!m.media || !(m.media.kind === 'voice' || m.media.circle)) { res.status(400).json({ error: 'Это не голосовое сообщение' }); return null; }
+    return { msgs, m, chat };
+}
+function saveTranscript(t, text) {
+    t.m.media.tr = String(text || '').trim().slice(0, 4000) || '…';
+    write(F.messages, t.msgs);
+    sendTo(t.chat.members, { type: 'transcript', data: { chatId: t.chat.id, messageId: t.m.id, text: t.m.media.tr } });
+    return t.m.media.tr;
+}
+// Сохранить расшифровку, сделанную в браузере (первая сохранённая — общая для всех участников)
+app.post('/api/messages/:messageId/transcript', async (req, res) => {
+    const t = trTarget(req, res); if (!t) return;
+    if (t.m.media.tr) return res.json({ text: t.m.media.tr });
+    const text = saveTranscript(t, req.body.text);
+    await persist();
+    res.json({ text });
+});
+// Расшифровать на сервере (если настроен ключ)
+const trBusy = new Map();
+app.post('/api/messages/:messageId/transcribe', async (req, res) => {
+    const t = trTarget(req, res); if (!t) return;
+    if (t.m.media.tr) return res.json({ text: t.m.media.tr });
+    if (!STT_KEY || typeof fetch !== 'function' || typeof FormData !== 'function') return res.status(501).json({ error: 'not_configured' });
+    const id = t.m.id;
+    try {
+        if (!trBusy.has(id)) trBusy.set(id, (async () => {
+            const name = path.basename(t.m.media.url), buf = await fs.promises.readFile(path.join(UP, name));
+            const fd = new FormData();
+            fd.append('file', new Blob([buf]), name);
+            fd.append('model', STT_MODEL);
+            fd.append('response_format', 'json');
+            const r = await fetch(STT_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + STT_KEY }, body: fd });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error((d.error && d.error.message) || 'STT ' + r.status);
+            return String(d.text || '');
+        })().finally(() => setTimeout(() => trBusy.delete(id), 1000)));
+        const text = await trBusy.get(id);
+        const fresh = trTarget(req, res); if (!fresh) return;
+        const out = fresh.m.media.tr || saveTranscript(fresh, text);
+        await persist();
+        res.json({ text: out });
+    } catch (e) {
+        console.error('transcribe:', e.message);
+        res.status(502).json({ error: 'Не удалось расшифровать: ' + e.message });
+    }
+});
+
 app.post('/api/messages/:messageId/comments', async (req, res) => {
     const p = postFor(req, res); if (!p) return;
     const text = String(req.body.text || '').trim().slice(0, 500);
@@ -2618,7 +3004,7 @@ wss.on('connection', ws => {
                 if (chat.type === 'channel' && chat.creator !== uid && !chat.open) return; // в канал пишет только автор (в текстовом — все)
                 if (chat.type === 'direct') {
                     const other = chat.members.find(i => i !== uid);
-                    if (other === BOT_ID) return; // с ботом общаются кнопками
+                    if (other === BOT_ID || other === HOURS_ID) return; // с этими ботами общаются кнопками
                     if (other && blockedEither(uid, other)) {
                         return ws.send(JSON.stringify({ type: 'error', data: { cid: m.cid, text: iBlocked(uid, other) ? 'Вы заблокировали этого пользователя' : 'Не удалось отправить сообщение' } }));
                     }
@@ -2671,6 +3057,7 @@ wss.on('connection', ws => {
                 write(F.messages, msgs);
                 sendTo(chat.members, { type: 'message', data: outMsg(msg, chat), cid: m.cid ? String(m.cid).slice(0, 40) : undefined }); // только участникам чата; cid — чтобы отправитель заменил своё временное
                 notifyMessage(chat, msg);
+                if (chat.type === 'direct') onCustomBotMessage(chat, uid, msg);
 
             } else if (m.type === 'read') {
                 if (chat.type === 'channel' && !chat.open) markViews(chat, uid);
@@ -2778,10 +3165,10 @@ async function init() {
         });
     }
     // Чего нет в базе (первый запуск) — берём из локальных файлов, иначе пустой список
-    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks', 'sticker_packs']) {
+    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks', 'sticker_packs', 'bots']) {
         if (mem[k] === undefined) {
             const d = loadFile(F[k]);
-            mem[k] = JSON.stringify((k === 'sessions' || k === 'blocks') && Array.isArray(d) ? {} : d); // объекты {токен: …}, {кто: [кого]}
+            mem[k] = JSON.stringify((k === 'sessions' || k === 'blocks' || k === 'bots') && Array.isArray(d) ? {} : d); // объекты {токен: …}, {кто: [кого]}
             if (pool) dirty.add(k);
         }
     }
@@ -2795,6 +3182,7 @@ async function init() {
     purgeBotAccounts();
     ensureBot();
     ensureSaimonChatBot();
+    ensureHoursBot();
     await ensureVapid();
     await persist();
 

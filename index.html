@@ -2250,6 +2250,7 @@ function connect() {
     }
     opened = true;
     if (pendingChat) { const id = pendingChat; pendingChat = null; history.replaceState(null, '', '/'); goChat(id); } // открыли по нажатию на уведомление
+    if (window.sgPendingU) { const h = sgPendingU; window.sgPendingU = null; history.replaceState(null, '', '/'); openByHandle(String(h).toLowerCase()); } // открыли QR-код профиля
   };
   ws.onmessage = e => onWs(JSON.parse(e.data));
   ws.onclose = () => { $('#conn').hidden = false; if (me) setTimeout(connect, 2000); };
@@ -2387,6 +2388,8 @@ async function onWs(m) {
     logout('Сессия устарела, войдите снова.');
   } else if (['call_offer','call_answer','call_ice','call_end','call_reject','call_busy','call_cam'].includes(m.type)) {
     onCallWs(m);
+  } else if (m.type === 'transcript') {
+    if (window.sgOnTranscript) sgOnTranscript(d);
   } else if (m.type === 'archive') {
     me = { ...me, archived: d.archived || [] }; save(); renderList();
   } else if (m.type === 'callUpdate') {
@@ -2568,14 +2571,16 @@ function renderHead() {
   const isBot = c.type === 'direct' && c.peer && c.peer.bot;
   const isSaimonChat = c.type === 'direct' && c.peer && c.peer.handle === 'saimon_chat';
   const iBlock = c.type === 'direct' && c.peer && blocked.has(c.peer.id);
-  const canWrite = !iBlock && !isBot && (c.type !== 'channel' || c.creator === me.id || c.open); // в канал пишет только автор
+  const isCustomBot = isBot && c.peer.custom, isHours = isBot && c.peer.id === 102;
+  const canWrite = !iBlock && (!isBot || (isCustomBot && !!c.last)) && (c.type !== 'channel' || c.creator === me.id || c.open); // в канал пишет только автор; своим ботам — после «Начать»
   $('#form').hidden = !canWrite; $('#rdonly').hidden = canWrite;
-  if (!canWrite) setHtml($('#rdonly'), isSaimonChat ? '🔒 Системные уведомления' : isBot ? '<button type="button" class="btn" id="botstart">▶️ Старт</button>' : iBlock ? 'Вы заблокировали этого пользователя · <button class="lnk" id="unb">Разблокировать</button>' : 'Писать в канал может только его автор');
+  if (!canWrite) setHtml($('#rdonly'), isSaimonChat ? '🔒 Системные уведомления' : isBot ? (isHours && c.last ? '<button type="button" class="btn" id="hbstudio">🛠 Hours Studio — мои боты</button>' : `<button type="button" class="btn" id="botstart">▶️ ${isCustomBot ? 'Начать' : 'Старт'}</button>`) : iBlock ? 'Вы заблокировали этого пользователя · <button class="lnk" id="unb">Разблокировать</button>' : 'Писать в канал может только его автор');
   setHtml($('#hd'), cav(c, 's') +
     `<div class="im">${titleH(c)}<small class="${t || on ? 'ty' : ''}">${sub}</small></div>`);
   const canCall = c.type === 'direct' && c.peer && !c.peer.bot;
   $('#callBtn').hidden = !canCall;
   $('#vcallBtn').hidden = !canCall;
+  if (window.hbPaintAppBtn) hbPaintAppBtn(canWrite ? c : null);
   renderPins();
 }
 $('#hd').onclick = () => {
@@ -2624,7 +2629,7 @@ const fmtDur = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s /
 const mediaHtml = md => {
   if (md.kind === 'voice') { // голосовое: круглая кнопка, волна (яркая часть = прослушано), таймер
     const wv = waveBars(md.url);
-    return `<div class="vc" data-u="${esc(md.url)}"><button type="button" class="vcb" aria-label="Прослушать">▶</button><div class="vcb2"><div class="vctr"><div class="vcbar"><span class="wv">${wv}</span><i><span class="wv">${wv}</span></i></div></div><span class="vct" data-d="${md.dur || 0}">${fmtDur(md.dur)}</span></div></div>`; }
+    return `<div class="vc" data-u="${esc(md.url)}"><button type="button" class="vcb" aria-label="Прослушать">▶</button><div class="vcb2"><div class="vctr"><div class="vcbar"><span class="wv">${wv}</span><i><span class="wv">${wv}</span></i></div></div><span class="vct" data-d="${md.dur || 0}">${fmtDur(md.dur)}</span></div>${sgTrBtn(md)}</div>`; }
   if (md.circle) return circleHtml(md);
   if (md.sticker) return `<img class="ph" src="${esc(md.url)}" alt="стикер" loading="lazy" decoding="async" style="width:130px;height:130px;object-fit:contain;background:transparent">`;
   const ar = md.w && md.h ? `aspect-ratio:${md.w}/${md.h};` : '';
@@ -2729,7 +2734,7 @@ function bubbleHtml(c, l, i) {
   // само сообщение (как в Telegram), а не отдельной кнопкой с тремя точками — см. msgsEl touch-обработчики.
   const fwdH = m.fwd ? `<div class="fwd">↪️ Переслано от <b>${esc(m.fwd.name)}</b></div>` : '';
   const rpH = m.reply ? `<div class="rp" data-r="${esc(m.reply.id)}"><b>${esc(m.reply.name)}</b><span>${m.reply.mk === 'circle' ? '⭕ Видеосообщение' : m.reply.mk === 'voice' ? '🎤 Голосовое сообщение' : m.reply.mk === 'sticker' ? '🎭 Стикер' : m.reply.mk === 'image' ? '📷 Фото' : m.reply.mk === 'video' ? '🎥 Видео' : m.reply.mk === 'gift' ? '🎁 Подарок' : esc(m.reply.text || '')}</span></div>` : '';
-  return `<div class="m ${mine && !ch ? 'me' : ''} ${ch ? '' : grpCls(l, i)} ${m.media || m.gift ? 'mm' : ''} ${ch ? 'ch' : ''} ${m.pending ? 'pending' : ''} ${m.media && m.media.sticker ? 'stk' : ''} ${m.media && m.media.circle ? 'circm' : ''} ${m.mentions && m.mentions.includes(me.id) ? 'ment' : ''}" data-id="${esc(m.id)}"${m.cid ? ` data-cid="${esc(m.cid)}"` : ''}>${who}${fwdH}${rpH}${m.call ? callBubble(m.call, mine) : ''}${m.gift ? giftBubble(m.gift, mine, m.text) : ''}${m.prem ? premBubble(m.prem, mine) : ''}${m.media ? mediaHtml(m.media) : ''}${m.text && !m.gift ? `<span class="tx">${linkify(m.text)}</span>` : ''}${btnsHtml(m)}${rxHtml(m)}<time>${ch && m.views != null ? `<span class="vw" data-vw>👁 ${fmtViews(m.views)}</span>` : ''}${m.edited ? 'изм. ' : ''}${hm(m.timestamp)}${st}</time>${ch ? cmRow(m) : ''}</div>`;
+  return `<div class="m ${mine && !ch ? 'me' : ''} ${ch ? '' : grpCls(l, i)} ${m.media || m.gift ? 'mm' : ''} ${ch ? 'ch' : ''} ${m.pending ? 'pending' : ''} ${m.media && m.media.sticker ? 'stk' : ''} ${m.media && m.media.circle ? 'circm' : ''} ${m.mentions && m.mentions.includes(me.id) ? 'ment' : ''}" data-id="${esc(m.id)}"${m.cid ? ` data-cid="${esc(m.cid)}"` : ''}>${who}${fwdH}${rpH}${m.call ? callBubble(m.call, mine) : ''}${m.gift ? giftBubble(m.gift, mine, m.text) : ''}${m.prem ? premBubble(m.prem, mine) : ''}${m.media ? mediaHtml(m.media) : ''}${sgTrHtml(m)}${m.text && !m.gift ? `<span class="tx">${linkify(m.text)}</span>` : ''}${btnsHtml(m)}${rxHtml(m)}<time>${ch && m.views != null ? `<span class="vw" data-vw>👁 ${fmtViews(m.views)}</span>` : ''}${m.edited ? 'изм. ' : ''}${hm(m.timestamp)}${st}</time>${ch ? cmRow(m) : ''}</div>`;
 }
 // @юзернеймы в тексте — кликабельные (ищут и «второстепенные» handles)
 const HNDL_RE = /(^|[^a-zA-Z0-9_])@([a-z0-9_]{3,20})/g;
@@ -2766,6 +2771,8 @@ function rerender() {
 }
 msgsEl.onclick = async e => {
   if (e.target.closest('[data-callm]')) { onCallBubbleClick(e.target.closest('.m')); return; }
+  const trb = e.target.closest('[data-trb]');
+  if (trb) { const mm = trb.closest('.m'); if (mm && mm.dataset.id) sgTranscribe(mm.dataset.id); return; }
   const circ = e.target.closest('.circ');
   if (circ) { circToggle(circ); return; }
   const ld = e.target.closest('.sgload');
@@ -2779,6 +2786,17 @@ msgsEl.onclick = async e => {
   const bb = e.target.closest('.bbtn');
   if (bb) {
     const row = bb.closest('.m');
+    const mm = (msgs.get(cur) || []).find(x => x.id === row.dataset.id), bo = mm && mm.buttons && (mm.buttons[+bb.dataset.r] || [])[+bb.dataset.k];
+    if (bo && bo.hb) { hbAction(bo.hb, bo.v); return; }  // кнопки Hours_bot открывают Hours Studio
+    const sc = chats.get(cur);
+    if (bo && sc && sc.peer && sc.peer.custom && mm.senderId === sc.peer.id) { // кнопки своих ботов
+      if (bo.k === 'url') { if (/^https?:\/\//i.test(bo.v) && confirm('Бот предлагает открыть ссылку:\n' + bo.v)) window.open(bo.v, '_blank', 'noopener'); return; }
+      if (bo.k === 'app') { hbOpenApp(sc.peer.id); return; }
+      bb.disabled = true;
+      try { await api(`/api/bots/${sc.peer.id}/click`, 'POST', {messageId: row.dataset.id, row: bb.dataset.r, col: bb.dataset.k}); } catch (x) { toast(x.message); }
+      bb.disabled = false;
+      return;
+    }
     bb.disabled = true;
     try {
       const r = await api('/api/bot/click', 'POST', {messageId: row.dataset.id, row: bb.dataset.r, col: bb.dataset.k});
@@ -3436,7 +3454,7 @@ const profRow = (ic, bg, t, sub, attr) => `<button type="button" class="tgs-row"
 function myProfile(view = 'hub') {
   const binders = [];
   if (typeof view !== 'string' || !PROF_TITLES[view]) view = 'hub';
-  const top = `<div class="tgp-top"><button type="button" class="tgp-back" ${view === 'hub' ? 'data-x' : 'data-back'} aria-label="Назад">‹</button><span class="tgp-title">${PROF_TITLES[view]}</span><span class="tgp-sp"></span></div>`;
+  const top = `<div class="tgp-top"><button type="button" class="tgp-back" ${view === 'hub' ? 'data-x' : 'data-back'} aria-label="Назад">‹</button><span class="tgp-title">${PROF_TITLES[view]}</span>${view === 'hub' ? `<button type="button" class="tgp-qr" data-myqr aria-label="QR-код"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg></button>` : '<span class="tgp-sp"></span>'}</div>`;
   const head = `<div class="tgp-head"><div id="pav">${uav(me, 'l')}</div>
 <div class="tgp-photo"><button type="button" class="lnk" id="pph">Сменить фото</button><button type="button" class="lnk" id="prm" ${me.avatar ? '' : 'hidden'}>Убрать</button></div>
 <h2>${ngName(me)}${me.verified ? BADGE : ''}${me.premium ? PREM_IC : ''}${accH(me.acc)}</h2>
@@ -3452,6 +3470,8 @@ ${profRow('👤', '#3390ec', 'Аккаунт', 'Имя, юзернейм, «О �
 ${profRow('💎', '#8e44ff', 'SAIMONPREMIYM', me.premium ? (me.premium === 'forever' ? 'Подписка навсегда' : 'Активна до ' + new Date(me.premium).toLocaleDateString('ru-RU')) : 'Подписки нет', 'data-go="premium"')}
 </div>
 <div class="tgp-card">
+${profRow('🤖', 'linear-gradient(135deg,#ff8a3d,#ff3d8b,#7b5cff)', 'Hours — свои боты<span class="sgnew">NEW</span>', 'Команды, кнопки, мини-приложения на HTML', 'data-hbstudio')}
+${profRow('🔳', 'linear-gradient(135deg,#3d6bff,#b23cff)', 'QR-код профиля<span class="sgnew">NEW</span>', 'Покажите другу — откроет ваш профиль', 'data-myqr')}
 ${profRow('✨', 'linear-gradient(135deg,#a35bff,#ff5bb0)', 'Оформление<span class="sgnew">NEW</span>', 'Текст, пузырьки, цвет сообщений', 'data-sg="appearance"')}
 ${profRow('🎨', '#ff6b35', 'Обои и тема', 'Обои чата, цветовая тема', 'data-go="customization"')}
 ${profRow('🔔', '#ff9f0a', 'Звуки и вибрация<span class="sgnew">NEW</span>', 'Сообщения, мелодия звонка', 'data-sg="sounds"')}
@@ -3578,6 +3598,8 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
   };
   $('#card').querySelectorAll('[data-go]').forEach(b => b.onclick = () => myProfile(b.dataset.go));
   $('#card').querySelectorAll('[data-sg]').forEach(b => b.onclick = () => sgSettings(b.dataset.sg));
+  $('#card').querySelectorAll('[data-myqr]').forEach(b => b.onclick = () => sgShowQR(me));
+  $('#card').querySelectorAll('[data-hbstudio]').forEach(b => b.onclick = () => hbStudio());
   $('#card').querySelectorAll('[data-back]').forEach(b => b.onclick = () => myProfile('hub'));
 
   // Мульти-аккаунт: переключение
@@ -3785,7 +3807,7 @@ function userProfile(u) {
   const isMe = u.id === me.id, isBl = blocked.has(u.id);
   const isSC = u.handle === 'saimon_chat'; // SAIMON-CHAT — только уведомления, без лишних кнопок
   profileModal(`<div class="tgp">
-<div class="tgp-top"><button type="button" class="tgp-back" data-x aria-label="Назад">‹</button><span class="tgp-title">Профиль</span><span class="tgp-sp"></span></div>
+<div class="tgp-top"><button type="button" class="tgp-back" data-x aria-label="Назад">‹</button><span class="tgp-title">Профиль</span>${u.handle && !u.bot ? `<button type="button" class="tgp-qr" data-uqr aria-label="QR-код"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg></button>` : '<span class="tgp-sp"></span>'}</div>
 <div class="tgp-head">${uav(u, 'l', true)}
 <h2>${ngName(u)}${u.verified ? BADGE : ''}${u.premium ? PREM_IC : ''}${accH(u.acc)}</h2>
 <div class="tgp-sub">${isSC ? 'Системный бот' : u.online ? 'в сети' : 'был(а) недавно'}</div>${u.premium ? '<div class="tgp-sub tgp-prem">💎 Премиум пользователь</div>' : ''}
@@ -3812,6 +3834,7 @@ ${isSC ? '' : '<div class="tgp-sec">Подарки</div><div class="gg tgp-gifts
   if ($('#myrb')) $('#myrb').onclick = async () => { await toggleRainbow(); userProfile(me); };
   if ($('#wb')) $('#wb').onclick = () => toggleBlock(u, true);
   if ($('#wr')) $('#wr').onclick = () => openUser(u.id);
+  $('#card').querySelectorAll('[data-uqr]').forEach(b => b.onclick = () => sgShowQR(u));
   if ($('#wg')) $('#wg').onclick = () => shop(u);
   if ($('#gpr')) $('#gpr').onclick = () => premiumShop(u);
   // Тап по второстепенному юзернейму: цена и дата покупки
@@ -3929,9 +3952,15 @@ $('#newGroup').onclick = () => {
   modal(`<h2 style="margin-bottom:12px">Создать</h2>
 <div class="row" style="margin-top:0"><button class="btn g" id="mkg">👥 Новая группа</button></div>
 <div class="row"><button class="btn g" id="mkc">📢 Новый канал</button></div>
+<div class="row"><button class="btn g" id="mkbot">🤖 Создать бота (Hours)</button></div>
+<div class="row"><button class="btn g" id="mkscan">📷 Сканировать QR-код</button></div>
+<div class="row"><button class="btn g" id="mkqr">🔳 Мой QR-код</button></div>
 <div class="row"><button type="button" class="btn g" data-x>Отмена</button></div>`);
   $('#mkg').onclick = newGroup;
   $('#mkc').onclick = newChannel;
+  $('#mkscan').onclick = () => { closeModal(); sgScanQR(); };
+  $('#mkbot').onclick = () => { closeModal(); hbCreate(); };
+  $('#mkqr').onclick = () => { closeModal(); sgShowQR(me); };
 };
 
 /* ---------- Каналы ---------- */
@@ -4958,9 +4987,11 @@ async function toggleBlock(u, reopen) {
   } catch (x) { toast(x.message); }
 }
 $('#rdonly').onclick = async e => {
+  if (e.target.id === 'hbstudio') { hbStudio(); return; }
   if (e.target.id === 'botstart') {
     e.target.disabled = true;
-    try { await api('/api/bot/start', 'POST', {}); } catch (x) { toast(x.message); }
+    const sc = chats.get(cur), pid = sc && sc.peer && sc.peer.id;
+    try { await api(pid && pid !== 100 ? `/api/bots/${pid}/start` : '/api/bot/start', 'POST', {}); } catch (x) { toast(x.message); }
     e.target.disabled = false;
     return;
   }
@@ -5911,7 +5942,7 @@ function sgSheet(html, opts = {}) {
   requestAnimationFrame(() => requestAnimationFrame(() => { dim.classList.add('on'); sh.classList.add('on'); }));
   // Смахнуть вниз, чтобы закрыть
   let y0 = null, dy = 0;
-  sh.addEventListener('pointerdown', e => { if (e.target.closest('button') && !e.target.closest('.grab')) return; y0 = e.clientY; dy = 0; sh.style.transition = 'none'; });
+  sh.addEventListener('pointerdown', e => { if (e.target.closest('button,input,textarea,select,label,.sgfl') && !e.target.closest('.grab')) return; y0 = e.clientY; dy = 0; sh.style.transition = 'none'; });
   sh.addEventListener('pointermove', e => { if (y0 == null) return; dy = Math.max(0, e.clientY - y0); sh.style.transform = `translateY(${dy}px)`; });
   const up = () => { if (y0 == null) return; y0 = null; sh.style.transition = ''; sh.style.transform = ''; if (dy > 80) sgSheetClose(); };
   sh.addEventListener('pointerup', up); sh.addEventListener('pointercancel', up);
@@ -5956,7 +5987,7 @@ function sgPlaySound(kind) {
 }
 window.sgOnIncoming = (c, d) => {
   if (cur === d.chatId && !stick) { sgUnseen++; sgDownPaint(); }
-  if (d.call || document.hidden || (c.type === 'channel' && !c.open) || (c.peer && c.peer.bot)) return;
+  if (d.call || document.hidden || (c.type === 'channel' && !c.open) || (c.peer && c.peer.bot && !c.peer.custom)) return;
   const snd = sgPref('msg_sound', 'drop');
   if (snd !== 'off') sgPlaySound(snd);
   if (sgPref('vib_msg', true) && navigator.vibrate) { try { navigator.vibrate(25); } catch {} }
@@ -6438,7 +6469,7 @@ const CIRC_LEN = 2 * Math.PI * 48;
 function circleHtml(md) {
   return `<div class="circ" data-u="${esc(md.url)}" data-d="${md.dur || 0}"><video src="${esc(md.url)}" playsinline muted loop preload="metadata"></video>
 <svg class="cring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" style="stroke-dasharray:${CIRC_LEN};stroke-dashoffset:${CIRC_LEN}"/></svg>
-<span class="cdur">${fmtDur(md.dur || 0)}</span><span class="csnd">🔇</span></div>`;
+<span class="cdur">${fmtDur(md.dur || 0)}</span><span class="csnd">🔇</span>${sgTrBtn(md)}</div>`;
 }
 // Кружки в зоне видимости крутятся без звука, как в Telegram
 const circIO = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => {
@@ -6713,6 +6744,982 @@ function forwardPick(id) {
     toast(c && c.type === 'saved' ? '🔖 Сохранено в Избранное' : 'Переслано ✓');
   });
 }
+
+</script>
+
+<!-- ===== v4: QR-код и расшифровка ===== -->
+<style id="sg-v4">
+/* ===== v4: QR-код и расшифровка ===== */
+.sgqr{display:flex;flex-direction:column;align-items:center;padding:0 4px 4px}
+.sgqr-card{width:min(330px,86vw);border-radius:30px;padding:22px 22px 18px;text-align:center;color:#111;
+  background:#fff;box-shadow:0 14px 40px rgba(91,76,255,.35),0 0 0 6px rgba(123,92,255,.18);position:relative;overflow:hidden;animation:sgQrIn .45s var(--spring)}
+@keyframes sgQrIn{from{opacity:0;transform:scale(.9) translateY(14px)}to{opacity:1;transform:none}}
+.sgqr-card::before{content:'';position:absolute;inset:0 0 auto;height:6px;background:linear-gradient(90deg,#3d6bff,#6a4cff,#b23cff)}
+.sgqr-code canvas{width:100%;height:auto;display:block;border-radius:18px}
+.sgqr-name{font-size:21px;font-weight:700;margin-top:10px}
+.sgqr-h{font-size:15px;font-weight:600;background:linear-gradient(90deg,#3d6bff,#b23cff);-webkit-background-clip:text;background-clip:text;color:transparent;margin-top:2px}
+.sgqr-note{color:var(--t2);font-size:13px;text-align:center;margin:14px 10px 4px;line-height:1.4}
+.sgqr-acts{display:flex;gap:10px;width:100%;margin-top:10px}
+.sgqr-acts button{flex:1;border:0;border-radius:20px;padding:12px 4px 10px;background:rgba(127,140,160,.13);color:var(--t);font:inherit;font-size:13px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;transition:transform .2s var(--spring)}
+.sgqr-acts button span{font-size:22px}
+.sgqr-acts button:active{transform:scale(.94)}
+.tgp-qr{width:40px;height:40px;border:0;background:none;color:var(--p);cursor:pointer;display:grid;place-items:center;border-radius:50%}
+.tgp-qr:active{background:rgba(127,140,160,.15)}
+/* Сканер */
+#sgScan{position:fixed;inset:0;z-index:16000;background:#000;color:#fff;opacity:0;transition:opacity .25s}
+#sgScan.on{opacity:1}
+#sgScan video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#sgScan .sc-shade{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 46%,transparent 0 34vmin,rgba(0,0,0,.55) calc(34vmin + 1px))}
+#sgScan .sc-frame{position:absolute;left:50%;top:46%;width:64vmin;height:64vmin;max-width:300px;max-height:300px;transform:translate(-50%,-50%);border-radius:34px;transition:transform .25s var(--spring)}
+#sgScan.hit .sc-frame{transform:translate(-50%,-50%) scale(.92)}
+#sgScan .sc-frame i{position:absolute;width:52px;height:52px;border:5px solid #fff;border-radius:0}
+#sgScan .sc-frame i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0;border-top-left-radius:30px}
+#sgScan .sc-frame i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0;border-top-right-radius:30px}
+#sgScan .sc-frame i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0;border-bottom-left-radius:30px}
+#sgScan .sc-frame i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0;border-bottom-right-radius:30px}
+#sgScan.hit .sc-frame i{border-color:#34c77b}
+#sgScan .sc-line{position:absolute;left:10%;right:10%;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,#7b8bff,transparent);box-shadow:0 0 14px #7b8bff;animation:sgScanLine 2.2s ease-in-out infinite}
+@keyframes sgScanLine{0%,100%{top:12%}50%{top:86%}}
+#sgScan .sc-top{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;right:12px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:17px}
+#sgScan .sc-top span:last-child{width:44px}
+#sgScan .sc-x{width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:18px;backdrop-filter:blur(10px);cursor:pointer}
+#sgScan .sc-hint{position:absolute;left:20px;right:20px;top:calc(46% + min(32vmin,150px) + 26px);text-align:center;font-size:15px;opacity:.9;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+#sgScan .sc-acts{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 34px);display:flex;justify-content:center;gap:12px}
+#sgScan .sc-acts button{border:0;border-radius:24px;padding:13px 20px;background:rgba(255,255,255,.16);color:#fff;font:inherit;font-weight:600;backdrop-filter:blur(12px);cursor:pointer}
+#msgs .vc .vcb2{flex-direction:column!important;align-items:flex-start!important;gap:2px!important;flex:none!important}
+#msgs .vc .vct{text-align:left!important;min-width:0!important;margin:0!important}
+#msgs .vc{min-width:0!important}
+#msgs .vc .sgtrb{margin-left:4px}
+/* «Аа» и текст расшифровки */
+.sgtrb{flex:none;width:34px;height:34px;border-radius:12px;border:0;cursor:pointer;font:700 13px/1 Roboto,sans-serif;letter-spacing:-.3px;display:grid;place-items:center;
+  background:rgba(79,141,255,.16);color:var(--sg1);transition:transform .2s var(--spring),background .2s}
+#msgs .m.me .sgtrb{background:rgba(255,255,255,.22);color:#fff}
+.sgtrb:active{transform:scale(.88)}
+.sgtrb.on{background:var(--sg1);color:#fff}
+#msgs .m.me .sgtrb.on{background:#fff;color:#5b6cff}
+.circ .sgtrb{position:absolute;right:6px;bottom:44px;background:rgba(0,0,0,.45);color:#fff;backdrop-filter:blur(6px)}
+.sgtrtx{margin-top:8px;padding:9px 12px;border-radius:16px;background:rgba(127,140,160,.14);font-size:calc(var(--msg-fs) - .5px);line-height:1.4;white-space:pre-wrap;animation:sgTrIn .35s var(--ease)}
+#msgs .m.me .sgtrtx{background:rgba(255,255,255,.18)}
+#msgs .m.circm .sgtrtx{background:var(--glass);max-width:240px;backdrop-filter:blur(12px)}
+@keyframes sgTrIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.sgtrtx.err{color:#ff7a70}
+.sgtrtx.busy{display:flex;flex-direction:column;gap:6px;min-width:190px}
+.sgtrtx.busy small{opacity:.75;font-size:12px}
+.sgtrsk{display:block;height:10px;width:92%;border-radius:6px;background:linear-gradient(90deg,rgba(127,140,160,.2),rgba(127,140,160,.45),rgba(127,140,160,.2));background-size:200% 100%;animation:sgShimmer 1.2s linear infinite}
+.sgtrsk.s{width:60%}
+
+</style>
+<script>
+// Мини-генератор QR-кода (байтовый режим, UTF-8, коррекция Q — ~25% можно закрыть логотипом), версии 1–10
+const sgQR = (() => {
+  // [ec на блок, [кол-во блоков, данных в блоке], ...] для уровня Q
+  const Q = [null, [13, [1, 13]], [22, [1, 22]], [18, [2, 17]], [26, [2, 24]], [18, [2, 15], [2, 16]], [24, [4, 19]],
+    [18, [2, 14], [4, 15]], [22, [4, 18], [2, 19]], [20, [4, 16], [4, 17]], [24, [6, 19], [2, 20]]];
+  const ALIGN = [null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50]];
+  // GF(256)
+  const EXP = new Array(512), LOG = new Array(256);
+  for (let i = 0, x = 1; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 256) x ^= 0x11d; }
+  for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255];
+  const mul = (a, b) => a && b ? EXP[LOG[a] + LOG[b]] : 0;
+  function rsGen(n) { let g = [1]; for (let i = 0; i < n; i++) { const ng = new Array(g.length + 1).fill(0); g.forEach((c, j) => { ng[j] ^= c; ng[j + 1] ^= mul(c, EXP[i]); }); g = ng; } return g; }
+  function rsRem(data, n) {
+    const g = rsGen(n), r = data.concat(new Array(n).fill(0));
+    for (let i = 0; i < data.length; i++) { const c = r[i]; if (c) for (let j = 0; j < g.length; j++) r[i + j] ^= mul(g[j], c); }
+    return r.slice(data.length);
+  }
+  const bch = (v, poly, bits) => { let r = v << bits; const pl = Math.floor(Math.log2(poly)); for (let i = Math.floor(Math.log2(r)); i >= pl; i--) if (r >> i & 1) r ^= poly << (i - pl); return (v << bits) | r; };
+
+  function encode(text) {
+    const bytes = [...new TextEncoder().encode(text)];
+    let ver = 1, dataCap = 0, spec;
+    for (; ver <= 10; ver++) {
+      spec = Q[ver]; dataCap = spec.slice(1).reduce((s, [n, d]) => s + n * d, 0);
+      if (4 + (ver < 10 ? 8 : 16) + bytes.length * 8 <= dataCap * 8) break;
+    }
+    if (ver > 10) throw new Error('Слишком длинный текст для QR');
+    // поток битов
+    const bits = [];
+    const put = (v, n) => { for (let i = n - 1; i >= 0; i--) bits.push(v >> i & 1); };
+    put(4, 4); put(bytes.length, ver < 10 ? 8 : 16); bytes.forEach(b => put(b, 8));
+    put(0, Math.min(4, dataCap * 8 - bits.length));
+    while (bits.length % 8) bits.push(0);
+    const cw = []; for (let i = 0; i < bits.length; i += 8) cw.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+    for (let p = 0; cw.length < dataCap; p++) cw.push(p % 2 ? 0x11 : 0xEC);
+    // блоки + коррекция, перемежение
+    const ec = spec[0], blocks = [];
+    let k = 0;
+    spec.slice(1).forEach(([n, d]) => { for (let i = 0; i < n; i++) { const dd = cw.slice(k, k + d); k += d; blocks.push({ d: dd, e: rsRem(dd, ec) }); } });
+    const out = [];
+    const maxD = Math.max(...blocks.map(b => b.d.length));
+    for (let i = 0; i < maxD; i++) blocks.forEach(b => { if (i < b.d.length) out.push(b.d[i]); });
+    for (let i = 0; i < ec; i++) blocks.forEach(b => out.push(b.e[i]));
+    // матрица
+    const N = 17 + ver * 4;
+    const M = Array.from({ length: N }, () => new Array(N).fill(null)), F = Array.from({ length: N }, () => new Array(N).fill(false));
+    const set = (r, c, v) => { M[r][c] = v; F[r][c] = true; };
+    const finder = (r, c) => { for (let i = -1; i <= 7; i++) for (let j = -1; j <= 7; j++) { const y = r + i, x = c + j; if (y < 0 || x < 0 || y >= N || x >= N) continue; const inn = i >= 0 && i <= 6 && j >= 0 && j <= 6; set(y, x, inn && (i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4))); } };
+    finder(0, 0); finder(0, N - 7); finder(N - 7, 0);
+    for (let i = 8; i < N - 8; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+    const al = ALIGN[ver];
+    const last = al[al.length - 1];
+    al.forEach(r => al.forEach(c => { if ((r === 6 && c === 6) || (r === 6 && c === last) || (r === last && c === 6)) return; for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) set(r + i, c + j, Math.max(Math.abs(i), Math.abs(j)) !== 1); }));
+    set(N - 8, 8, true); // тёмный модуль
+    // резерв под служебную информацию
+    for (let i = 0; i < 9; i++) { if (!F[8][i]) F[8][i] = true; if (!F[i][8]) F[i][8] = true; }
+    for (let i = 0; i < 8; i++) { F[8][N - 1 - i] = true; F[N - 1 - i][8] = true; }
+    if (ver >= 7) for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) { F[i][N - 11 + j] = true; F[N - 11 + j][i] = true; }
+    // данные змейкой
+    const dbits = []; out.forEach(b => { for (let i = 7; i >= 0; i--) dbits.push(b >> i & 1); });
+    const pos = [];
+    for (let c = N - 1, up = true; c > 0; c -= 2, up = !up) {
+      if (c === 6) c--;
+      for (let i = 0; i < N; i++) { const r = up ? N - 1 - i : i; for (const cc of [c, c - 1]) if (!F[r][cc]) pos.push([r, cc]); }
+    }
+    const MASKS = [(r, c) => (r + c) % 2 === 0, r => r % 2 === 0, (r, c) => c % 3 === 0, (r, c) => (r + c) % 3 === 0,
+      (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0, (r, c) => (r * c) % 2 + (r * c) % 3 === 0,
+      (r, c) => ((r * c) % 2 + (r * c) % 3) % 2 === 0, (r, c) => ((r + c) % 2 + (r * c) % 3) % 2 === 0];
+    const build = mask => {
+      const G = M.map(row => row.slice());
+      pos.forEach(([r, c], i) => { G[r][c] = !!(dbits[i] || 0) !== MASKS[mask](r, c); });
+      const fmt = bch((0b11 << 3) | mask, 0x537, 10) ^ 0x5412; // Q = 11
+      const fb = i => !!(fmt >> i & 1);
+      // первая копия — вокруг левого верхнего «глаза»
+      for (let i = 0; i <= 5; i++) G[i][8] = fb(i);
+      G[7][8] = fb(6); G[8][8] = fb(7); G[8][7] = fb(8);
+      for (let i = 9; i < 15; i++) G[8][14 - i] = fb(i);
+      // вторая копия — у правого верхнего и левого нижнего
+      for (let i = 0; i < 8; i++) G[8][N - 1 - i] = fb(i);
+      for (let i = 8; i < 15; i++) G[N - 15 + i][8] = fb(i);
+      G[N - 8][8] = true;
+      if (ver >= 7) { const vi = bch(ver, 0x1F25, 12); for (let i = 0; i < 18; i++) { const b = !!(vi >> i & 1), a = Math.floor(i / 3), cc = N - 11 + i % 3; G[a][cc] = b; G[cc][a] = b; } }
+      return G;
+    };
+    const penalty = G => {
+      let p = 0;
+      for (let r = 0; r < N; r++) for (const line of [G[r], G.map(x => x[r])]) {
+        let run = 1;
+        for (let i = 1; i <= N; i++) { if (i < N && line[i] === line[i - 1]) run++; else { if (run >= 5) p += run - 2; run = 1; } }
+        const s = line.map(x => x ? 1 : 0).join('');
+        p += 40 * ((s.match(/(?=10111010000)/g) || []).length + (s.match(/(?=00001011101)/g) || []).length);
+      }
+      for (let r = 0; r < N - 1; r++) for (let c = 0; c < N - 1; c++) { const v = G[r][c]; if (G[r + 1][c] === v && G[r][c + 1] === v && G[r + 1][c + 1] === v) p += 3; }
+      const dark = G.flat().filter(Boolean).length;
+      p += Math.floor(Math.abs(dark * 20 - N * N * 10) / (N * N)) * 10;
+      return p;
+    };
+    let best = null, bp = Infinity;
+    for (let m = 0; m < 8; m++) { const G = build(m), pp = penalty(G); if (pp < bp) { bp = pp; best = G; } }
+    return best;
+  }
+  return { encode };
+})();
+
+
+// ===================================================================
+//  SAIMONGRAM v4: QR-код профиля и расшифровка голосовых «Аа»
+// ===================================================================
+
+/* ---------- QR: рисуем красивый код на холсте ---------- */
+const sgProfileUrl = h => location.origin + '/?u=' + encodeURIComponent(h);
+function sgQRCanvas(text, { px = 720, logo = null, letter = 'S', dot = 'circle', eye = .25 } = {}) {
+  const mat = sgQR.encode(text), n = mat.length, quiet = 3;
+  const cell = Math.floor(px / (n + quiet * 2)), size = cell * (n + quiet * 2);
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, size, size);
+  const grad = g.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, '#3d6bff'); grad.addColorStop(.55, '#6a4cff'); grad.addColorStop(1, '#b23cff');
+  g.fillStyle = grad;
+  const o = quiet * cell, isFinder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+  // область под логотип в центре (уровень коррекции Q позволяет закрыть часть кода)
+  const lw = Math.max(5, Math.round(n * .22)) | 1, l0 = (n - lw) >> 1;
+  const inLogo = (r, c) => r >= l0 - 0 && r < l0 + lw && c >= l0 && c < l0 + lw;
+  const rr = (x, y, w, h, rad) => { g.beginPath(); g.moveTo(x + rad, y); g.arcTo(x + w, y, x + w, y + h, rad); g.arcTo(x + w, y + h, x, y + h, rad); g.arcTo(x, y + h, x, y, rad); g.arcTo(x, y, x + w, y, rad); g.closePath(); };
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    if (!mat[r][c] || isFinder(r, c) || (logo !== false && inLogo(r, c))) continue;
+    if (dot === 'sq') g.fillRect(o + c * cell, o + r * cell, cell, cell);
+    else if (dot === 'rr') { rr(o + c * cell + .5, o + r * cell + .5, cell - 1, cell - 1, cell * .3); g.fill(); }
+    else { g.beginPath(); g.arc(o + c * cell + cell / 2, o + r * cell + cell / 2, cell * .46, 0, Math.PI * 2); g.fill(); }
+  }
+  // «глаза» — скруглённые квадраты
+  [[0, 0], [0, n - 7], [n - 7, 0]].forEach(([r, c]) => {
+    const x = o + c * cell, y = o + r * cell;
+    const k = eye === 'sq' ? 0 : typeof eye === 'number' ? eye : 1;
+    rr(x, y, cell * 7, cell * 7, cell * 2.2 * k + .01); g.fill();
+    g.fillStyle = '#fff'; rr(x + cell, y + cell, cell * 5, cell * 5, cell * 1.6 * k + .01); g.fill();
+    g.fillStyle = grad; rr(x + cell * 2, y + cell * 2, cell * 3, cell * 3, cell * 1.1 * k + .01); g.fill();
+  });
+  // логотип: аватар или буква в круге
+  if (logo !== false) {
+    const cx = size / 2, R = lw * cell / 2;
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(cx, cx, R, 0, Math.PI * 2); g.fill();
+    g.save(); g.beginPath(); g.arc(cx, cx, R * .84, 0, Math.PI * 2); g.clip();
+    if (logo) g.drawImage(logo, cx - R * .84, cx - R * .84, R * 1.68, R * 1.68);
+    else { g.fillStyle = grad; g.fillRect(cx - R, cx - R, R * 2, R * 2); g.fillStyle = '#fff'; g.font = `700 ${Math.round(R)}px Roboto, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(letter, cx, cx + R * .06); }
+    g.restore();
+  }
+  return cv;
+}
+const sgLoadImg = url => new Promise(res => { if (!url) return res(null); const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => res(null); i.src = url; });
+
+/* ---------- Экран «QR-код профиля» ---------- */
+async function sgShowQR(u = me) {
+  if (!u || !u.handle) return toast('Сначала задайте юзернейм в настройках');
+  const url = sgProfileUrl(u.handle), mine = u.id === me.id;
+  const name = mine ? me.username : (cnames[u.id] || u.username);
+  const sh = sgSheet(`<div class="sgqr">
+<div class="sgqr-card"><div class="sgqr-code" id="sgQrBox"></div>
+<div class="sgqr-name">${esc(name)}</div><div class="sgqr-h">@${esc(u.handle)}</div></div>
+<div class="sgqr-note">${mine ? 'Покажите код другу — он наведёт камеру и сразу откроет ваш профиль' : 'Отсканируйте, чтобы открыть профиль'}</div>
+<div class="sgqr-acts">
+<button type="button" data-q="share"><span>📤</span>Поделиться</button>
+<button type="button" data-q="save"><span>💾</span>Сохранить</button>
+<button type="button" data-q="scan"><span>📷</span>Сканировать</button>
+</div></div>`, { title: mine ? 'Мой QR-код' : 'QR-код профиля' });
+  sh.style.touchAction = 'pan-y';
+  const box = sh.querySelector('#sgQrBox');
+  const draw = logo => { const cv = sgQRCanvas(url, { logo, letter: (name || '?')[0].toUpperCase() }); box.innerHTML = ''; box.appendChild(cv); return cv; };
+  let cv = draw(null);
+  sgLoadImg(u.avatar).then(img => { if (img && sh.isConnected) cv = draw(img); });
+  sh.querySelectorAll('[data-q]').forEach(b => b.onclick = async () => {
+    const a = b.dataset.q;
+    if (a === 'share') {
+      try { if (navigator.share) await navigator.share({ title: name + ' в Saimongram', text: `Напиши мне в Saimongram: @${u.handle}`, url }); else { await navigator.clipboard.writeText(url); toast('🔗 Ссылка скопирована'); } }
+      catch (e) { if (e && e.name !== 'AbortError') { try { await navigator.clipboard.writeText(url); toast('🔗 Ссылка скопирована'); } catch { toast(url); } } }
+    } else if (a === 'save') {
+      // картинка: код + имя на градиентной карточке
+      const W = 900, H = 1100, pic = document.createElement('canvas'); pic.width = W; pic.height = H;
+      const g = pic.getContext('2d'), gr = g.createLinearGradient(0, 0, W, H);
+      gr.addColorStop(0, '#3d6bff'); gr.addColorStop(1, '#b23cff'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#fff'; g.beginPath(); g.roundRect ? g.roundRect(90, 90, 720, 900, 60) : g.rect(90, 90, 720, 900); g.fill();
+      g.drawImage(cv, 140, 130, 620, 620);
+      g.fillStyle = '#111'; g.font = '700 54px Roboto, sans-serif'; g.textAlign = 'center'; g.fillText(name, W / 2, 840);
+      g.fillStyle = '#6a4cff'; g.font = '500 40px Roboto, sans-serif'; g.fillText('@' + u.handle, W / 2, 905);
+      g.fillStyle = 'rgba(255,255,255,.85)'; g.font = '500 34px Roboto, sans-serif'; g.fillText('Saimongram', W / 2, 1055);
+      pic.toBlob(blob => {
+        const file = new File([blob], `saimongram-${u.handle}.png`, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] }) && /iphone|ipad|android/i.test(navigator.userAgent)) { navigator.share({ files: [file] }).catch(() => {}); return; }
+        const a2 = document.createElement('a'); a2.href = URL.createObjectURL(blob); a2.download = file.name; a2.click(); setTimeout(() => URL.revokeObjectURL(a2.href), 4000);
+        toast('💾 Картинка сохранена');
+      }, 'image/png');
+    } else if (a === 'scan') { sgSheetClose(); setTimeout(sgScanQR, 250); }
+  });
+}
+
+/* ---------- Сканер QR ---------- */
+let sgJsQR = null;
+function sgLoadJsQR() {
+  if (sgJsQR) return sgJsQR;
+  sgJsQR = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'; s.onload = () => res(window.jsQR); s.onerror = () => { sgJsQR = null; rej(new Error('Не удалось загрузить сканер')); }; document.head.appendChild(s); });
+  return sgJsQR;
+}
+async function sgDecodeFrame(src, w, h) {
+  if ('BarcodeDetector' in window) {
+    try { const det = sgDecodeFrame.det || (sgDecodeFrame.det = new BarcodeDetector({ formats: ['qr_code'] })); const r = await det.detect(src); if (r[0]) return r[0].rawValue; return null; } catch {}
+  }
+  const jsQR = await sgLoadJsQR();
+  const c = sgDecodeFrame.cv || (sgDecodeFrame.cv = document.createElement('canvas'));
+  const scale = Math.min(1, 640 / Math.max(w, h)); c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(src, 0, 0, c.width, c.height);
+  const d = g.getImageData(0, 0, c.width, c.height), r = jsQR(d.data, c.width, c.height, { inversionAttempts: 'dontInvert' });
+  return r ? r.data : null;
+}
+function sgHandleScan(text) {
+  let h = null;
+  try { const u = new URL(text); h = u.searchParams.get('u'); } catch {}
+  if (!h && /^@?[a-z0-9_]{3,20}$/i.test(text.trim())) h = text.trim().replace(/^@/, '');
+  if (h) { closeModal(); openByHandle(h.toLowerCase()); return true; }
+  if (/^https?:\/\//i.test(text)) { if (confirm('Это QR-код с ссылкой:\n' + text + '\n\nОткрыть?')) window.open(text, '_blank', 'noopener'); return true; }
+  toast('QR-код: ' + text.slice(0, 120)); return true;
+}
+async function sgScanQR() {
+  if (!navigator.mediaDevices?.getUserMedia) return toast('Камера недоступна в этом браузере');
+  const ov = document.createElement('div'); ov.id = 'sgScan';
+  ov.innerHTML = `<video playsinline muted autoplay></video><div class="sc-shade"></div>
+<div class="sc-frame"><i></i><i></i><i></i><i></i><b class="sc-line"></b></div>
+<div class="sc-top"><button type="button" class="sc-x" aria-label="Закрыть">✕</button><span>Сканировать QR-код</span><span></span></div>
+<div class="sc-hint">Наведите камеру на QR-код профиля</div>
+<div class="sc-acts"><button type="button" data-s="gal">🖼 Из галереи</button><button type="button" data-s="my">🔳 Мой код</button></div>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('on'));
+  const v = ov.querySelector('video');
+  let stream = null, alive = true, busy = false;
+  const close = () => { alive = false; stream && stream.getTracks().forEach(t => t.stop()); ov.classList.remove('on'); setTimeout(() => ov.remove(), 250); };
+  ov.querySelector('.sc-x').onclick = close;
+  ov.querySelector('[data-s="my"]').onclick = () => { close(); setTimeout(() => sgShowQR(me), 200); };
+  ov.querySelector('[data-s="gal"]').onclick = async () => {
+    const f = await pickFile('image/*'); if (!f) return;
+    const img = await sgLoadImg(URL.createObjectURL(f));
+    if (!img) return toast('Не удалось открыть картинку');
+    try { const t = await sgDecodeFrame(img, img.naturalWidth, img.naturalHeight); if (t) { close(); sgHandleScan(t); } else toast('QR-код на картинке не найден'); }
+    catch (x) { toast(x.message); }
+  };
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false }); }
+  catch { ov.querySelector('.sc-hint').textContent = 'Нет доступа к камере — можно выбрать фото с QR из галереи'; return; }
+  if (!alive) { stream.getTracks().forEach(t => t.stop()); return; }
+  v.srcObject = stream; await v.play().catch(() => {});
+  const loop = async () => {
+    if (!alive) return;
+    if (!busy && v.videoWidth) {
+      busy = true;
+      try {
+        const t = await sgDecodeFrame(v, v.videoWidth, v.videoHeight);
+        if (t && alive) { try { navigator.vibrate && navigator.vibrate(40); } catch {} ov.classList.add('hit'); setTimeout(() => { close(); sgHandleScan(t); }, 260); return; }
+      } catch (x) { ov.querySelector('.sc-hint').textContent = x.message; }
+      busy = false;
+    }
+    setTimeout(loop, 180);
+  };
+  loop();
+}
+
+/* ---------- Расшифровка «Аа» ---------- */
+const sgTrOpen = new Set(), sgTrState = new Map(); // id → {busy, err, progress}
+const sgTrCan = m => m && m.media && (m.media.kind === 'voice' || m.media.circle) && !m.pending;
+function sgTrHtml(m) {
+  if (!sgTrCan(m) || !sgTrOpen.has(m.id)) return '';
+  const st = sgTrState.get(m.id) || {};
+  if (m.media.tr) return `<div class="sgtrtx">${esc(m.media.tr)}</div>`;
+  if (st.err) return `<div class="sgtrtx err">⚠️ ${esc(st.err)}</div>`;
+  return `<div class="sgtrtx busy"><span class="sgtrsk"></span><span class="sgtrsk s"></span><small>${esc(st.progress || 'Расшифровываю…')}</small></div>`;
+}
+const sgTrBtn = (md) => `<button type="button" class="sgtrb${md.tr ? ' done' : ''}" data-trb aria-label="Расшифровать">Аа</button>`;
+function sgTrRepaint(id) {
+  const l = msgs.get(cur), i = l ? l.findIndex(x => x.id === id) : -1, c = chats.get(cur), el = bubbleEl(id);
+  if (i < 0 || !el || !c) return;
+  const keep = stick;
+  el.outerHTML = bubbleHtml(c, l, i);
+  const nb = bubbleEl(id); if (nb) nb.querySelector('.sgtrb')?.classList.toggle('on', sgTrOpen.has(id));
+  if (keep) msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+let sgWhisper = null;
+function sgLoadWhisper(onProgress) {
+  if (sgWhisper) return sgWhisper;
+  sgWhisper = (async () => {
+    const T = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.2');
+    const files = {};
+    return T.pipeline('automatic-speech-recognition', 'Xenova/whisper-base', {
+      progress_callback: p => {
+        if (p.status === 'progress' && p.file) { files[p.file] = [p.loaded || 0, p.total || 0]; const v = Object.values(files), lo = v.reduce((s, x) => s + x[0], 0), to = v.reduce((s, x) => s + x[1], 0); if (to) onProgress(`Загружаю распознавание речи… ${Math.round(lo / to * 100)}%`); }
+      },
+    });
+  })().catch(e => { sgWhisper = null; throw e; });
+  return sgWhisper;
+}
+async function sgBrowserTranscribe(url, onProgress) {
+  onProgress('Загружаю распознавание речи…');
+  const asr = await sgLoadWhisper(onProgress);
+  onProgress('Расшифровываю…');
+  const buf = await (await fetch(url)).arrayBuffer();
+  const ac = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  let audio;
+  try { audio = (await ac.decodeAudioData(buf)).getChannelData(0); } finally { ac.close && ac.close(); }
+  const ru = /^(ru|uk|be|kk)/i.test(navigator.language || 'ru');
+  const r = await asr(audio, { chunk_length_s: 30, stride_length_s: 5, ...(ru ? { language: 'russian' } : {}), task: 'transcribe' });
+  return String((r && r.text) || '').trim();
+}
+async function sgTranscribe(id) {
+  const l = msgs.get(cur), m = l && l.find(x => x.id === id);
+  if (!sgTrCan(m)) return;
+  if (sgTrOpen.has(id) && (m.media.tr || (sgTrState.get(id) || {}).err)) { sgTrOpen.delete(id); sgTrState.delete(id); return sgTrRepaint(id); }
+  sgTrOpen.add(id);
+  if (m.media.tr) return sgTrRepaint(id);
+  if ((sgTrState.get(id) || {}).busy) return;
+  const st = { busy: true }; sgTrState.set(id, st); sgTrRepaint(id);
+  const prog = t => { st.progress = t; const el = bubbleEl(id), sm = el && el.querySelector('.sgtrtx small'); if (sm) sm.textContent = t; };
+  try {
+    let text = null;
+    if (typeof cfg !== 'undefined' && cfg && cfg.stt) {
+      try { text = (await api('/api/messages/' + encodeURIComponent(id) + '/transcribe', 'POST', {})).text; }
+      catch (x) { if (!/not_configured/.test(x.message)) throw x; }
+    }
+    if (text == null) {
+      text = await sgBrowserTranscribe(m.media.url, prog);
+      try { text = (await api('/api/messages/' + encodeURIComponent(id) + '/transcript', 'POST', { text: text || '…' })).text; } catch {}
+    }
+    m.media.tr = text || '…';
+    sgTrState.delete(id);
+  } catch (x) {
+    st.busy = false; st.err = /fetch|import|Failed/i.test(x.message) ? 'Не удалось загрузить распознавание. Проверьте интернет и попробуйте ещё раз.' : x.message;
+  }
+  sgTrRepaint(id);
+}
+window.sgOnTranscript = d => {
+  const l = msgs.get(d.chatId), m = l && l.find(x => x.id === d.messageId);
+  if (!m || !m.media) return;
+  m.media.tr = d.text;
+  if (cur === d.chatId && sgTrOpen.has(d.messageId)) { sgTrState.delete(d.messageId); sgTrRepaint(d.messageId); }
+};
+
+/* ---------- Ссылка ?u=юзернейм — сразу открыть профиль ---------- */
+window.sgPendingU = new URLSearchParams(location.search).get('u');
+
+</script>
+
+<!-- ===== Hours_bot: конструктор ботов ===== -->
+<style id="sg-hours">
+/* ===== Hours Studio ===== */
+.hb-av{width:42px;height:42px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:17px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.hb-av img{width:100%;height:100%;object-fit:cover}
+.hb-av.l{width:60px;height:60px;font-size:24px}
+.hb-av.s{width:34px;height:34px;font-size:14px}
+.hb-hero{margin:12px 14px 4px;padding:24px 18px 20px;border-radius:26px;text-align:center;color:#fff;
+  background:linear-gradient(135deg,#ff8a3d 0%,#ff3d8b 50%,#7b5cff 100%);box-shadow:0 12px 30px rgba(255,61,139,.3);position:relative;overflow:hidden}
+.hb-hero::after{content:'';position:absolute;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.12);right:-80px;top:-90px}
+.hb-hero b{display:block;font-size:20px;margin:10px 0 4px}.hb-hero small{opacity:.9;font-size:13.5px;line-height:1.4;display:block}
+.hb-logo{width:64px;height:64px;margin:0 auto;border-radius:20px;background:rgba(255,255,255,.2);display:grid;place-items:center;backdrop-filter:blur(6px)}
+.hb-logo svg{width:44px;height:44px}
+.hb-botrow .tx small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb-head{display:flex;align-items:center;gap:12px;margin:12px 14px 6px;padding:12px 14px;border-radius:22px;background:var(--card-bg2,#fff)}
+html[data-theme="dark"] .hb-head{--card-bg2:#18232f}
+.hb-head b{display:block;font-size:17px}.hb-head small{color:var(--t2)}
+.hb-head>div{flex:1;min-width:0}
+.hb-open{border:0;border-radius:16px;padding:8px 12px;background:rgba(79,141,255,.15);color:var(--sg1);font:600 13px/1 inherit;cursor:pointer;white-space:nowrap}
+.hb-tabs{display:flex;gap:6px;overflow-x:auto;padding:6px 14px 4px;scrollbar-width:none}
+.hb-tabs::-webkit-scrollbar{display:none}
+.hb-tabs button{flex:none;border:0;border-radius:16px;padding:9px 14px;background:rgba(127,140,160,.14);color:var(--t2);font:600 13.5px/1 inherit;cursor:pointer;transition:background .2s,color .2s}
+.hb-tabs button.on{background:var(--sgrad);color:#fff;box-shadow:0 3px 10px rgba(79,100,255,.35)}
+.hb-fields{padding:6px 14px 12px}
+.hb-fields label{display:block;font-size:12.5px;color:var(--t2);font-weight:600;margin-top:10px}
+.hb-fields input,.hb-fields textarea,.hb-fields select,.hb-form input,.hb-form textarea{display:block;width:100%;box-sizing:border-box;margin-top:6px;border:1px solid rgba(127,140,160,.25);border-radius:14px;padding:11px 13px;background:rgba(127,140,160,.08);color:var(--t);font:inherit;font-size:15px;outline:none;resize:vertical}
+.hb-fields input:focus,.hb-fields textarea:focus,.hb-form input:focus,.hb-form textarea:focus{border-color:#7b8bff;box-shadow:0 0 0 3px rgba(123,139,255,.18)}
+.hb-fields>textarea{margin-top:10px}
+.hb-at{display:flex;align-items:center;margin-top:6px;border:1px solid rgba(127,140,160,.25);border-radius:14px;background:rgba(127,140,160,.08);padding-left:12px}
+.hb-at span{color:var(--t2);font-weight:600}
+.hb-at input{border:0!important;background:none!important;margin:0!important;box-shadow:none!important;padding-left:4px!important}
+.hb-tip{font-size:12px;color:var(--t2);margin:6px 2px 0}
+.hb-link{display:block;border:0;background:none;color:var(--sg1);font:600 14px/1 inherit;padding:14px 2px 4px;cursor:pointer}
+.hb-btns{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.hb-brow{display:grid;grid-template-columns:1fr 112px 30px;gap:6px;align-items:center;padding:8px;border-radius:16px;background:rgba(127,140,160,.08)}
+.hb-brow .hb-bv{grid-column:1/3}
+.hb-brow input,.hb-brow select{margin:0!important;padding:9px 10px!important;font-size:14px!important;border-radius:11px!important}
+.hb-bx{grid-row:1;grid-column:3;width:30px;height:30px;border:0;border-radius:50%;background:rgba(255,69,58,.14);color:#ff5a50;cursor:pointer}
+.hb-addbtn{margin-top:10px;width:100%;border:1.5px dashed rgba(127,140,160,.45);border-radius:14px;padding:11px;background:none;color:var(--sg1);font:600 14px/1 inherit;cursor:pointer}
+.hb-tpls{display:flex;gap:8px;overflow-x:auto;padding:2px 14px 4px;scrollbar-width:none}
+.hb-tpls button{flex:none;border:0;border-radius:16px;padding:11px 14px;background:var(--card-bg2,#fff);color:var(--t);font:600 13.5px/1 inherit;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+html[data-theme="dark"] .hb-tpls button{--card-bg2:#18232f}
+.hb-code{display:block;width:calc(100% - 28px);margin:6px 14px;box-sizing:border-box;min-height:260px;border-radius:18px;border:0;padding:14px;resize:vertical;
+  background:#0d1117;color:#c9d1d9;font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2;white-space:pre;outline:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.hb-code:focus{box-shadow:inset 0 0 0 2px #7b8bff}
+.hb-row2{display:flex;gap:10px;margin:0 14px}
+.hb-row2 .sg-btn{margin:10px 0;width:auto;flex:1}
+.sg-btn.hb-ghost{background:rgba(127,140,160,.16);color:var(--t);box-shadow:none}
+.hb-api{margin:6px 14px 14px;border-radius:18px;background:rgba(127,140,160,.1);padding:4px 14px}
+.hb-api summary{cursor:pointer;padding:10px 0;font-weight:600}
+.hb-api pre{margin:0 0 12px;font:12px/1.6 ui-monospace,Menlo,monospace;white-space:pre-wrap;color:var(--t2)}
+.hb-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 14px}
+.hb-stat{border-radius:22px;padding:16px;background:var(--card-bg2,#fff);display:flex;flex-direction:column;gap:2px}
+html[data-theme="dark"] .hb-stat{--card-bg2:#18232f}
+.hb-stat span{font-size:22px}.hb-stat b{font-size:28px;letter-spacing:-.5px}.hb-stat small{color:var(--t2);font-size:12.5px}
+.hb-data{white-space:pre-wrap;word-break:break-word;color:var(--t)!important;font-family:ui-monospace,Menlo,monospace;font-size:12px!important;margin:4px 0!important}
+.hb-form{display:flex;flex-direction:column;gap:12px}
+.hb-form label{font-size:12.5px;color:var(--t2);font-weight:600}
+.hb-hint{font-size:12.5px;color:var(--t2);padding:0 4px}
+.hb-hint.ok{color:#34c77b}
+.hb-help{padding:8px 14px}
+.hb-step{display:flex;gap:14px;padding:14px;margin-bottom:10px;border-radius:22px;background:var(--card-bg2,#fff)}
+html[data-theme="dark"] .hb-step{--card-bg2:#18232f}
+.hb-step>b{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#fff;background:var(--sgrad)}
+.hb-step h4{margin:4px 0 4px;font-size:16px}.hb-step div{font-size:14px;line-height:1.45;color:var(--t2)}
+.hb-step code,.hb-help code{background:rgba(127,140,160,.18);border-radius:6px;padding:1px 5px;color:var(--t)}
+/* Кнопка приложения в чате с ботом */
+.hb-appbtn{flex:none;border:0;border-radius:18px;padding:0 12px;max-width:118px!important;height:38px;margin-left:2px;background:var(--sgrad);color:#fff;font:700 13.5px/1 Roboto,sans-serif;cursor:pointer;box-shadow:0 3px 10px rgba(79,100,255,.4);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;transition:transform .2s var(--spring)}
+.hb-appbtn:active{transform:scale(.92)}
+.hb-appbtn[hidden]{display:none!important}
+#msgs .bbtn{border-radius:14px!important;transition:transform .15s var(--spring)}
+#msgs .bbtn:active{transform:scale(.95)}
+/* Окно мини-приложения */
+#hbApp{position:fixed;inset:0;z-index:17000;background:rgba(0,0,0,0);transition:background .3s;display:flex;align-items:flex-end;justify-content:center}
+#hbApp.on{background:rgba(0,0,0,.5)}
+#hbApp .ha-sheet{width:100%;max-width:560px;height:calc(100% - env(safe-area-inset-top,0px) - 22px);background:var(--bg);border-radius:26px 26px 0 0;overflow:hidden;display:flex;flex-direction:column;
+  transform:translateY(100%);transition:transform .42s var(--ease);box-shadow:0 -10px 40px rgba(0,0,0,.4)}
+html[data-theme="dark"] #hbApp .ha-sheet{background:#0f1722}
+#hbApp.on .ha-sheet{transform:none}
+#hbApp .ha-head{display:flex;align-items:center;gap:10px;padding:10px 12px;flex:none;border-bottom:1px solid rgba(127,140,160,.15)}
+#hbApp .ha-t{flex:1;display:flex;align-items:center;gap:10px;min-width:0}
+#hbApp .ha-t b{display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hbApp .ha-t small{color:var(--t2);font-size:12px}
+#hbApp .ha-x,#hbApp .ha-more{width:38px;height:38px;border-radius:50%;border:0;background:rgba(127,140,160,.14);color:var(--t);font-size:16px;cursor:pointer;flex:none}
+#hbApp .ha-body{flex:1;position:relative;background:#fff}
+#hbApp iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+#hbApp .ha-load{position:absolute;inset:0;display:grid;place-items:center;z-index:1;background:var(--bg)}
+#hbApp .ha-load span{width:38px;height:38px;border-radius:50%;border:4px solid rgba(127,140,160,.25);border-top-color:#7b5cff;animation:hbSpin .8s linear infinite}
+@keyframes hbSpin{to{transform:rotate(360deg)}}
+
+</style>
+<script>
+// Шаблоны мини-приложений Hours (готовые примеры, которые можно менять)
+const HB_TEMPLATES = {
+clicker: { name: '👆 Тапалка', html: `<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+    font-family:system-ui,sans-serif;color:#fff;background:radial-gradient(circle at 50% 30%,#3b2a8f,#0d0a26)}
+  h1{margin:0;font-size:22px;opacity:.9}
+  #score{font-size:64px;font-weight:800;letter-spacing:-2px}
+  #tap{width:200px;height:200px;border-radius:50%;border:0;font-size:80px;cursor:pointer;
+    background:linear-gradient(135deg,#ffb347,#ff3d8b);box-shadow:0 20px 60px rgba(255,61,139,.5);transition:transform .08s}
+  #tap:active{transform:scale(.92)}
+  button.s{border:0;border-radius:20px;padding:12px 22px;font-size:15px;font-weight:600;background:rgba(255,255,255,.15);color:#fff}
+</style></head><body>
+  <h1>Привет, <span id="name"></span>!</h1>
+  <div id="score">0</div>
+  <button id="tap">🍕</button>
+  <button class="s" id="send">🏆 Отправить рекорд</button>
+<script>
+  let score = 0;
+  document.getElementById('name').textContent = Hours.user.name;
+  Hours.storage.get('score').then(v => { score = Number(v) || 0; show(); });
+  function show() { document.getElementById('score').textContent = score; }
+  document.getElementById('tap').onclick = () => { score++; show(); Hours.haptic('light'); if (score % 10 === 0) Hours.storage.set('score', score); };
+  document.getElementById('send').onclick = async () => {
+    await Hours.storage.set('score', score);
+    await Hours.sendData({ рекорд: score });
+    Hours.toast('Рекорд отправлен: ' + score);
+  };
+<\/script></body></html>` },
+form: { name: '📝 Заявка', html: `<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;background:#f4f5fb;color:#14142b}
+  .hero{padding:34px 22px 26px;color:#fff;background:linear-gradient(135deg,#4f8dff,#7b5cff);border-radius:0 0 30px 30px}
+  .hero h1{margin:0 0 6px;font-size:26px}.hero p{margin:0;opacity:.85}
+  form{padding:20px;display:flex;flex-direction:column;gap:12px}
+  input,textarea,select{font:inherit;padding:14px 16px;border-radius:16px;border:1px solid #dfe2f0;background:#fff;outline:none}
+  input:focus,textarea:focus{border-color:#7b5cff;box-shadow:0 0 0 3px rgba(123,92,255,.15)}
+  button{border:0;border-radius:18px;padding:15px;font:600 16px system-ui;color:#fff;background:linear-gradient(135deg,#4f8dff,#7b5cff)}
+  .ok{display:none;text-align:center;padding:60px 20px;font-size:18px}
+</style></head><body>
+  <div class="hero"><h1>Оставьте заявку</h1><p>Мы ответим вам прямо в этом чате</p></div>
+  <form id="f">
+    <input name="name" placeholder="Ваше имя" required>
+    <input name="phone" placeholder="Телефон" inputmode="tel" required>
+    <select name="what"><option>Консультация</option><option>Заказ</option><option>Другое</option></select>
+    <textarea name="comment" rows="3" placeholder="Комментарий"></textarea>
+    <button>Отправить заявку</button>
+  </form>
+  <div class="ok" id="ok">✅ Заявка отправлена!<br><br>Скоро с вами свяжутся.</div>
+<script>
+  document.querySelector('[name=name]').value = Hours.user.name;
+  document.getElementById('f').onsubmit = async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    await Hours.sendData(data);
+    await Hours.sendMessage('Спасибо, ' + data.name + '! Заявка «' + data.what + '» принята ✅');
+    e.target.style.display = 'none'; document.getElementById('ok').style.display = 'block';
+  };
+<\/script></body></html>` },
+quiz: { name: '❓ Викторина', html: `<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;min-height:100vh;font-family:system-ui,sans-serif;color:#fff;background:linear-gradient(160deg,#0f2b46,#1b1046);padding:24px;box-sizing:border-box}
+  .bar{height:8px;border-radius:4px;background:rgba(255,255,255,.15);overflow:hidden;margin-bottom:26px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,#34d399,#4f8dff);transition:width .3s}
+  h2{font-size:22px;line-height:1.3}
+  .a{display:block;width:100%;margin:10px 0;padding:16px;border:0;border-radius:18px;font:500 16px system-ui;text-align:left;color:#fff;background:rgba(255,255,255,.1)}
+  .a.ok{background:#22a06b}.a.no{background:#d64545}
+  .res{text-align:center;padding-top:60px}.res b{font-size:60px;display:block}
+</style></head><body>
+<div class="bar"><i id="bar"></i></div><div id="app"></div>
+<script>
+  const Q = [
+    ['Какая планета самая большая?', ['Марс', 'Юпитер', 'Земля'], 1],
+    ['Сколько дней в високосном году?', ['365', '366', '364'], 1],
+    ['Столица Японии?', ['Киото', 'Осака', 'Токио'], 2],
+  ];
+  let i = 0, right = 0;
+  const app = document.getElementById('app');
+  function draw() {
+    document.getElementById('bar').style.width = (i / Q.length * 100) + '%';
+    if (i >= Q.length) {
+      app.innerHTML = '<div class="res"><b>' + right + '/' + Q.length + '</b>' + (right === Q.length ? 'Идеально! 🏆' : 'Неплохо! 👍') + '</div>';
+      Hours.sendData({ викторина: right + ' из ' + Q.length });
+      return;
+    }
+    const [q, opts, ok] = Q[i];
+    app.innerHTML = '<h2>' + q + '</h2>' + opts.map((o, k) => '<button class="a" data-k="' + k + '">' + o + '</button>').join('');
+    app.querySelectorAll('.a').forEach(b => b.onclick = () => {
+      const good = +b.dataset.k === ok; if (good) right++;
+      b.classList.add(good ? 'ok' : 'no'); Hours.haptic(good ? 'success' : 'error');
+      setTimeout(() => { i++; draw(); }, 600);
+    });
+  }
+  draw();
+<\/script></body></html>` },
+blank: { name: '✨ С нуля', html: `<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;padding:24px;font-family:system-ui,sans-serif;background:#fff;color:#111}
+  button{padding:12px 18px;border-radius:14px;border:0;background:#6a4cff;color:#fff;font-size:15px}
+</style></head><body>
+  <h1>Моё приложение</h1>
+  <p>Пользователь: <b id="u"></b></p>
+  <button onclick="Hours.toast('Привет!')">Показать уведомление</button>
+<script>
+  // Hours.user — {id, name, handle} того, кто открыл приложение
+  document.getElementById('u').textContent = Hours.user.name + ' (@' + Hours.user.handle + ')';
+  // Hours.sendData(данные)  — отправить данные владельцу бота (придут в Hours)
+  // Hours.sendMessage(текст) — бот напишет пользователю в чат
+  // Hours.storage.get/set   — личное хранилище пользователя
+  // Hours.close(), Hours.haptic('light'), Hours.openLink(url), Hours.theme.dark
+<\/script></body></html>` },
+};
+
+// ===================================================================
+//  Hours Studio: свои боты, команды, кнопки, мини-приложения
+// ===================================================================
+const HOURS_ID = 102;
+const HB_LOGO = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="27" fill="none" stroke="#fff" stroke-width="7"/><path d="M50 34v17l11 7" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+let hbBot = null; // бот, который сейчас редактируется
+
+const hbAv = (b, cls = '') => b.avatar ? `<span class="hb-av ${cls}"><img src="${esc(b.avatar)}" alt=""></span>` : `<span class="hb-av ${cls}" style="background:${hbColor(b.id)}">${esc((b.name || '?')[0].toUpperCase())}</span>`;
+const hbColor = id => { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) % 360; return `linear-gradient(135deg,hsl(${h} 75% 60%),hsl(${(h + 40) % 360} 70% 48%))`; };
+const hbTop = (title, back) => `<div class="tgp-top"><button type="button" class="tgp-back" ${back ? 'data-hbback' : 'data-x'} aria-label="Назад">‹</button><span class="tgp-title">${title}</span><span class="tgp-sp"></span></div>`;
+const hbPage = (html, back) => { profileModal(`<div class="tgp hbp">${html}</div>`); const b = $('#card').querySelector('[data-hbback]'); if (b) b.onclick = back; };
+
+/* ---------- Действия из кнопок Hours_bot ---------- */
+async function hbAction(act, v) {
+  if (act === 'create') return hbCreate();
+  if (act === 'list') return hbStudio();
+  if (act === 'help') return hbHelp();
+  if (act === 'edit') return hbEditor(+v);
+  if (act === 'chat') { await openUser(+v); return; }
+  if (act === 'reply') { const [bid, uid] = String(v).split(':').map(Number); return hbReplySheet(bid, uid); }
+}
+async function hbOpenHoursChat() {
+  closeModal();
+  await openUser(HOURS_ID);
+  const c = chats.get(cur);
+  if (c && !c.last) try { await api('/api/bots/' + HOURS_ID + '/start', 'POST', {}); } catch {}
+}
+
+/* ---------- Список ботов ---------- */
+async function hbStudio() {
+  hbPage(hbTop('Hours Studio') + '<div class="sgsk" style="width:auto;height:150px;margin:14px;align-self:auto"></div>');
+  let list = [];
+  try { list = await api('/api/hours/bots'); } catch (x) { return toast(x.message); }
+  const lim = me.premium ? 20 : 5;
+  hbPage(hbTop('Hours Studio') + `
+<div class="hb-hero"><div class="hb-logo">${HB_LOGO}</div><b>Свои боты за пару минут</b><small>Команды, кнопки, рассылки и мини-приложения на HTML — без сервера и программирования</small></div>
+<button type="button" class="sg-btn" id="hbNew" ${list.length >= lim ? 'disabled style="opacity:.5"' : ''}>➕ Создать бота</button>
+<div class="sg-sec">Мои боты · ${list.length}/${lim}</div>
+${list.length ? `<div class="tgp-card">${list.map(b => `<button type="button" class="sg-row hb-botrow" data-bid="${b.id}">${hbAv(b)}<span class="tx"><b>${esc(b.name)}</b><small>@${esc(b.handle)} · 👥 ${b.stats.users} · 💬 ${b.stats.msgs}${b.hasApp ? ' · 🚀 приложение' : ''}</small></span><span class="go">›</span></button>`).join('')}</div>`
+  : '<div class="sg-note" style="text-align:center;padding:10px 30px">У вас пока нет ботов. Создайте первого — это бесплатно.</div>'}
+<div class="tgp-card">${sgRow({ ic: '📖', bg: '#4f8dff', t: 'Как это работает', sub: 'Команды, кнопки и API мини-приложений', attr: 'data-hbhelp', go: true })}
+${sgRow({ ic: '💬', bg: 'linear-gradient(135deg,#ff8a3d,#7b5cff)', t: 'Чат с Hours', sub: 'Уведомления о сообщениях вашим ботам', attr: 'data-hbchat', go: true })}</div>`);
+  const card = $('#card');
+  card.querySelector('#hbNew').onclick = hbCreate;
+  card.querySelectorAll('[data-bid]').forEach(b => b.onclick = () => hbEditor(+b.dataset.bid));
+  card.querySelector('[data-hbhelp]').onclick = hbHelp;
+  card.querySelector('[data-hbchat]').onclick = hbOpenHoursChat;
+}
+
+/* ---------- Создание ---------- */
+function hbCreate() {
+  closeModal();
+  const sh = sgSheet(`<div class="hb-form">
+<label>Имя бота<input id="hbName" maxlength="40" placeholder="Например, Пицца Mario"></label>
+<label>Юзернейм<div class="hb-at"><span>@</span><input id="hbHandle" maxlength="30" autocapitalize="off" autocomplete="off" placeholder="pizza_mario_bot"></div></label>
+<div class="hb-hint" id="hbHint">Латиница, цифры и _, должен заканчиваться на <b>bot</b></div>
+<button type="button" class="sg-btn" id="hbGo">Создать</button></div>`, { title: '🤖 Новый бот' });
+  sh.style.touchAction = 'pan-y';
+  const n = sh.querySelector('#hbName'), h = sh.querySelector('#hbHandle'), hint = sh.querySelector('#hbHint');
+  let touched = false;
+  const TR = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'z', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' };
+  const slug = s => [...s.toLowerCase()].map(ch => TR[ch] ?? ch).join('').replace(/[^a-z0-9_ ]/g, '').trim().replace(/\s+/g, '_').replace(/^[^a-z]+/, '').slice(0, 26);
+  n.oninput = () => { if (!touched) { const s = slug(n.value); h.value = s ? (s.endsWith('bot') ? s : s + '_bot') : ''; } check(); };
+  h.oninput = () => { touched = true; h.value = h.value.toLowerCase().replace(/[^a-z0-9_]/g, ''); check(); };
+  const check = () => { const ok = /^[a-z][a-z0-9_]{1,26}bot$/.test(h.value); hint.classList.toggle('ok', ok); hint.innerHTML = ok ? '✓ Отличный юзернейм' : 'Латиница, цифры и _, должен заканчиваться на <b>bot</b>'; };
+  setTimeout(() => n.focus(), 350);
+  sh.querySelector('#hbGo').onclick = async () => {
+    const b = sh.querySelector('#hbGo'); b.disabled = true;
+    try { const bot = await api('/api/hours/bots', 'POST', { name: n.value, handle: h.value }); sgSheetClose(); toast('✅ Бот @' + bot.handle + ' создан'); setTimeout(() => hbEditor(bot.id), 300); }
+    catch (x) { hint.classList.remove('ok'); hint.textContent = x.message; b.disabled = false; }
+  };
+}
+
+/* ---------- Редактор кнопок (общий) ---------- */
+const HB_KINDS = [['cmd', 'Команда'], ['url', 'Ссылка'], ['app', 'Приложение']];
+function hbButtonsHtml(rows) {
+  const flat = (rows || []).flat();
+  return `<div class="hb-btns">${flat.map((b, i) => hbBtnRow(b, i)).join('')}</div><button type="button" class="hb-addbtn" data-addbtn>＋ Добавить кнопку</button>`;
+}
+const hbBtnRow = b => `<div class="hb-brow"><input class="hb-bt" maxlength="40" placeholder="Текст кнопки" value="${esc(b.t || '')}">
+<select class="hb-bk">${HB_KINDS.map(([k, t]) => `<option value="${k}" ${b.k === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+<input class="hb-bv" maxlength="400" placeholder="${b.k === 'url' ? 'https://…' : '/команда'}" value="${esc(b.v || '')}" ${b.k === 'app' ? 'hidden' : ''}>
+<button type="button" class="hb-bx" aria-label="Удалить">✕</button></div>`;
+function hbBindButtons(root) {
+  const box = root.querySelector('.hb-btns');
+  const bindRow = r => {
+    r.querySelector('.hb-bx').onclick = () => r.remove();
+    const k = r.querySelector('.hb-bk'), v = r.querySelector('.hb-bv');
+    k.onchange = () => { v.hidden = k.value === 'app'; v.placeholder = k.value === 'url' ? 'https://…' : '/команда'; };
+  };
+  box.querySelectorAll('.hb-brow').forEach(bindRow);
+  root.querySelector('[data-addbtn]').onclick = () => {
+    if (box.children.length >= 8) return toast('Максимум 8 кнопок');
+    box.insertAdjacentHTML('beforeend', hbBtnRow({ k: 'cmd' })); bindRow(box.lastElementChild); box.lastElementChild.querySelector('input').focus();
+  };
+}
+const hbReadButtons = root => [...root.querySelectorAll('.hb-brow')].map(r => ({ t: r.querySelector('.hb-bt').value.trim(), k: r.querySelector('.hb-bk').value, v: r.querySelector('.hb-bv').value.trim() }))
+  .filter(b => b.t).map(b => [b]);
+
+/* ---------- Редактор бота ---------- */
+const HB_TABS = [['main', 'Основное'], ['cmds', 'Команды'], ['app', 'Приложение'], ['cast', 'Рассылка'], ['stats', 'Статистика']];
+async function hbSave(patch, quiet) {
+  try { hbBot = await api('/api/hours/bots/' + hbBot.id, 'PUT', patch); if (!quiet) toast('💾 Сохранено'); loadChats(); return true; }
+  catch (x) { toast(x.message); return false; }
+}
+async function hbEditor(id, tab = 'main') {
+  if (!hbBot || hbBot.id !== id) {
+    try { hbBot = await api('/api/hours/bots/' + id); } catch (x) { return toast(x.message); }
+  }
+  const b = hbBot;
+  const head = `<div class="hb-head">${hbAv(b, 'l')}<div><b>${esc(b.name)}</b><small>@${esc(b.handle)}</small></div><button type="button" class="hb-open" data-openbot>Открыть чат</button></div>
+<div class="hb-tabs">${HB_TABS.map(([k, t]) => `<button type="button" data-tab="${k}" class="${k === tab ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+  let body = '';
+  if (tab === 'main') {
+    body = `<div class="sg-sec">Профиль</div>
+<div class="tgp-card hb-fields"><label>Имя<input id="hbN" maxlength="40" value="${esc(b.name)}"></label>
+<label>Описание<textarea id="hbAbout" rows="2" maxlength="200" placeholder="Что умеет бот — видно в профиле">${esc(b.about)}</textarea></label>
+<button type="button" class="hb-link" id="hbPhoto">📷 ${b.avatar ? 'Сменить фото' : 'Добавить фото'}</button></div>
+<div class="sg-sec">Приветствие — ответ на /start</div>
+<div class="tgp-card hb-fields" id="hbStart"><textarea id="hbStartT" rows="4" maxlength="4000">${esc(b.start.text)}</textarea>
+<div class="hb-tip">{name} заменится на имя пользователя</div>${hbButtonsHtml(b.start.buttons)}</div>
+<div class="sg-sec">Если бот не понял</div>
+<div class="tgp-card hb-fields"><textarea id="hbFb" rows="2" maxlength="4000" placeholder="Пусто — бот промолчит">${esc(b.fallback.text)}</textarea></div>
+<div class="tgp-card">${sgRow({ ic: '📨', bg: '#ff9f0a', t: 'Пересылать мне сообщения', sub: 'Сообщения боту придут вам в Hours — ответите от имени бота', right: sgTg(b.forward), attr: 'data-fwd' })}</div>
+<button type="button" class="sg-btn" id="hbSaveMain">💾 Сохранить</button>
+<button type="button" class="sg-btn red" id="hbDel">🗑 Удалить бота</button>`;
+  } else if (tab === 'cmds') {
+    body = `<div class="sg-note" style="padding-top:14px">Команда срабатывает на /команду, ключевые слова — на любое сообщение, где они встречаются. /help со списком команд бот покажет сам.</div>
+${b.commandsList.length ? `<div class="tgp-card">${b.commandsList.map((c, i) => sgRow({ ic: c.cmd ? '/' : '🔑', bg: c.cmd ? '#4f8dff' : '#34c77b', t: esc(c.cmd || c.kw.join(', ')), sub: esc((c.desc ? c.desc + ' · ' : '') + c.text.slice(0, 60)) + (c.buttons.length ? ' · 🔘 ' + c.buttons.flat().length : ''), attr: `data-cmd="${i}"`, go: true })).join('')}</div>` : '<div class="sg-note" style="text-align:center">Команд пока нет</div>'}
+<button type="button" class="sg-btn" data-cmd="new">＋ Добавить команду</button>`;
+  } else if (tab === 'app') {
+    body = `<div class="sg-note" style="padding-top:14px">Мини-приложение — ваша страница на HTML, CSS и JavaScript. Пользователь открывает её кнопкой в чате с ботом. Страница работает в защищённой «песочнице» и общается с Saimongram через объект <b>Hours</b>.</div>
+<div class="tgp-card hb-fields"><label>Заголовок<input id="hbAT" maxlength="40" value="${esc(b.appTitle || b.name)}"></label>
+<label>Текст кнопки в чате<input id="hbAB" maxlength="24" value="${esc(b.appBtn || 'Открыть')}"></label></div>
+<div class="sg-sec">Начать с шаблона</div>
+<div class="hb-tpls">${Object.entries(HB_TEMPLATES).map(([k, t]) => `<button type="button" data-tpl="${k}">${t.name}</button>`).join('')}</div>
+<div class="sg-sec">Код · <span id="hbSize"></span></div>
+<textarea id="hbHtml" class="hb-code" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="<!doctype html>…">${esc(b.html || '')}</textarea>
+<div class="hb-row2"><button type="button" class="sg-btn hb-ghost" id="hbPrev">▶ Предпросмотр</button><button type="button" class="sg-btn" id="hbSaveApp">💾 Сохранить</button></div>
+${b.html ? '<button type="button" class="hb-link" id="hbRmApp" style="color:#ff5a50">Убрать приложение</button>' : ''}
+<details class="hb-api"><summary>📖 API мини-приложения</summary><pre>Hours.user          // {id, name, handle}
+Hours.bot           // {name, handle}
+Hours.theme.dark    // true — тёмная тема
+Hours.sendData(obj)       // данные → владельцу в Hours
+Hours.sendMessage(text)   // бот пишет пользователю
+Hours.storage.get(key)    // личное хранилище
+Hours.storage.set(key, v)
+Hours.storage.all()
+Hours.toast(text)         // уведомление
+Hours.haptic('light')     // вибрация
+Hours.openLink(url)       // открыть ссылку
+Hours.setTitle(text)
+Hours.close()</pre></details>`;
+  } else if (tab === 'cast') {
+    body = `<div class="sg-hero" style="margin-top:14px"><div class="e">📣</div><b>Рассылка</b><small>Сообщение получат все, кто запускал бота: ${b.stats.users} ${plural(b.stats.users, ['человек', 'человека', 'человек'])}</small></div>
+<div class="tgp-card hb-fields" id="hbCast"><textarea id="hbCastT" rows="5" maxlength="4000" placeholder="Например: 🔥 Сегодня скидка 20%!"></textarea>${hbButtonsHtml([])}</div>
+<button type="button" class="sg-btn" id="hbCastGo" ${b.stats.users ? '' : 'disabled style="opacity:.5"'}>📣 Отправить</button>
+<div class="sg-note">Не чаще одной рассылки в минуту. Не рассылайте спам — пользователи могут заблокировать бота.</div>`;
+  } else if (tab === 'stats') {
+    const tile = (n, t, e) => `<div class="hb-stat"><span>${e}</span><b>${n}</b><small>${t}</small></div>`;
+    body = `<div class="hb-stats">${tile(b.stats.users, 'пользователей', '👥')}${tile(b.stats.msgs, 'сообщений', '💬')}${tile(b.stats.opens, 'открытий приложения', '🚀')}${tile(b.stats.broadcasts, 'рассылок', '📣')}</div>
+<div class="sg-sec">Данные из приложения</div>
+${b.inbox && b.inbox.length ? `<div class="tgp-card">${b.inbox.map(x => `<div class="sg-row" style="cursor:default;align-items:flex-start"><span class="sg-ic" style="background:#7b5cff">📦</span><span class="tx"><b>${esc(x.name || 'Пользователь')}${x.handle ? ' <small style="display:inline">@' + esc(x.handle) + '</small>' : ''}</b><small class="hb-data">${esc(x.data)}</small><small>${new Date(x.at).toLocaleString('ru-RU')}</small></span><button type="button" class="lnk" data-rep="${x.from}">Ответить</button></div>`).join('')}</div>`
+  : '<div class="sg-note" style="text-align:center">Пока пусто. Когда приложение вызовет Hours.sendData(…), данные появятся здесь и придут вам в Hours.</div>'}
+<div class="sg-note">Создан ${new Date(b.createdAt).toLocaleDateString('ru-RU')}</div>`;
+  }
+  hbPage(hbTop('Настройка бота', true) + head + body, hbStudio);
+  const card = $('#card');
+  card.querySelectorAll('[data-tab]').forEach(t => t.onclick = () => hbEditor(id, t.dataset.tab));
+  card.querySelector('[data-openbot]').onclick = async () => { closeModal(); await openUser(b.id); };
+  if (tab === 'main') {
+    hbBindButtons(card.querySelector('#hbStart'));
+    card.querySelector('[data-fwd]').onclick = e => { const t = e.currentTarget.querySelector('.sg-tg'); t.classList.toggle('on'); };
+    card.querySelector('#hbPhoto').onclick = async () => {
+      const f = await pickFile('image/*'); if (!f) return;
+      try { const url = await uploadAvatar(f); if (url && await hbSave({ avatar: url })) hbEditor(id, 'main'); } catch (x) { toast(x.message); }
+    };
+    card.querySelector('#hbSaveMain').onclick = async () => {
+      if (await hbSave({ name: card.querySelector('#hbN').value, about: card.querySelector('#hbAbout').value,
+        start: { text: card.querySelector('#hbStartT').value, buttons: hbReadButtons(card.querySelector('#hbStart')) },
+        fallback: { text: card.querySelector('#hbFb').value, buttons: [] },
+        forward: card.querySelector('[data-fwd] .sg-tg').classList.contains('on') })) hbEditor(id, 'main');
+    };
+    card.querySelector('#hbDel').onclick = async () => {
+      if (!confirm(`Удалить бота @${b.handle}? Все чаты с ним пропадут у пользователей. Это нельзя отменить.`)) return;
+      try { await api('/api/hours/bots/' + id, 'DELETE'); hbBot = null; toast('Бот удалён'); loadChats(); hbStudio(); } catch (x) { toast(x.message); }
+    };
+  } else if (tab === 'cmds') {
+    card.querySelectorAll('[data-cmd]').forEach(r => r.onclick = () => hbCmdEditor(r.dataset.cmd === 'new' ? -1 : +r.dataset.cmd));
+  } else if (tab === 'app') {
+    const ta = card.querySelector('#hbHtml'), size = card.querySelector('#hbSize');
+    const paint = () => { size.textContent = sgFmtBytes(new Blob([ta.value]).size) + ' из 300 КБ'; };
+    ta.oninput = paint; paint();
+    ta.onkeydown = e => { if (e.key === 'Tab') { e.preventDefault(); const p = ta.selectionStart; ta.setRangeText('  ', p, ta.selectionEnd, 'end'); } };
+    card.querySelectorAll('[data-tpl]').forEach(t => t.onclick = () => { if (ta.value.trim() && !confirm('Заменить текущий код шаблоном?')) return; ta.value = HB_TEMPLATES[t.dataset.tpl].html; paint(); });
+    card.querySelector('#hbPrev').onclick = () => { if (!ta.value.trim()) return toast('Сначала добавьте код или выберите шаблон'); hbRunApp({ html: ta.value, title: card.querySelector('#hbAT').value || b.name, name: b.name, handle: b.handle, avatar: b.avatar, botId: b.id, preview: true }); };
+    card.querySelector('#hbSaveApp').onclick = async () => { if (await hbSave({ html: ta.value, appTitle: card.querySelector('#hbAT').value, appBtn: card.querySelector('#hbAB').value })) hbEditor(id, 'app'); };
+    card.querySelector('#hbRmApp')?.addEventListener('click', async () => { if (confirm('Убрать мини-приложение у бота?') && await hbSave({ html: '' })) hbEditor(id, 'app'); });
+  } else if (tab === 'cast') {
+    hbBindButtons(card.querySelector('#hbCast'));
+    card.querySelector('#hbCastGo').onclick = async () => {
+      const text = card.querySelector('#hbCastT').value.trim();
+      if (!text) return toast('Напишите текст рассылки');
+      if (!confirm(`Отправить сообщение ${b.stats.users} ${plural(b.stats.users, ['пользователю', 'пользователям', 'пользователям'])}?`)) return;
+      try { const r = await api('/api/hours/bots/' + id + '/broadcast', 'POST', { text, buttons: hbReadButtons(card.querySelector('#hbCast')) }); toast(`📣 Отправлено: ${r.count}`); hbBot = null; hbEditor(id, 'stats'); }
+      catch (x) { toast(x.message); }
+    };
+  } else if (tab === 'stats') {
+    card.querySelectorAll('[data-rep]').forEach(r => r.onclick = () => hbReplySheet(id, +r.dataset.rep));
+  }
+}
+
+/* ---------- Команда ---------- */
+function hbCmdEditor(i) {
+  const b = hbBot, c = i >= 0 ? b.commandsList[i] : { cmd: '', kw: [], desc: '', text: '', buttons: [] };
+  const mode = c.cmd || i < 0 ? 'cmd' : 'kw';
+  hbPage(hbTop(i >= 0 ? 'Команда' : 'Новая команда', true) + `
+<div class="sg-seg" id="hbMode"><button type="button" data-m="cmd" class="${mode === 'cmd' ? 'on' : ''}">/команда</button><button type="button" data-m="kw" class="${mode === 'kw' ? 'on' : ''}">Ключевые слова</button></div>
+<div class="tgp-card hb-fields">
+<label id="hbCmdL" ${mode === 'kw' ? 'hidden' : ''}>Команда<div class="hb-at"><span>/</span><input id="hbCmd" maxlength="32" autocapitalize="off" placeholder="menu" value="${esc((c.cmd || '').replace(/^\//, ''))}"></div></label>
+<label id="hbKwL" ${mode === 'cmd' ? 'hidden' : ''}>Ключевые слова через запятую<input id="hbKw" maxlength="400" placeholder="цена, сколько, стоимость" value="${esc(c.kw.join(', '))}"></label>
+<label>Описание для /help<input id="hbDesc" maxlength="80" placeholder="Показать меню" value="${esc(c.desc || '')}"></label>
+<label>Ответ бота<textarea id="hbTxt" rows="5" maxlength="4000" placeholder="Текст ответа">${esc(c.text)}</textarea></label>
+<div class="hb-tip">{name} заменится на имя пользователя</div>
+<div id="hbCB">${hbButtonsHtml(c.buttons)}</div></div>
+<button type="button" class="sg-btn" id="hbCmdSave">💾 Сохранить команду</button>
+${i >= 0 ? '<button type="button" class="sg-btn red" id="hbCmdDel">Удалить команду</button>' : ''}`, () => hbEditor(b.id, 'cmds'));
+  const card = $('#card');
+  hbBindButtons(card.querySelector('#hbCB'));
+  let m = mode;
+  card.querySelectorAll('#hbMode button').forEach(x => x.onclick = () => { m = x.dataset.m; card.querySelectorAll('#hbMode button').forEach(y => y.classList.toggle('on', y === x)); card.querySelector('#hbCmdL').hidden = m !== 'cmd'; card.querySelector('#hbKwL').hidden = m !== 'kw'; });
+  const list = () => b.commandsList.map(x => ({ ...x, kw: x.kw.join(', ') }));
+  card.querySelector('#hbCmdSave').onclick = async () => {
+    const item = { id: c.id, cmd: m === 'cmd' ? card.querySelector('#hbCmd').value : '', kw: m === 'kw' ? card.querySelector('#hbKw').value : '', desc: card.querySelector('#hbDesc').value,
+      text: card.querySelector('#hbTxt').value, buttons: hbReadButtons(card.querySelector('#hbCB')) };
+    if (m === 'cmd' && !item.cmd.replace(/[^a-z0-9_]/gi, '')) return toast('Введите команду латиницей');
+    if (m === 'kw' && !item.kw.trim()) return toast('Введите хотя бы одно слово');
+    if (!item.text.trim() && !item.buttons.length) return toast('Напишите ответ бота');
+    const all = list(); if (i >= 0) all[i] = item; else all.push(item);
+    if (await hbSave({ commands: all })) hbEditor(b.id, 'cmds');
+  };
+  card.querySelector('#hbCmdDel')?.addEventListener('click', async () => { const all = list(); all.splice(i, 1); if (await hbSave({ commands: all })) hbEditor(b.id, 'cmds'); });
+}
+
+/* ---------- Ответ пользователю от имени бота ---------- */
+function hbReplySheet(botId, uid) {
+  closeModal();
+  const sh = sgSheet(`<div class="hb-form"><textarea id="hbRep" rows="4" maxlength="4000" placeholder="Ваш ответ — придёт от имени бота"></textarea><button type="button" class="sg-btn" id="hbRepGo">Отправить</button></div>`, { title: '↩️ Ответ от имени бота' });
+  sh.style.touchAction = 'pan-y';
+  setTimeout(() => sh.querySelector('#hbRep').focus(), 350);
+  sh.querySelector('#hbRepGo').onclick = async () => {
+    const text = sh.querySelector('#hbRep').value.trim(); if (!text) return;
+    try { await api('/api/hours/bots/' + botId + '/reply', 'POST', { to: uid, text }); sgSheetClose(); toast('✅ Ответ отправлен'); } catch (x) { toast(x.message); }
+  };
+}
+
+/* ---------- Справка ---------- */
+function hbHelp() {
+  hbPage(hbTop('Как это работает', true) + `<div class="hb-help">
+<div class="hb-step"><b>1</b><div><h4>Создайте бота</h4>Придумайте имя и юзернейм, который заканчивается на <code>bot</code>. Бот сразу появится в поиске.</div></div>
+<div class="hb-step"><b>2</b><div><h4>Приветствие и команды</h4>Напишите, что бот ответит на <code>/start</code>, добавьте команды (<code>/menu</code>, <code>/price</code>) и ключевые слова. К ответам можно прикрепить кнопки: команду, ссылку или запуск приложения.</div></div>
+<div class="hb-step"><b>3</b><div><h4>Мини-приложение</h4>Вставьте свой HTML/CSS/JS или возьмите шаблон. Приложение открывается кнопкой в чате и умеет отправлять вам данные, писать пользователю и хранить его прогресс.</div></div>
+<div class="hb-step"><b>4</b><div><h4>Общайтесь и делайте рассылки</h4>Сообщения пользователей приходят вам в Hours — отвечайте от имени бота. Рассылка дойдёт всем, кто запускал бота.</div></div>
+<div class="sg-note">🔒 Приложения ботов работают в защищённой «песочнице»: у них нет доступа к вашему аккаунту, перепискам и паролю.</div></div>
+<button type="button" class="sg-btn" id="hbHelpNew">➕ Создать бота</button>`, hbStudio);
+  $('#card').querySelector('#hbHelpNew').onclick = hbCreate;
+}
+
+/* ---------- Запуск мини-приложения в «песочнице» ---------- */
+const HB_BRIDGE = cfg => `<script>(function(){var n=0,w={},C=${JSON.stringify(cfg).replace(/</g, '\\u003c')};
+function call(m,a){return new Promise(function(res,rej){var id=++n;w[id]=[res,rej];parent.postMessage({__hours:1,id:id,m:m,a:a||{}},'*');});}
+addEventListener('message',function(e){var d=e.data;if(!d||!d.__hoursR||!w[d.id])return;var p=w[d.id];delete w[d.id];d.e?p[1](new Error(d.e)):p[0](d.r);});
+window.Hours={user:C.user,bot:C.bot,theme:C.theme,
+toast:function(t){return call('toast',{text:String(t)})},close:function(){return call('close')},haptic:function(t){return call('haptic',{type:t||'light'})},
+sendData:function(d){return call('sendData',{data:d})},sendMessage:function(t){return call('sendMessage',{text:String(t)})},
+openLink:function(u){return call('openLink',{url:String(u)})},setTitle:function(t){return call('setTitle',{title:String(t)})},
+storage:{get:function(k){return call('storageGet',{key:String(k)})},set:function(k,v){return call('storageSet',{key:String(k),value:v})},remove:function(k){return call('storageSet',{key:String(k),value:null})},all:function(){return call('storageAll')}}};
+})();<\/script>`;
+function hbInject(html, bridge) {
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, m => m + bridge);
+  if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, m => m + '<head>' + bridge + '</head>');
+  return '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">' + bridge + '</head><body>' + html + '</body></html>';
+}
+async function hbOpenApp(botId) {
+  try { const d = await api('/api/bots/' + botId + '/app'); hbRunApp({ ...d, botId }); }
+  catch (x) { toast(x.message); }
+}
+function hbRunApp({ html, title, name, handle, avatar, botId, preview }) {
+  $('#hbApp')?.remove();
+  const dark = document.documentElement.dataset.theme === 'dark';
+  const ov = document.createElement('div'); ov.id = 'hbApp';
+  ov.innerHTML = `<div class="ha-sheet"><div class="ha-head"><button type="button" class="ha-x" aria-label="Закрыть">✕</button>
+<div class="ha-t">${hbAv({ id: botId, name, avatar }, 's')}<div><b id="haTitle">${esc(title || name)}</b><small>${preview ? '🧪 предпросмотр' : 'бот @' + esc(handle)}</small></div></div>
+<button type="button" class="ha-more" aria-label="Ещё">⋯</button></div>
+<div class="ha-body"><div class="ha-load"><span></span></div></div></div>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('on'));
+  const body = ov.querySelector('.ha-body');
+  const fr = document.createElement('iframe');
+  fr.setAttribute('sandbox', 'allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads');
+  fr.setAttribute('allow', 'autoplay; fullscreen; clipboard-write');
+  fr.setAttribute('referrerpolicy', 'no-referrer');
+  const cfgApp = { user: { id: me.id, name: me.username, handle: me.handle }, bot: { name, handle }, theme: { dark, accent: '#6a4cff' } };
+  const load = () => { fr.srcdoc = hbInject(html, HB_BRIDGE(cfgApp)); };
+  fr.onload = () => ov.querySelector('.ha-load')?.remove();
+  body.appendChild(fr); load();
+  let store = null;
+  const close = () => { removeEventListener('message', onMsg); ov.classList.remove('on'); setTimeout(() => ov.remove(), 300); };
+  async function rpc(m, a) {
+    if (m === 'toast') { toast(String(a.text).slice(0, 200)); return true; }
+    if (m === 'close') { close(); return true; }
+    if (m === 'haptic') { try { navigator.vibrate && navigator.vibrate(a.type === 'error' ? [40, 40, 40] : a.type === 'success' ? [20, 30, 20] : 12); } catch {} return true; }
+    if (m === 'setTitle') { ov.querySelector('#haTitle').textContent = String(a.title).slice(0, 40); return true; }
+    if (m === 'openLink') { const u = String(a.url); if (!/^https?:\/\//i.test(u)) throw new Error('Только http(s) ссылки'); if (confirm('Бот хочет открыть ссылку:\n' + u)) window.open(u, '_blank', 'noopener'); return true; }
+    if (m === 'sendData') { if (preview) { toast('🧪 Предпросмотр: данные «' + JSON.stringify(a.data).slice(0, 80) + '»'); return true; } await api('/api/bots/' + botId + '/app/data', 'POST', { data: a.data }); return true; }
+    if (m === 'sendMessage') { if (preview) { toast('🧪 Бот написал бы: ' + String(a.text).slice(0, 80)); return true; } await api('/api/bots/' + botId + '/app/message', 'POST', { text: a.text }); return true; }
+    if (m === 'storageAll' || m === 'storageGet' || m === 'storageSet') {
+      if (store == null) store = preview ? JSON.parse(sessionStorage.getItem('hbprev_' + botId) || '{}') : await api('/api/bots/' + botId + '/app/storage');
+      const parse = v => { try { return JSON.parse(v); } catch { return v; } };
+      if (m === 'storageAll') return Object.fromEntries(Object.entries(store).map(([k, v]) => [k, parse(v)]));
+      if (m === 'storageGet') return a.key in store ? parse(store[a.key]) : null;
+      const v = a.value == null ? null : typeof a.value === 'string' ? a.value : JSON.stringify(a.value);
+      if (v == null) delete store[a.key]; else store[a.key] = v;
+      if (preview) sessionStorage.setItem('hbprev_' + botId, JSON.stringify(store));
+      else await api('/api/bots/' + botId + '/app/storage', 'PUT', { key: a.key, value: v });
+      return true;
+    }
+    throw new Error('Неизвестный метод ' + m);
+  }
+  async function onMsg(e) {
+    if (e.source !== fr.contentWindow) return; // только сообщения из этого приложения
+    const d = e.data; if (!d || !d.__hours) return;
+    let r, err;
+    try { r = await rpc(String(d.m), d.a || {}); } catch (x) { err = x.message || 'Ошибка'; }
+    fr.contentWindow && fr.contentWindow.postMessage({ __hoursR: 1, id: d.id, ...(err ? { e: err } : { r }) }, '*');
+  }
+  addEventListener('message', onMsg);
+  ov.querySelector('.ha-x').onclick = close;
+  ov.querySelector('.ha-more').onclick = () => {
+    const sh = sgSheet(`<div class="acts"><button type="button" data-a="reload"><span>Перезагрузить</span><span>🔄</span></button>${preview ? '' : '<button type="button" data-a="chat"><span>Открыть чат с ботом</span><span>💬</span></button>'}</div>
+<div class="sg-note" style="padding:12px 6px 0">🔒 Приложение работает в «песочнице» и не видит ваш аккаунт. Никогда не вводите в приложениях ботов пароль от Saimongram.</div>`, { title: esc(name) });
+    sh.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => { sgSheetClose(); if (b.dataset.a === 'reload') { store = null; load(); } else { close(); await openUser(botId); } });
+  };
+}
+
+/* ---------- Кнопка приложения в чате со своим ботом ---------- */
+const hbAppBtn = document.createElement('button');
+hbAppBtn.type = 'button'; hbAppBtn.id = 'hbAppBtn'; hbAppBtn.className = 'hb-appbtn'; hbAppBtn.hidden = true;
+$('#form').prepend(hbAppBtn);
+window.hbPaintAppBtn = c => {
+  const show = !!(c && c.peer && c.peer.custom && c.peer.app);
+  hbAppBtn.hidden = !show;
+  const cb = document.getElementById('circBtn'); if (cb) cb.style.display = show ? 'none' : ''; // в чате с ботом место отдаём кнопке приложения
+  if (show) { hbAppBtn.textContent = '🚀 ' + c.peer.app; hbAppBtn.onclick = () => hbOpenApp(c.peer.id); }
+};
 
 </script>
 </body>
