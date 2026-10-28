@@ -2346,9 +2346,9 @@ async function onWs(m) {
   } else if (m.type === 'messageEdited') {
     const l = msgs.get(d.chatId), i = l ? l.findIndex(x => x.id === d.messageId) : -1;
     if (i >= 0) {
-      l[i].text = d.text; l[i].edited = d.edited;
+      l[i].text = d.text; l[i].edited = d.edited; if ('ai' in d) l[i].ai = d.ai;
       const c = chats.get(d.chatId), el = cur === d.chatId && bubbleEl(d.messageId);
-      if (el && c) el.outerHTML = bubbleHtml(c, l, i);
+      if (el && c) { const keep = 'ai' in d && stick; el.outerHTML = bubbleHtml(c, l, i); if (keep) msgsEl.scrollTop = msgsEl.scrollHeight; }
     }
     const c = chats.get(d.chatId);
     if (c && c.last && c.last.id === d.messageId) { c.last.text = d.text; c.last.edited = d.edited; }
@@ -2388,6 +2388,8 @@ async function onWs(m) {
       const c = chats.get(d.chatId), el = cur === d.chatId && bubbleEl(d.messageId);
       if (el && c) el.outerHTML = bubbleHtml(c, l, i);
     }
+  } else if (m.type === 'auction') {
+    aucOnWs(d);
   } else if (m.type === 'emojiTap') {
     aeRemoteTap(d);
   } else if (m.type === 'msgPreview') {
@@ -2591,12 +2593,12 @@ function renderHead() {
   const c = chats.get(cur);
   if (!c) return;
   const t = typing.has(cur), on = c.peer && c.peer.online;
-  const sub = c.type === 'saved' ? 'заметки, ссылки и пересланное' : t ? 'печатает…' : c.type === 'group' ? c.members.length + ' участн.' : c.type === 'channel' ? subs(c.subscribers) : (c.peer && c.peer.bot ? 'бот' : on ? 'в сети' : fmtLastSeen(c.peer));
+  const sub = c.type === 'saved' ? 'заметки, ссылки и пересланное' : t ? (c.peer && c.peer.id === 103 ? 'думает…' : 'печатает…') : c.type === 'group' ? c.members.length + ' участн.' : c.type === 'channel' ? subs(c.subscribers) : (c.peer && c.peer.bot ? 'бот' : on ? 'в сети' : fmtLastSeen(c.peer));
   const isBot = c.type === 'direct' && c.peer && c.peer.bot;
   const isSaimonChat = c.type === 'direct' && c.peer && c.peer.handle === 'saimon_chat';
   const iBlock = c.type === 'direct' && c.peer && blocked.has(c.peer.id);
   const isCustomBot = isBot && c.peer.custom, isHours = isBot && c.peer.id === 102;
-  const canWrite = !iBlock && (!isBot || (isCustomBot && !!c.last)) && (c.type !== 'channel' || c.creator === me.id || c.open); // в канал пишет только автор; своим ботам — после «Начать»
+  const canWrite = !iBlock && (!isBot || c.peer.id === 103 || (isCustomBot && !!c.last)) && (c.type !== 'channel' || c.creator === me.id || c.open); // в канал пишет только автор; своим ботам — после «Начать»
   $('#form').hidden = !canWrite; $('#rdonly').hidden = canWrite;
   if (!canWrite) setHtml($('#rdonly'), isSaimonChat ? '🔒 Системные уведомления' : isBot ? (isHours && c.last ? '<button type="button" class="btn" id="hbstudio">🛠 Hours Studio — мои боты</button>' : `<button type="button" class="btn" id="botstart">▶️ ${isCustomBot ? 'Начать' : 'Старт'}</button>`) : iBlock ? 'Вы заблокировали этого пользователя · <button class="lnk" id="unb">Разблокировать</button>' : 'Писать в канал может только его автор');
   setHtml($('#hd'), cav(c, 's') +
@@ -2850,8 +2852,8 @@ function bubbleHtml(c, l, i) {
   // само сообщение (как в Telegram), а не отдельной кнопкой с тремя точками — см. msgsEl touch-обработчики.
   const fwdH = m.fwd ? `<div class="fwd">↪️ Переслано от <b>${esc(m.fwd.name)}</b></div>` : '';
   const rpH = m.reply ? `<div class="rp" data-r="${esc(m.reply.id)}"><b>${esc(m.reply.name)}</b><span>${m.reply.mk === 'circle' ? '⭕ Видеосообщение' : m.reply.mk === 'voice' ? '🎤 Голосовое сообщение' : m.reply.mk === 'sticker' ? '🎭 Стикер' : m.reply.mk === 'image' ? '📷 Фото' : m.reply.mk === 'video' ? '🎥 Видео' : m.reply.mk === 'gift' ? '🎁 Подарок' : esc(m.reply.text || '')}</span></div>` : '';
-  const ae = !m.media && !m.gift && !m.call && !m.prem && !m.preview && !(m.buttons && m.buttons.length) && aeOnly(m.text);
-  return `<div class="m ${ae ? 'jmb jmb' + ae.length : ''} ${mine && !ch ? 'me' : ''} ${ch ? '' : grpCls(l, i)} ${m.media || m.gift ? 'mm' : ''} ${ch ? 'ch' : ''} ${m.pending ? 'pending' : ''} ${m.media && m.media.sticker ? 'stk' : ''} ${m.media && m.media.circle ? 'circm' : ''} ${m.mentions && m.mentions.includes(me.id) ? 'ment' : ''}" data-id="${esc(m.id)}"${m.cid ? ` data-cid="${esc(m.cid)}"` : ''}>${who}${fwdH}${rpH}${m.call ? callBubble(m.call, mine) : ''}${m.gift ? giftBubble(m.gift, mine, m.text) : ''}${m.prem ? premBubble(m.prem, mine) : ''}${m.media ? mediaHtml(m.media) : ''}${sgTrHtml(m)}${ae ? `<span class="tx">${aeHtml(ae)}</span>` : m.text && !m.gift ? `<span class="tx">${linkify(m.text)}</span>` : ''}${m.preview && !m.gift ? lpCard(m.preview) : ''}${btnsHtml(m)}${rxHtml(m)}<time>${ch && m.views != null ? `<span class="vw" data-vw>👁 ${fmtViews(m.views)}</span>` : ''}${m.edited ? 'изм. ' : ''}${hm(m.timestamp)}${st}</time>${ch ? cmRow(m) : ''}</div>`;
+  const ae = !m.media && !m.gift && !m.call && !m.prem && !m.preview && !(m.buttons && m.buttons.length) && m.senderId !== 103 && aeOnly(m.text);
+  return `<div class="m ${ae ? 'jmb jmb' + ae.length : ''} ${mine && !ch ? 'me' : ''} ${ch ? '' : grpCls(l, i)} ${m.media || m.gift ? 'mm' : ''} ${ch ? 'ch' : ''} ${m.pending ? 'pending' : ''} ${m.media && m.media.sticker ? 'stk' : ''} ${m.media && m.media.circle ? 'circm' : ''} ${m.mentions && m.mentions.includes(me.id) ? 'ment' : ''}" data-id="${esc(m.id)}"${m.cid ? ` data-cid="${esc(m.cid)}"` : ''}>${who}${fwdH}${rpH}${m.call ? callBubble(m.call, mine) : ''}${m.gift ? giftBubble(m.gift, mine, m.text) : ''}${m.prem ? premBubble(m.prem, mine) : ''}${m.media ? mediaHtml(m.media) : ''}${sgTrHtml(m)}${ae ? `<span class="tx">${aeHtml(ae)}</span>` : m.senderId === 103 && (m.text || m.ai) && !m.gift ? aiHtml(m) : m.text && !m.gift ? `<span class="tx">${linkify(m.text)}</span>` : ''}${aiTr.size ? aiTrHtml(m) : ''}${m.preview && !m.gift ? lpCard(m.preview) : ''}${btnsHtml(m)}${rxHtml(m)}<time>${ch && m.views != null ? `<span class="vw" data-vw>👁 ${fmtViews(m.views)}</span>` : ''}${m.edited ? 'изм. ' : ''}${hm(m.timestamp)}${st}</time>${ch ? cmRow(m) : ''}</div>`;
 }
 // @юзернеймы в тексте — кликабельные (ищут и «второстепенные» handles)
 const HNDL_RE = /(^|[^a-zA-Z0-9_])@([a-z0-9_]{3,20})/g;
@@ -3592,11 +3594,13 @@ function picker(box, exclude) {
 $('#meBtn').onclick = () => myProfile('hub');
 
 // Настройки профиля: разделы в стиле мессенджера (группы строк с цветными иконками)
-const PROF_TITLES = { hub: 'Настройки', account: 'Аккаунт', premium: 'SAIMONPREMIYM', market: 'Магазин и рынок', customization: 'Кастомизация' };
+const PROF_TITLES = { hub: 'Настройки', account: 'Аккаунт', premium: 'SAIMONPREMIYM', market: 'Подарки и Mars', customization: 'Обои и тема', look: 'Внешний вид', security: 'Безопасность', device: 'Звуки и данные', tools: 'Инструменты' };
+const SG_FOLDERS = ['look', 'security', 'device', 'tools', 'market'];
 const profRow = (ic, bg, t, sub, attr) => `<button type="button" class="tgs-row" ${attr}><span class="tgs-ic" style="background:${bg}">${ic}</span><span class="tgs-tx"><b>${t}</b><small>${sub}</small></span><span class="tgs-go">›</span></button>`;
 function myProfile(view = 'hub') {
   const binders = [];
   if (typeof view !== 'string' || !PROF_TITLES[view]) view = 'hub';
+  if (view === 'hub') window.sgFolder = null; else if (SG_FOLDERS.includes(view)) window.sgFolder = view;
   const top = `<div class="tgp-top"><button type="button" class="tgp-back" ${view === 'hub' ? 'data-x' : 'data-back'} aria-label="Назад">‹</button><span class="tgp-title">${PROF_TITLES[view]}</span>${view === 'hub' ? `<button type="button" class="tgp-qr" data-myqr aria-label="QR-код"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg></button>` : '<span class="tgp-sp"></span>'}</div>`;
   const head = `<div class="tgp-head"><div id="pav">${uav(me, 'l')}</div>
 <div class="tgp-photo"><button type="button" class="lnk" id="pph">Сменить фото</button><button type="button" class="lnk" id="prm" ${me.avatar ? '' : 'hidden'}>Убрать</button></div>
@@ -3613,21 +3617,13 @@ ${profRow('👤', '#3390ec', 'Аккаунт', 'Имя, юзернейм, «О �
 ${profRow('💎', '#8e44ff', 'SAIMONPREMIYM', me.premium ? (me.premium === 'forever' ? 'Подписка навсегда' : 'Активна до ' + new Date(me.premium).toLocaleDateString('ru-RU')) : 'Подписки нет', 'data-go="premium"')}
 </div>
 <div class="tgp-card">
-${profRow('🤖', 'linear-gradient(135deg,#ff8a3d,#ff3d8b,#7b5cff)', 'Hours — свои боты<span class="sgnew">NEW</span>', 'Команды, кнопки, мини-приложения на HTML', 'data-hbstudio')}
-${profRow('🔳', 'linear-gradient(135deg,#3d6bff,#b23cff)', 'QR-код профиля<span class="sgnew">NEW</span>', 'Покажите другу — откроет ваш профиль', 'data-myqr')}
-${profRow('✨', 'linear-gradient(135deg,#a35bff,#ff5bb0)', 'Оформление<span class="sgnew">NEW</span>', 'Текст, пузырьки, цвет сообщений', 'data-sg="appearance"')}
-${profRow('🎨', '#ff6b35', 'Обои и тема', 'Обои чата, цветовая тема', 'data-go="customization"')}
-${profRow('🔔', '#ff9f0a', 'Звуки и вибрация<span class="sgnew">NEW</span>', 'Сообщения, мелодия звонка', 'data-sg="sounds"')}
+${profRow('🎨', 'linear-gradient(135deg,#a35bff,#ff5bb0)', 'Внешний вид', 'Оформление, обои и тема', 'data-go="look"')}
+${profRow('🔔', '#ff9f0a', 'Звуки и данные', 'Уведомления, звонок, память', 'data-go="device"')}
+${profRow('🔐', '#34c77b', 'Безопасность', 'Приватность, код-пароль, сеансы', 'data-go="security"')}
 </div>
 <div class="tgp-card">
-${profRow('🔒', '#34c77b', 'Конфиденциальность<span class="sgnew">NEW</span>', 'Звонки, фото, подарки, прочтение', 'data-sg="privacy"')}
-${profRow('🔑', '#5856d6', 'Код-пароль<span class="sgnew">NEW</span>', sgPinOn() ? 'Включён' : 'Выключен', 'data-sg="passcode"')}
-${profRow('🙈', '#7b5cff', 'Скрытые чаты<span class="sgnew">NEW</span>', 'Открываются по код-паролю', 'data-sg="hidden"')}
-${profRow('💻', '#ff453a', 'Активные сеансы<span class="sgnew">NEW</span>', 'Где вы вошли в аккаунт', 'data-sg="sessions"')}
-${profRow('💾', '#0aa5c9', 'Данные и память<span class="sgnew">NEW</span>', 'Кэш, автозагрузка медиа', 'data-sg="data"')}
-</div>
-<div class="tgp-card">
-${profRow('🎁', '#ff9500', 'Магазин и рынок', 'Подарки и юзернеймы', 'data-go="market"')}
+${profRow('🧰', 'linear-gradient(135deg,#22d3ee,#6366f1 55%,#d946ef)', 'Инструменты', 'Saimon AI, свои боты, QR-код', 'data-go="tools"')}
+${profRow('🎁', '#ff9500', 'Подарки и Mars', 'Магазин, рынок NFT, аукционы', 'data-go="market"')}
 ${ADMIN_HANDLES.includes(me.handle) ? profRow('🛠', '#5856d6', 'Админ-панель', 'Каналы и пользователи', 'id="padm"') : ''}
 </div>
 ${pinnedNftHtml(me)}
@@ -3671,7 +3667,38 @@ ${me.premium ? `<button type="button" class="tgp-item ${me.rainbowBorder ? 'tgp-
   } else if (view === 'market') {
     body = `<div class="tgp-card">
 ${profRow('🎁', '#ff9500', 'Магазин подарков', 'Купить и отправить подарки', 'id="pshop"')}
+${profRow('🛒', '#34c77b', 'Рынок NFT', 'Купить у игроков или продать свой', 'data-nft')}
+${profRow('🔨', 'linear-gradient(135deg,#ff8a3d,#ff3d8b,#7b5cff)', 'Аукционы NFT', 'Ставки с таймером', 'data-auc')}
 ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка и продажа юзернеймов', 'id="punm"')}
+</div>`;
+  } else if (view === 'look') {
+    body = `<div class="tgp-card">
+${profRow('✨', 'linear-gradient(135deg,#a35bff,#ff5bb0)', 'Оформление', 'Текст, пузырьки, цвет сообщений', 'data-sg="appearance"')}
+${profRow('🖼', '#ff6b35', 'Обои и тема', 'Обои чата, цветовая тема', 'data-go="customization"')}
+</div>`;
+  } else if (view === 'device') {
+    body = `<div class="tgp-card">
+${profRow('🔔', '#ff9f0a', 'Звуки и вибрация', 'Сообщения, мелодия звонка', 'data-sg="sounds"')}
+${profRow('💾', '#0aa5c9', 'Данные и память', 'Кэш, автозагрузка медиа', 'data-sg="data"')}
+</div>`;
+  } else if (view === 'security') {
+    body = `<div class="tgp-card">
+${profRow('🔒', '#34c77b', 'Конфиденциальность', 'Звонки, фото, подарки, прочтение', 'data-sg="privacy"')}
+${profRow('🔑', '#5856d6', 'Код-пароль', sgPinOn() ? 'Включён' : 'Выключен', 'data-sg="passcode"')}
+${profRow('🙈', '#7b5cff', 'Скрытые чаты', 'Открываются по код-паролю', 'data-sg="hidden"')}
+</div>
+<div class="tgp-card">
+${profRow('💻', '#ff453a', 'Активные сеансы', 'Где вы вошли в аккаунт', 'data-sg="sessions"')}
+${profRow('📷', '#3390ec', 'Подключить устройство', 'Вход на компьютере по QR-коду', 'data-scan')}
+</div>`;
+  } else if (view === 'tools') {
+    body = `<div class="tgp-card">
+${profRow('✨', 'linear-gradient(135deg,#22d3ee,#6366f1 55%,#d946ef)', 'Saimon AI', 'Умный помощник: вопросы, фото, поиск', 'data-aiopen')}
+${profRow('🤖', 'linear-gradient(135deg,#ff8a3d,#ff3d8b,#7b5cff)', 'Hours — свои боты', 'Команды, кнопки, мини-приложения', 'data-hbstudio')}
+</div>
+<div class="tgp-card">
+${profRow('🔳', 'linear-gradient(135deg,#3d6bff,#b23cff)', 'Мой QR-код', 'Покажите другу — откроет ваш профиль', 'data-myqr')}
+${profRow('📷', '#34c77b', 'Сканировать QR', 'Профиль друга или вход на компьютере', 'data-scan')}
 </div>`;
   } else if (view === 'customization') {
     const curAccent = localStorage.getItem('accent_theme') || 'blue';
@@ -3743,7 +3770,11 @@ ${profRow('🔤', '#30b0c7', 'Рынок юзернеймов', 'Покупка 
   $('#card').querySelectorAll('[data-sg]').forEach(b => b.onclick = () => sgSettings(b.dataset.sg));
   $('#card').querySelectorAll('[data-myqr]').forEach(b => b.onclick = () => sgShowQR(me));
   $('#card').querySelectorAll('[data-hbstudio]').forEach(b => b.onclick = () => hbStudio());
-  $('#card').querySelectorAll('[data-back]').forEach(b => b.onclick = () => myProfile('hub'));
+  $('#card').querySelectorAll('[data-back]').forEach(b => b.onclick = () => myProfile(SG_FOLDERS.includes(view) || !window.sgFolder ? 'hub' : window.sgFolder));
+  $('#card').querySelectorAll('[data-aiopen]').forEach(b => b.onclick = () => aiOpen());
+  $('#card').querySelectorAll('[data-scan]').forEach(b => b.onclick = () => { closeModal(); sgScanQR(); });
+  $('#card').querySelectorAll('[data-nft]').forEach(b => b.onclick = () => market());
+  $('#card').querySelectorAll('[data-auc]').forEach(b => b.onclick = () => auctions());
 
   // Мульти-аккаунт: переключение
   $('#card').querySelectorAll('[data-accid]').forEach(b => {
@@ -4564,11 +4595,13 @@ async function market(sort = 'new', kind = '') {
   try { lots = await api(`/api/market?sort=${sort}&kind=${encodeURIComponent(kind)}`); }
   catch (x) { modal(`<div class="err">${esc(x.message)}</div><div class="row"><button type="button" class="btn g" data-x>Закрыть</button></div>`); return; }
   modal(`<h2>🛒 Рынок NFT</h2>
+<button type="button" class="auc-entry" id="mkAuc"><span>🔨</span><b>Аукционы NFT</b><small>ставки с таймером</small><i>›</i></button>
 <div style="margin:6px 0 10px;font-weight:600">👽 <span class="mars-n">${me.unlimited ? '∞' : (me.mars || 0)}</span> Mars</div>
 <div class="mkbar"><button type="button" class="chip ${sort === 'new' ? 'on' : ''}" data-s="new">Новые</button><button type="button" class="chip ${sort === 'price' ? 'on' : ''}" data-s="price">Дешёвые</button><select id="mkk"><option value="">Все подарки</option>${[...catalog.values()].map(c => `<option value="${c.kind}" ${c.kind === kind ? 'selected' : ''}>${esc(c.emoji + ' ' + c.name)}</option>`).join('')}</select></div>
 ${lots.length ? `<div class="gg" id="mkg">${lots.map(lotCard).join('')}</div>` : '<div class="sec" style="padding:16px 0;text-align:center">Лотов пока нет.<br>Выставьте свой подарок: профиль → подарок → «Продать».</div>'}
 <div class="row"><button type="button" class="btn g" id="mkb">← В магазин</button><button type="button" class="btn g" data-x>Закрыть</button></div>`);
   $('#mkb').onclick = () => shop();
+  $('#mkAuc').onclick = () => auctions();
   $('#mkk').onchange = e => market(sort, e.target.value);
   $('#card').querySelectorAll('.chip').forEach(c => c.onclick = () => market(c.dataset.s, kind));
   const g = $('#mkg');
@@ -4709,12 +4742,14 @@ ${mine ? `
 ${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gwr">${me.acc && me.acc.gid === g.id ? '✨ Снять с ника' : '✨ Носить рядом с ником'}</button></div>`}
 ${g.listing ? '' : `<div class="row"><button class="btn g gok" id="gpinbtn">${me.pinnedNft && me.pinnedNft.gid === g.id ? '📌 Открепить из профиля' : '📌 Закрепить в профиле'}</button></div>`}
 ${g.listing ? '' : `<div class="row"><button class="btn gok" id="gupg" style="background:linear-gradient(135deg,#a259ff,#3390ec);color:#fff">🎲 Улучшить модель · 👽 ${Math.max(10, Math.round((g.price||k.price) * 0.3))} Mars</button></div>`}
-<div class="row"><button class="btn g gok" id="gsl">${g.listing ? `💰 На рынке за ${g.listing.price} Mars — изменить` : '💰 Продать на рынке'}</button></div>
+${g.auction ? '<div class="row"><button class="btn gok auc-go" id="gauc">🔨 На аукционе — открыть лот</button></div>' : `<div class="row"><button class="btn g gok" id="gsl">${g.listing ? `💰 На рынке за ${g.listing.price} Mars — изменить` : '💰 Продать на рынке'}</button></div>${g.listing ? '' : '<div class="row"><button class="btn g gok" id="gaucs">🔨 Выставить на аукцион</button></div>'}`}
 ${g.listing ? '<div class="row"><button class="btn r gok" id="gun">Снять с продажи</button></div>' : ''}
 <div class="row"><button class="btn g gok" id="gtr">Передать</button></div>` : ''}`);
   $('#gbk').onclick = back;
   if (mine) {
-    $('#gsl').onclick = () => askPrice(g, k, () => giftInfo(g, mine, back));
+    if ($('#gsl')) $('#gsl').onclick = () => askPrice(g, k, () => giftInfo(g, mine, back));
+    if ($('#gauc')) $('#gauc').onclick = () => aucLot(g.id, () => giftInfo(g, mine, back));
+    if ($('#gaucs')) $('#gaucs').onclick = () => aucStartSheet(g);
     if (g.listing) $('#gun').onclick = async () => {
       try { await api('/api/market/unlist', 'POST', {giftId: g.id}); delete g.listing; toast('Подарок снят с продажи'); giftInfo(g, mine, back); }
       catch (x) { const e = $('#ge'); if (e) e.textContent = x.message; }
@@ -5063,6 +5098,7 @@ function msgMenu(id) {
 <div class="acts">
 ${act('reply', '↩️', 'Ответить')}
 ${m.text ? act('copy', '📋', 'Копировать') : ''}
+${m.text || (m.media && m.media.tr) ? act('aitr', '🌍', 'Перевести · ИИ') : ''}
 ${m.gift || m.call ? '' : act('fwd', '↪️', 'Переслать')}
 ${act('pin', pinned ? '📍' : '📌', pinned ? 'Открепить' : 'Закрепить')}
 ${act('find', '🔍', 'Поиск в чате')}
@@ -5078,6 +5114,7 @@ ${mine ? act('del', '🗑', 'Удалить', 'red') : ''}
     if (k === 'reply') startReply(id);
     else if (k === 'copy') { try { await navigator.clipboard.writeText(m.text); toast('Скопировано'); } catch { toast('Не удалось скопировать'); } }
     else if (k === 'fwd') forwardPick(id);
+    else if (k === 'aitr') aiTranslate(id);
     else if (k === 'pin') togglePin(id);
     else if (k === 'find') { $('#sbar').hidden = false; $('#sres').hidden = true; $('#si').value = ''; $('#si').focus(); }
     else if (k === 'edit') startEdit(id);
@@ -5181,6 +5218,7 @@ function chatMenu(id) {
   items.unshift(['hide', sgIsHidden(c.id) ? '👁 Вернуть в список чатов' : '🙈 Скрыть чат (по код-паролю)', 'g']);
   if (c.type !== 'saved') items.unshift(['arch', ((me.archived || []).includes(c.id)) ? '📤 Вернуть из архива' : '🗄 В архив', 'g']);
   items.unshift(['media', '🖼 Медиа, ссылки и голосовые', 'g']);
+  if (c.type !== 'saved' && !(c.peer && c.peer.id === 103)) items.unshift(['aisum', '✨ Пересказ чата · ИИ', 'g']);
   modal(`<h2 style="margin-bottom:6px">${esc(title(c))}</h2>${items.map(([k, t, cls]) =>
     `<div class="row"><button class="btn ${cls}" data-a="${k}">${t}</button></div>`).join('')}
 <div class="row"><button type="button" class="btn g" data-x>Отмена</button></div>`);
@@ -6419,7 +6457,7 @@ ${sgRow({ ic: '🎬', bg: '#ff6b8a', t: 'Видео', sub: 'Выкл — вид�
   }
   profileModal(`<div class="tgp sgp">${top}${body}</div>`);
   const card = $('#card'), again = () => sgSettings(view, opts);
-  card.querySelector('[data-sgback]').onclick = () => back === 'hub' ? myProfile('hub') : sgSettings(back);
+  card.querySelector('[data-sgback]').onclick = () => back === 'hub' ? myProfile(window.sgFolder || 'hub') : sgSettings(back);
   card.querySelectorAll('[data-sgto]').forEach(b => b.onclick = () => sgSettings(b.dataset.sgto, { from: view }));
   card.querySelector('[data-gocust]')?.addEventListener('click', () => myProfile('customization'));
   card.querySelector('[data-goacc]')?.addEventListener('click', () => myProfile('account'));
@@ -8184,6 +8222,66 @@ html[data-theme="dark"] .ql-card{background:#17212b;color:#f2f5f8}
 .ql-ask .ql-yes{background:linear-gradient(135deg,#4f8dff,#7b5cff)!important;color:#fff!important}
 .ql-ask .sg-btn{width:100%;margin:6px 0 0}
 .ql-ask .ql-no{background:rgba(127,127,127,.16)!important;color:inherit!important;box-shadow:none!important}
+
+/* ===== Saimon AI ===== */
+.ai-ib{background:linear-gradient(135deg,#22d3ee,#6366f1 55%,#d946ef)!important;color:#fff!important;border-radius:50%;box-shadow:0 4px 14px rgba(99,102,241,.45)}
+#msgs .aitx{white-space:pre-wrap}
+html #msgs .m .aitx b{display:inline!important;font-weight:700!important;color:inherit!important;font-size:inherit!important;margin:0!important;padding:0!important}
+html #msgs .m .aitx i{font-style:italic}
+#msgs .aitx code.aic{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em;padding:1px 5px;border-radius:6px;background:rgba(127,127,127,.18)}
+#msgs .aipre{position:relative;margin:6px 0;padding:30px 12px 10px;border-radius:14px;background:rgba(0,0,0,.28);overflow-x:auto;white-space:pre;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:#e6edf3}
+html[data-theme="light"] #msgs .aipre,html:not([data-theme="dark"]) #msgs .aipre{background:#0f172a}
+#msgs .aipre code{white-space:pre}
+.aicopy{position:absolute;top:6px;right:8px;border:0;border-radius:8px;padding:3px 8px;background:rgba(255,255,255,.12);color:#cbd5e1;font-size:11px;cursor:pointer}
+.aidots{display:inline-flex;gap:4px;vertical-align:middle;padding:4px 2px}
+.aidots i{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.35;animation:aiDot 1.2s infinite}
+.aidots i:nth-child(2){animation-delay:.2s}.aidots i:nth-child(3){animation-delay:.4s}
+@keyframes aiDot{30%{opacity:1;transform:translateY(-3px)}60%{opacity:.35;transform:none}}
+.aist{opacity:.75;font-size:.95em}
+.aicaret{display:inline-block;width:7px;height:1em;margin-left:2px;vertical-align:-2px;border-radius:2px;background:linear-gradient(#6366f1,#d946ef);animation:aiCaret .9s steps(2) infinite}
+@keyframes aiCaret{50%{opacity:0}}
+.aitr{margin-top:6px;padding:7px 10px;border-radius:12px;background:rgba(127,127,127,.13);font-size:.95em;white-space:pre-wrap}
+.aitr small{display:block;font-size:11px;opacity:.6;margin-bottom:2px}
+.aitr.err{color:#e5484d}
+.aisum{padding:2px 4px 10px}
+.aisum-h{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.aisum-h b{display:block;font-size:17px}.aisum-h small{opacity:.6}
+.aisum-ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:linear-gradient(135deg,#22d3ee,#6366f1 55%,#d946ef);box-shadow:0 6px 16px rgba(99,102,241,.4)}
+.aisum-b{white-space:pre-wrap;line-height:1.5;font-size:15px;padding:12px 14px;border-radius:16px;background:rgba(127,127,127,.1)}
+.aisum-n{display:block;margin-top:8px;opacity:.5;font-size:12px}
+/* ===== Аукцион ===== */
+.auc-entry{display:flex;align-items:center;gap:10px;width:100%;margin:8px 0 10px;padding:12px 14px;border:0;border-radius:18px;color:#fff;cursor:pointer;text-align:left;font-family:inherit;background:linear-gradient(135deg,#ff8a3d,#ff3d8b 55%,#7b5cff);box-shadow:0 8px 22px rgba(255,61,139,.3)}
+.auc-entry span{font-size:22px}.auc-entry b{font-size:15.5px}.auc-entry small{flex:1;opacity:.85;font-size:12.5px}.auc-entry i{font-style:normal;font-size:22px;opacity:.8}
+.auc-note{font-size:12.5px;color:var(--t2);margin:2px 0 10px;line-height:1.4}
+.auc-c{position:relative}
+.auc-p{font-weight:700;font-size:13px;margin-top:2px}
+.auc-t{display:inline-block;margin-top:3px;padding:1px 7px;border-radius:9px;background:rgba(0,0,0,.25);font-size:11.5px;font-variant-numeric:tabular-nums}
+.auc-t.hot,.auc-tm.hot{color:#ffd166}
+.auc-lead{position:absolute;top:6px;left:6px;padding:1px 6px;border-radius:8px;background:rgba(0,0,0,.35);font-size:10.5px}
+.auc-lead.out{background:rgba(229,72,77,.75)}
+.auc-head{display:flex;gap:10px;margin:12px 0 8px}
+.auc-head>div{flex:1;padding:10px 12px;border-radius:16px;background:rgba(127,127,127,.12)}
+.auc-head small{display:block;font-size:12px;color:var(--t2)}.auc-head b{font-size:20px;font-variant-numeric:tabular-nums}
+.auc-me{margin:0 0 8px;padding:8px 12px;border-radius:14px;background:rgba(52,199,123,.15);color:#1f9d5c;font-weight:600;font-size:14px;text-align:center}
+.auc-me.out{background:rgba(229,72,77,.12);color:#e5484d}
+.auc-bids{display:flex;flex-direction:column;gap:2px;margin:4px 0 8px;max-height:180px;overflow:auto}
+.auc-bids>div{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:12px;font-size:14px}
+.auc-bids>div:first-child{background:rgba(255,184,0,.14)}
+.auc-bids>div.me span{font-weight:700}
+.auc-bids span{flex:1}.auc-bids small{color:var(--t2);font-size:12px}
+.auc-bid{margin:8px 0}
+.auc-q{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.auc-bid input{width:100%;box-sizing:border-box;padding:13px 16px;border-radius:16px;border:1px solid rgba(127,127,127,.3);background:transparent;color:inherit;font-size:18px;font-weight:700;text-align:center;margin-bottom:8px}
+.btn.auc-go{width:100%;background:linear-gradient(135deg,#ff8a3d,#ff3d8b 55%,#7b5cff)!important;color:#fff!important;border:0}
+.auc-st{padding:0 4px 8px}
+.auc-st-h{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.auc-st-h b{display:block;font-size:16px}.auc-st-h small{opacity:.6;font-size:12.5px}
+.auc-st-pic{width:64px;height:64px;flex:none;border-radius:18px;display:grid;place-items:center;font-size:40px}
+.auc-st-pic .gpic{width:50px;height:50px}
+.auc-st label{display:block;font-size:13px;opacity:.7;margin:10px 2px 6px}
+.auc-st input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:14px;border:1px solid rgba(127,127,127,.3);background:transparent;color:inherit;font-size:17px}
+.auc-st .sg-seg{margin:0}
+.auc-st .sg-btn{width:100%;margin:12px 0 0}
 </style>
 <script>
 // ===================================================================
@@ -8593,6 +8691,197 @@ window.sgPendingQL = new URLSearchParams(location.search).get('qrlogin');
   const au = window.authUI;
   if (typeof au === 'function') window.authUI = function () { const r = au.apply(this, arguments); try { qlMountButton(); qlSync(); } catch {} return r; };
   if (document.readyState !== 'loading') qlMountButton(); else document.addEventListener('DOMContentLoaded', qlMountButton);
+})();
+</script>
+<script>
+// ===================================================================
+//  Saimon AI (клиент) + аукцион NFT
+// ===================================================================
+const AI_UID = 103;
+// --- Ответы ИИ: лёгкая разметка (жирный, курсив, код, блоки кода, списки)
+function aiInline(s) {
+  let h = linkify(s);
+  h = h.replace(/`([^`\n]+)`/g, '<code class="aic">$1</code>')
+    .replace(/\*\*([^*\n][^\n]*?)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[\s(«])\*(?!\s)([^*\n]+?)\*(?=[\s.,:;!?)»]|$)/gm, '$1<i>$2</i>')
+    .replace(/^#{1,6}\s+(.+)$/gm, '<b>$1</b>')
+    .replace(/^(\s*)[-*•]\s+/gm, '$1• ');
+  return h;
+}
+function aiMd(t) {
+  const segs = String(t || '').split('```');
+  return segs.map((b, i) => i % 2 ? b : b.replace(i > 0 ? /^\n+/ : /^/, '').replace(i < segs.length - 1 ? /\n+$/ : /$/, '')).map((b, i) => i % 2
+    ? `<pre class="aipre"><button type="button" class="aicopy" data-aicopy>Копировать</button><code>${esc(b.replace(/^[\w+#-]*\n/, '').replace(/\n$/, ''))}</code></pre>`
+    : aiInline(b)).join('');
+}
+function aiHtml(m) {
+  const busy = m.ai && m.ai.busy;
+  if (!m.text && busy) return `<span class="tx aitx">${m.ai.status === 'search' ? '<span class="aist">🔎 Ищу в интернете…</span>' : '<span class="aidots"><i></i><i></i><i></i></span>'}</span>`;
+  return `<span class="tx aitx">${aiMd(m.text)}${busy ? '<span class="aicaret"></span>' : ''}</span>`;
+}
+// --- Перевод сообщения (видит только тот, кто попросил)
+const aiTr = new Map(); // id → {busy, text, err}
+function aiTrHtml(m) {
+  const t = aiTr.get(m.id); if (!t) return '';
+  if (t.busy) return '<div class="aitr busy"><span class="aidots"><i></i><i></i><i></i></span> Перевожу…</div>';
+  if (t.err) return `<div class="aitr err">⚠️ ${esc(t.err)}</div>`;
+  return `<div class="aitr"><small>🌍 Перевод · ИИ</small>${linkify(t.text)}</div>`;
+}
+function aiRepaint(id) {
+  const l = msgs.get(cur), i = l ? l.findIndex(x => x.id === id) : -1, c = chats.get(cur), el = bubbleEl(id);
+  if (i >= 0 && c && el) { el.outerHTML = bubbleHtml(c, l, i); }
+}
+async function aiTranslate(id) {
+  const ru = /[а-яё]/i.test(((msgs.get(cur) || []).find(x => x.id === id) || {}).text || '');
+  aiTr.set(id, { busy: true }); aiRepaint(id);
+  try { const r = await api('/api/ai/translate', 'POST', { messageId: id, to: ru ? 'английский' : 'русский' }); aiTr.set(id, { text: r.text }); }
+  catch (x) { aiTr.set(id, { err: x.message }); }
+  aiRepaint(id);
+}
+// --- Пересказ чата
+async function aiSummary(chatId) {
+  const sh = sgSheet(`<div class="aisum"><div class="aisum-h"><span class="aisum-ic">✨</span><div><b>Пересказ чата</b><small>Saimon AI · видите только вы</small></div></div><div class="aisum-b"><span class="aidots"><i></i><i></i><i></i></span> Читаю переписку…</div></div>`);
+  try {
+    const r = await api('/api/ai/summary', 'POST', { chatId, count: 150 });
+    const b = sh.querySelector('.aisum-b'); if (b) b.innerHTML = aiMd(r.text) + `<small class="aisum-n">по последним ${r.count} сообщениям</small>`;
+  } catch (x) { const b = sh.querySelector('.aisum-b'); if (b) b.innerHTML = '⚠️ ' + esc(x.message); }
+}
+function aiOpen() { closeModal(); openUser(AI_UID); }
+
+// ===== Аукцион =====
+const aucLeft = ms => {
+  if (ms <= 0) return 'завершается…';
+  const s = Math.floor(ms / 1000), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+  return d ? `${d} д ${h} ч` : h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+};
+let aucTimer = null, aucView = null; // {giftId, back}
+function aucTick() {
+  document.querySelectorAll('[data-end]').forEach(el => { const left = +el.dataset.end - Date.now(); el.textContent = aucLeft(left); el.classList.toggle('hot', left < 300000); });
+}
+function aucStartTimer() { clearInterval(aucTimer); aucTick(); aucTimer = setInterval(() => { if ($('#modal').hidden || !document.querySelector('[data-end]')) { clearInterval(aucTimer); aucView = null; return; } aucTick(); }, 1000); }
+const aucCard = g => {
+  const k = kindInfo(g.kind), a = g.auction;
+  return `<div class="gc r-${k.rarity} auc-c" data-auc="${esc(g.id)}" style="background:${giftBg(g, k)}">${patOverlay(g)}<div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)}</div><div class="gs">#${g.serial}</div>
+<div class="auc-p">🔨 ${a.top || a.start}</div><div class="auc-t" data-end="${a.ends}"></div>${a.mine ? '<div class="auc-lead">👑 вы лидер</div>' : a.iBid ? '<div class="auc-lead out">перебили</div>' : ''}</div>`;
+};
+async function auctions(sort = 'soon') {
+  modal('<div class="sec" style="padding:0">Загрузка…</div>');
+  let lots;
+  try { lots = await api('/api/auctions?sort=' + (sort === 'hot' ? 'hot' : 'soon')); }
+  catch (x) { modal(`<div class="err">${esc(x.message)}</div><div class="row"><button type="button" class="btn g" data-x>Закрыть</button></div>`); return; }
+  aucView = { list: true, sort };
+  modal(`<h2>🔨 Аукционы NFT</h2>
+<div style="margin:6px 0 4px;font-weight:600">👽 <span class="mars-n">${me.unlimited ? '∞' : (me.mars || 0)}</span> Mars</div>
+<div class="auc-note">Ставка сразу резервируется. Перебили — Mars вернутся. Ставка в последние 2 минуты продлевает аукцион.</div>
+<div class="mkbar"><button type="button" class="chip ${sort !== 'hot' ? 'on' : ''}" data-s="soon">⏱ Скоро конец</button><button type="button" class="chip ${sort === 'hot' ? 'on' : ''}" data-s="hot">🔥 Горячие</button></div>
+${lots.length ? `<div class="gg" id="aucg">${lots.map(aucCard).join('')}</div>` : '<div class="sec" style="padding:16px 0;text-align:center">Аукционов пока нет.<br>Выставьте свой NFT: профиль → подарок → «Выставить на аукцион».</div>'}
+<div class="row"><button type="button" class="btn g" id="aucMk">🛒 Рынок</button><button type="button" class="btn g" data-x>Закрыть</button></div>`);
+  $('#aucMk').onclick = () => market();
+  $('#card').querySelectorAll('.chip').forEach(c => c.onclick = () => auctions(c.dataset.s));
+  const g = $('#aucg'); if (g) g.onclick = e => { const el = e.target.closest('[data-auc]'); if (el) aucLot(el.dataset.auc, () => auctions(sort)); };
+  aucStartTimer();
+}
+async function aucLot(giftId, back) {
+  let g;
+  try { g = await api('/api/auctions/' + encodeURIComponent(giftId)); }
+  catch (x) { toast(x.message); return back ? back() : closeModal(); }
+  const k = kindInfo(g.kind), a = g.auction, own = g.seller && g.seller.id === me.id;
+  const row = (t, v) => `<div class="gr"><div class="gk">${t}</div><div class="gv">${v}</div></div>`;
+  aucView = { giftId, back };
+  const keepInput = $('#aucAmt') && $('#aucAmt').dataset.gid === giftId ? $('#aucAmt').value : null;
+  modal(`<div class="gc big" style="background:${giftBg(g, k)}">${patOverlay(g)}<div class="gi">${gPic(k)}</div><div class="gn">${esc(k.name)} #${g.serial}</div></div>
+<div class="auc-head"><div><small>${a.count ? 'Текущая ставка' : 'Стартовая цена'}</small><b>👽 ${a.top || a.start}</b></div><div><small>До конца</small><b class="auc-tm" data-end="${a.ends}"></b></div></div>
+${a.mine ? '<div class="auc-me">👑 Ваша ставка лидирует</div>' : a.iBid ? '<div class="auc-me out">Вашу ставку перебили — Mars вернулись на счёт</div>' : ''}
+<div class="gtab">
+${row('Продавец', g.seller ? esc(g.seller.username) + (g.seller.handle ? ` <span style="color:var(--t2)">@${esc(g.seller.handle)}</span>` : '') : '—')}
+${row('Лидер', a.leader ? esc(a.leader.username) : 'пока нет ставок')}
+${row('Ставок', `${a.count} · участников ${a.bidders}`)}
+${row('Узор', ptLine(g))}
+</div>
+${g.bids.length ? `<div class="gh2">История ставок</div><div class="auc-bids">${g.bids.slice(0, 10).map(b => `<div class="${b.me ? 'me' : ''}"><span>${esc(b.name)}${b.me ? ' (вы)' : ''}</span><b>👽 ${b.amount}</b><small>${hm(new Date(b.at).toISOString())}</small></div>`).join('')}</div>` : ''}
+<div class="err" id="ge"></div>
+${own ? (a.count ? '<div class="auc-note" style="text-align:center">Это ваш лот. Когда аукцион закончится, Mars придут на ваш счёт.</div>' : '<div class="row"><button type="button" class="btn r" id="aucCancel">Отменить аукцион</button></div>')
+  : `<div class="auc-bid"><div class="auc-q">${[[a.next, 'мин.'], [Math.ceil((a.top || a.start) * 1.1), '+10%'], [Math.ceil((a.top || a.start) * 1.25), '+25%'], [Math.ceil((a.top || a.start) * 1.5), '+50%']].filter(([v], i, arr) => v >= a.next && arr.findIndex(x => x[0] === v) === i).map(([v, t]) => `<button type="button" class="chip" data-v="${v}">${t} · ${v}</button>`).join('')}</div>
+<input id="aucAmt" data-gid="${esc(giftId)}" type="number" inputmode="numeric" min="${a.next}" value="${keepInput || a.next}">
+<button type="button" class="btn auc-go" id="aucGo">🔨 Сделать ставку</button></div>`}
+<div class="row"><button type="button" class="btn g" id="aucBk">← Назад</button></div>`);
+  $('#aucBk').onclick = () => { aucView = null; back ? back() : closeModal(); };
+  if ($('#aucCancel')) $('#aucCancel').onclick = async () => {
+    if (!confirm('Снять подарок с аукциона?')) return;
+    try { await api('/api/auctions/cancel', 'POST', { giftId }); toast('Аукцион отменён'); aucView = null; back ? back() : closeModal(); } catch (x) { $('#ge').textContent = x.message; }
+  };
+  $('#card').querySelectorAll('.auc-q .chip').forEach(c => c.onclick = () => { $('#aucAmt').value = c.dataset.v; });
+  if ($('#aucGo')) $('#aucGo').onclick = async () => {
+    const amount = Math.floor(+$('#aucAmt').value), b = $('#aucGo');
+    if (!(amount >= a.next)) { $('#ge').textContent = `Минимальная ставка — ${a.next} Mars`; return; }
+    if (!confirm(`Поставить ${amount} Mars на «${k.name} #${g.serial}»?\nMars спишутся сейчас и вернутся, если вашу ставку перебьют.`)) return;
+    b.disabled = true;
+    try {
+      const r = await api('/api/auctions/bid', 'POST', { giftId, amount });
+      setMars(r.mars, r.unlimited); toast(r.extended ? '🔨 Ставка принята! Аукцион продлён на 2 минуты' : '🔨 Ставка принята — вы лидер!');
+      aucLot(giftId, back);
+    } catch (x) { $('#ge').textContent = x.message; b.disabled = false; }
+  };
+  aucStartTimer();
+}
+// Кто-то сделал ставку — обновляем открытый лот или список
+let aucWsT = null;
+function aucOnWs(d) {
+  if (!aucView || $('#modal').hidden) return;
+  clearTimeout(aucWsT);
+  aucWsT = setTimeout(() => {
+    if (!aucView || $('#modal').hidden) return;
+    if (aucView.giftId === d.giftId) { if (d.done) { toast('🔨 Аукцион завершён'); const b = aucView.back; aucView = null; b ? b() : closeModal(); } else aucLot(d.giftId, aucView.back); }
+    else if (aucView.list) auctions(aucView.sort);
+  }, 300);
+}
+// Выставить свой подарок на аукцион
+function aucStartSheet(g, done) {
+  const k = kindInfo(g.kind), price = g.price != null ? g.price : k.price;
+  const sh = sgSheet(`<div class="auc-st"><div class="auc-st-h"><div class="auc-st-pic" style="background:${giftBg(g, k)}">${gPic(k)}</div><div><b>Аукцион «${esc(k.name)} #${g.serial}»</b><small>Победитель — тот, чья ставка выше, когда время закончится</small></div></div>
+<label>Стартовая цена, Mars</label><input id="aucStart" type="number" inputmode="numeric" min="1" value="${Math.max(1, Math.round(price * 0.8))}">
+<label>Длительность</label><div class="sg-seg" id="aucDur">${[[1, '1 ч'], [3, '3 ч'], [6, '6 ч'], [12, '12 ч'], [24, '24 ч'], [48, '48 ч']].map(([v, t]) => `<button type="button" data-v="${v}" class="${v === 24 ? 'on' : ''}">${t}</button>`).join('')}</div>
+<div class="auc-note">Пока идёт аукцион, подарок нельзя передать, продать или улучшить. Отменить можно, пока нет ставок.</div>
+<div class="err" id="aucErr"></div>
+<button type="button" class="sg-btn" id="aucStartGo">🔨 Начать аукцион</button></div>`);
+  let hours = 24;
+  sh.querySelectorAll('#aucDur [data-v]').forEach(b => b.onclick = () => { hours = +b.dataset.v; sh.querySelectorAll('#aucDur [data-v]').forEach(x => x.classList.toggle('on', x === b)); });
+  sh.querySelector('#aucStartGo').onclick = async () => {
+    const start = Math.floor(+sh.querySelector('#aucStart').value);
+    try { const r = await api('/api/auctions/start', 'POST', { giftId: g.id, start, hours }); sgSheetClose(); toast('🔨 Аукцион начался!'); g.auction = r.lot.auction; if (me.acc && me.acc.gid === g.id) { delete me.acc; save(); } done && done(); aucLot(g.id, () => auctions()); }
+    catch (x) { sh.querySelector('#aucErr').textContent = x.message; }
+  };
+}
+
+// --- Подключение к интерфейсу
+(() => {
+  // кнопка ✨ в шапке списка чатов
+  const ng = $('#newGroup');
+  if (ng && !$('#aiBtn')) { const b = document.createElement('button'); b.className = 'ib ai-ib'; b.id = 'aiBtn'; b.title = 'Saimon AI'; b.type = 'button'; b.innerHTML = '✨'; b.onclick = aiOpen; ng.before(b); }
+  // меню чата: пересказ
+  const ca = window.chatAction;
+  if (typeof ca === 'function') window.chatAction = function (c, a) { if (a === 'aisum') { closeModal(); return aiSummary(c.id); } return ca.apply(this, arguments); };
+  // группа: быстро добавить ИИ
+  const gi = window.groupInfo;
+  if (typeof gi === 'function') window.groupInfo = function (id) {
+    const r = gi.apply(this, arguments);
+    try {
+      const c = chats.get(id), gb = $('#gbot');
+      if (c && gb && !(c.members || []).some(u => (u.id || u) === AI_UID)) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn g'; b.id = 'gaiadd'; b.style.margin = '0 0 6px'; b.textContent = '✨ Добавить Saimon AI';
+        b.onclick = async () => { try { const g = await api('/api/groups/' + encodeURIComponent(id) + '/bots', 'POST', { handle: 'saimon_ai' }); if (typeof putChat === 'function') putChat(g); toast('✨ Saimon AI в группе — пишите @saimon_ai'); window.groupInfo(id); } catch (x) { toast(x.message); } };
+        gb.after(b);
+      }
+    } catch {}
+    return r;
+  };
+  // копирование кода из ответа ИИ
+  msgsEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-aicopy]'); if (!b) return;
+    e.stopPropagation();
+    const code = b.parentElement.querySelector('code');
+    navigator.clipboard && navigator.clipboard.writeText(code.textContent).then(() => { b.textContent = 'Скопировано ✓'; setTimeout(() => { b.textContent = 'Копировать'; }, 1500); }).catch(() => toast('Не удалось скопировать'));
+  }, true);
 })();
 </script>
 </body>
