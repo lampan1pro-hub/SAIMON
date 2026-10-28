@@ -1966,7 +1966,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const tosCheck = $('#tosCheck'); if (tosCheck) tosCheck.onchange = () => updateAuthBtn();
 });
 
-fetch('/api/config').then(r => r.json()).then(c => { cfg = c; authUI(); initPush(); }).catch(() => {});
+// Номер сборки этой страницы (подставляет сервер). Если на сервере уже новая версия — перезагружаемся один раз
+const SG_BUILD = '__SG_BUILD__';
+function sgCheckBuild(c) {
+  if (!c || !c.build || SG_BUILD.startsWith('__') || c.build === SG_BUILD) return;
+  try { if (sessionStorage.getItem('sg_reloaded') === c.build) return; sessionStorage.setItem('sg_reloaded', c.build); } catch {}
+  location.reload();
+}
+fetch('/api/config', { cache: 'no-store' }).then(r => r.json()).then(c => { cfg = c; sgCheckBuild(c); authUI(); initPush(); }).catch(() => {});
+// проверяем и когда приложение снова открыли (на телефоне вкладка может жить днями)
+document.addEventListener('visibilitychange', () => { if (!document.hidden) fetch('/api/config', { cache: 'no-store' }).then(r => r.json()).then(sgCheckBuild).catch(() => {}); });
 
 // ── Отправка формы ──
 $('#authForm').onsubmit = async e => {
@@ -3886,8 +3895,9 @@ function groupInfo(id) {
 <button class="btn">Сохранить название</button></form>
 <div class="sec" style="padding-left:0;margin-top:10px">Участники: ${c.members.length}</div>
 <button type="button" class="btn g" id="gadd" style="margin:4px 0 6px">＋ Добавить участников</button>
+<button type="button" class="btn g" id="gbot" style="margin:0 0 6px">🤖 Добавить бота</button>
 <div style="max-height:220px;overflow:auto">${c.members.map(u =>
-  `<div class="it" data-p="${u.id}" style="padding-left:0;padding-right:0">${uav(u, 's', true)}<div class="im">${nmH(cnames[u.id] || u.username, u.verified, u.id === me.id ? ' (вы)' : '', u.acc, u.ng, !!u.premium)}<div class="lm"><span>@${esc(u.handle)}</span></div></div></div>`).join('')}</div>
+  `<div class="it" data-p="${u.id}" style="padding-left:0;padding-right:0">${uav(u, 's', true)}<div class="im">${nmH(cnames[u.id] || u.username, u.verified, u.id === me.id ? ' (вы)' : '', u.acc, u.ng, !!u.premium)}<div class="lm"><span>${u.custom ? '🤖 бот · ' : ''}@${esc(u.handle)}</span></div></div>${u.custom ? `<button type="button" class="g-botrm" data-rmbot="${u.id}">Убрать</button>` : ''}</div>`).join('')}</div>
 <div class="row"><button type="button" class="btn g" data-x>Закрыть</button></div>`);
 
   const patch = async body => {
@@ -3908,6 +3918,8 @@ function groupInfo(id) {
   };
   $('#grm').onclick = () => patch({avatar: ''}).catch(x => { $('#ge').textContent = x.message; });
   $('#gadd').onclick = () => addMembers(id);
+  $('#gbot').onclick = () => hbAddBotToGroup(id);
+  $('#card').querySelectorAll('[data-rmbot]').forEach(b => b.onclick = e => { e.stopPropagation(); hbRemoveBotFromGroup(id, +b.dataset.rmbot); });
   $('#card').querySelectorAll('[data-p]').forEach(el => el.onclick = () => {
     const u = c.members.find(x => x.id == el.dataset.p);
     if (u && u.id !== me.id) userProfile(u);
@@ -6617,7 +6629,7 @@ $('#room').appendChild(mentBox);
 let mentSel = 0, mentList = [], mentQ = null;
 function mentCandidates(c) {
   if (!c || !Array.isArray(c.members) || !(c.type === 'group' || (c.type === 'channel' && c.open))) return [];
-  return c.members.filter(u => u.id !== me.id && !u.bot);
+  return c.members.filter(u => u.id !== me.id && (!u.bot || u.custom));
 }
 function mentPaint() {
   const c = chats.get(cur);
@@ -7346,6 +7358,47 @@ quiz: { name: '❓ Викторина', html: `<!doctype html>
   }
   draw();
 <\/script></body></html>` },
+shop: { name: '🛍 Магазин', html: `<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;background:#f5f3ff;color:#1a1033;padding-bottom:110px}
+  h1{margin:0;padding:24px 18px 8px;font-size:24px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:10px 14px}
+  .it{background:#fff;border-radius:22px;padding:14px;text-align:center;box-shadow:0 4px 16px rgba(80,40,160,.08)}
+  .it .e{font-size:54px}.it b{display:block;margin:6px 0 2px}.it small{color:#7a6fa0}
+  .it button{margin-top:10px;width:100%;border:0;border-radius:14px;padding:10px;font:600 15px system-ui;background:#efeaff;color:#5b3cff}
+  .it button.in{background:#5b3cff;color:#fff}
+  .cart{position:fixed;left:14px;right:14px;bottom:16px;border:0;border-radius:22px;padding:17px;font:700 17px system-ui;color:#fff;
+    background:linear-gradient(135deg,#ff8a3d,#ff3d8b,#7b5cff);box-shadow:0 10px 30px rgba(255,61,139,.4);display:none}
+</style></head><body>
+  <h1>🍕 Меню</h1>
+  <div class="grid" id="g"></div>
+  <button class="cart" id="cart"></button>
+<script>
+  const ITEMS = [
+    { id: 'pep', e: '🍕', name: 'Пепперони', price: 250 },
+    { id: 'mar', e: '🧀', name: 'Маргарита', price: 200 },
+    { id: 'bur', e: '🍔', name: 'Бургер', price: 180 },
+    { id: 'col', e: '🥤', name: 'Кола', price: 60 },
+  ];
+  const cart = {};
+  const total = () => ITEMS.reduce((s, i) => s + (cart[i.id] || 0) * i.price, 0);
+  function draw() {
+    document.getElementById('g').innerHTML = ITEMS.map(i => '<div class="it"><div class="e">' + i.e + '</div><b>' + i.name + '</b><small>' + i.price + ' Mars</small><button data-id="' + i.id + '" class="' + (cart[i.id] ? 'in' : '') + '">' + (cart[i.id] ? 'В корзине: ' + cart[i.id] : 'Добавить') + '</button></div>').join('');
+    document.querySelectorAll('[data-id]').forEach(b => b.onclick = () => { cart[b.dataset.id] = (cart[b.dataset.id] || 0) + 1; Hours.haptic('light'); draw(); });
+    const t = total(), c = document.getElementById('cart');
+    c.style.display = t ? 'block' : 'none'; c.textContent = 'Оплатить ' + t + ' Mars';
+  }
+  document.getElementById('cart').onclick = async () => {
+    const list = ITEMS.filter(i => cart[i.id]).map(i => i.name + ' ×' + cart[i.id]).join(', ');
+    try {
+      const r = await Hours.pay(total(), 'Заказ: ' + list, { cart });
+      await Hours.sendMessage('Заказ оплачен ✅ ' + list + '. Номер: ' + r.id);
+      for (const k in cart) delete cart[k]; draw();
+    } catch (e) { if (e.message !== 'cancelled') Hours.toast(e.message); }
+  };
+  draw();
+<\/script></body></html>` },
 blank: { name: '✨ С нуля', html: `<!doctype html>
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -7488,7 +7541,8 @@ async function hbEditor(id, tab = 'main') {
 <div class="hb-tip">{name} заменится на имя пользователя</div>${hbButtonsHtml(b.start.buttons)}</div>
 <div class="sg-sec">Если бот не понял</div>
 <div class="tgp-card hb-fields"><textarea id="hbFb" rows="2" maxlength="4000" placeholder="Пусто — бот промолчит">${esc(b.fallback.text)}</textarea></div>
-<div class="tgp-card">${sgRow({ ic: '📨', bg: '#ff9f0a', t: 'Пересылать мне сообщения', sub: 'Сообщения боту придут вам в Hours — ответите от имени бота', right: sgTg(b.forward), attr: 'data-fwd' })}</div>
+<div class="tgp-card">${sgRow({ ic: '📨', bg: '#ff9f0a', t: 'Пересылать мне сообщения', sub: 'Сообщения боту придут вам в Hours — ответите от имени бота', right: sgTg(b.forward), attr: 'data-fwd' })}
+${sgRow({ ic: '👥', bg: '#34c77b', t: 'Можно добавлять в группы', sub: 'В группе бот отвечает на свои команды и упоминание @' + esc(b.handle), right: sgTg(b.groups !== false), attr: 'data-grp' })}</div>
 <button type="button" class="sg-btn" id="hbSaveMain">💾 Сохранить</button>
 <button type="button" class="sg-btn red" id="hbDel">🗑 Удалить бота</button>`;
   } else if (tab === 'cmds') {
@@ -7517,7 +7571,9 @@ Hours.toast(text)         // уведомление
 Hours.haptic('light')     // вибрация
 Hours.openLink(url)       // открыть ссылку
 Hours.setTitle(text)
-Hours.close()</pre></details>`;
+Hours.close()
+await Hours.pay(250, 'Пицца')  // оплата в Mars
+// → {ok, id} или ошибка 'cancelled'</pre></details>`;
   } else if (tab === 'cast') {
     body = `<div class="sg-hero" style="margin-top:14px"><div class="e">📣</div><b>Рассылка</b><small>Сообщение получат все, кто запускал бота: ${b.stats.users} ${plural(b.stats.users, ['человек', 'человека', 'человек'])}</small></div>
 <div class="tgp-card hb-fields" id="hbCast"><textarea id="hbCastT" rows="5" maxlength="4000" placeholder="Например: 🔥 Сегодня скидка 20%!"></textarea>${hbButtonsHtml([])}</div>
@@ -7525,7 +7581,11 @@ Hours.close()</pre></details>`;
 <div class="sg-note">Не чаще одной рассылки в минуту. Не рассылайте спам — пользователи могут заблокировать бота.</div>`;
   } else if (tab === 'stats') {
     const tile = (n, t, e) => `<div class="hb-stat"><span>${e}</span><b>${n}</b><small>${t}</small></div>`;
-    body = `<div class="hb-stats">${tile(b.stats.users, 'пользователей', '👥')}${tile(b.stats.msgs, 'сообщений', '💬')}${tile(b.stats.opens, 'открытий приложения', '🚀')}${tile(b.stats.broadcasts, 'рассылок', '📣')}</div>
+    const pays = b.payments || [];
+    body = `<div class="hb-stats"><div class="hb-stat money"><span>💰</span><b>${(b.stats.revenue || 0).toLocaleString('ru-RU')} Mars</b><small>заработано через приложение</small></div>${tile(b.stats.users, 'пользователей', '👥')}${tile(b.stats.msgs, 'сообщений', '💬')}${tile(b.stats.opens, 'открытий приложения', '🚀')}${tile(b.stats.broadcasts, 'рассылок', '📣')}</div>
+<div class="sg-sec">Платежи</div>
+${pays.length ? `<div class="tgp-card">${pays.map(x => `<div class="hb-pay${x.refunded ? ' ref' : ''}"><span class="sg-ic" style="background:linear-gradient(135deg,#ff8a3d,#ff3d8b)">💰</span><span class="tx"><b>${esc(x.title)}</b><small>${esc(x.name || 'Покупатель')}${x.handle ? ' · @' + esc(x.handle) : ''} · ${new Date(x.at).toLocaleString('ru-RU')}${x.refunded ? ' · возвращён' : ''}</small></span><span class="amt">+${x.amount}</span>${x.refunded ? '' : `<button type="button" class="lnk" data-refund="${esc(x.id)}">Вернуть</button>`}</div>`).join('')}</div>`
+  : '<div class="sg-note" style="text-align:center">Платежей пока нет. Вызовите в приложении <b>Hours.pay(сумма, «название»)</b> — пользователь подтвердит оплату, и Mars придут вам.</div>'}
 <div class="sg-sec">Данные из приложения</div>
 ${b.inbox && b.inbox.length ? `<div class="tgp-card">${b.inbox.map(x => `<div class="sg-row" style="cursor:default;align-items:flex-start"><span class="sg-ic" style="background:#7b5cff">📦</span><span class="tx"><b>${esc(x.name || 'Пользователь')}${x.handle ? ' <small style="display:inline">@' + esc(x.handle) + '</small>' : ''}</b><small class="hb-data">${esc(x.data)}</small><small>${new Date(x.at).toLocaleString('ru-RU')}</small></span><button type="button" class="lnk" data-rep="${x.from}">Ответить</button></div>`).join('')}</div>`
   : '<div class="sg-note" style="text-align:center">Пока пусто. Когда приложение вызовет Hours.sendData(…), данные появятся здесь и придут вам в Hours.</div>'}
@@ -7538,6 +7598,7 @@ ${b.inbox && b.inbox.length ? `<div class="tgp-card">${b.inbox.map(x => `<div cl
   if (tab === 'main') {
     hbBindButtons(card.querySelector('#hbStart'));
     card.querySelector('[data-fwd]').onclick = e => { const t = e.currentTarget.querySelector('.sg-tg'); t.classList.toggle('on'); };
+    card.querySelector('[data-grp]').onclick = e => { const t = e.currentTarget.querySelector('.sg-tg'); t.classList.toggle('on'); };
     card.querySelector('#hbPhoto').onclick = async () => {
       const f = await pickFile('image/*'); if (!f) return;
       try { const url = await uploadAvatar(f); if (url && await hbSave({ avatar: url })) hbEditor(id, 'main'); } catch (x) { toast(x.message); }
@@ -7546,7 +7607,7 @@ ${b.inbox && b.inbox.length ? `<div class="tgp-card">${b.inbox.map(x => `<div cl
       if (await hbSave({ name: card.querySelector('#hbN').value, about: card.querySelector('#hbAbout').value,
         start: { text: card.querySelector('#hbStartT').value, buttons: hbReadButtons(card.querySelector('#hbStart')) },
         fallback: { text: card.querySelector('#hbFb').value, buttons: [] },
-        forward: card.querySelector('[data-fwd] .sg-tg').classList.contains('on') })) hbEditor(id, 'main');
+        forward: card.querySelector('[data-fwd] .sg-tg').classList.contains('on'), groups: card.querySelector('[data-grp] .sg-tg').classList.contains('on') })) hbEditor(id, 'main');
     };
     card.querySelector('#hbDel').onclick = async () => {
       if (!confirm(`Удалить бота @${b.handle}? Все чаты с ним пропадут у пользователей. Это нельзя отменить.`)) return;
@@ -7574,6 +7635,10 @@ ${b.inbox && b.inbox.length ? `<div class="tgp-card">${b.inbox.map(x => `<div cl
     };
   } else if (tab === 'stats') {
     card.querySelectorAll('[data-rep]').forEach(r => r.onclick = () => hbReplySheet(id, +r.dataset.rep));
+    card.querySelectorAll('[data-refund]').forEach(r => r.onclick = async () => {
+      if (!confirm('Вернуть покупателю Mars? Сумма спишется с вашего баланса.')) return;
+      try { await api('/api/hours/bots/' + id + '/refund', 'POST', { payId: r.dataset.refund }); toast('↩️ Возврат выполнен'); hbBot = null; hbEditor(id, 'stats'); } catch (x) { toast(x.message); }
+    });
   }
 }
 
@@ -7640,7 +7705,7 @@ addEventListener('message',function(e){var d=e.data;if(!d||!d.__hoursR||!w[d.id]
 window.Hours={user:C.user,bot:C.bot,theme:C.theme,
 toast:function(t){return call('toast',{text:String(t)})},close:function(){return call('close')},haptic:function(t){return call('haptic',{type:t||'light'})},
 sendData:function(d){return call('sendData',{data:d})},sendMessage:function(t){return call('sendMessage',{text:String(t)})},
-openLink:function(u){return call('openLink',{url:String(u)})},setTitle:function(t){return call('setTitle',{title:String(t)})},
+openLink:function(u){return call('openLink',{url:String(u)})},pay:function(a,t,p){return call('pay',{amount:a,title:t,payload:p})},setTitle:function(t){return call('setTitle',{title:String(t)})},
 storage:{get:function(k){return call('storageGet',{key:String(k)})},set:function(k,v){return call('storageSet',{key:String(k),value:v})},remove:function(k){return call('storageSet',{key:String(k),value:null})},all:function(){return call('storageAll')}}};
 })();<\/script>`;
 function hbInject(html, bridge) {
@@ -7671,7 +7736,7 @@ function hbRunApp({ html, title, name, handle, avatar, botId, preview }) {
   const load = () => { fr.srcdoc = hbInject(html, HB_BRIDGE(cfgApp)); };
   fr.onload = () => ov.querySelector('.ha-load')?.remove();
   body.appendChild(fr); load();
-  let store = null;
+  let store = null, payBusy = false;
   const close = () => { removeEventListener('message', onMsg); ov.classList.remove('on'); setTimeout(() => ov.remove(), 300); };
   async function rpc(m, a) {
     if (m === 'toast') { toast(String(a.text).slice(0, 200)); return true; }
@@ -7679,6 +7744,23 @@ function hbRunApp({ html, title, name, handle, avatar, botId, preview }) {
     if (m === 'haptic') { try { navigator.vibrate && navigator.vibrate(a.type === 'error' ? [40, 40, 40] : a.type === 'success' ? [20, 30, 20] : 12); } catch {} return true; }
     if (m === 'setTitle') { ov.querySelector('#haTitle').textContent = String(a.title).slice(0, 40); return true; }
     if (m === 'openLink') { const u = String(a.url); if (!/^https?:\/\//i.test(u)) throw new Error('Только http(s) ссылки'); if (confirm('Бот хочет открыть ссылку:\n' + u)) window.open(u, '_blank', 'noopener'); return true; }
+    if (m === 'pay') {
+      const amount = Math.floor(Number(a.amount));
+      if (!(amount >= 1 && amount <= 100000)) throw new Error('Сумма — от 1 до 100000 Mars');
+      if (payBusy) throw new Error('Уже идёт оплата');
+      payBusy = true;
+      try {
+        const title = String(a.title || 'Оплата').slice(0, 80);
+        const yes = await hbPayConfirm({ amount, title, bot: { id: botId, name, handle, avatar }, preview });
+        if (!yes) throw new Error('cancelled');
+        if (preview) { toast('🧪 Тестовая оплата прошла — Mars не списаны'); return { ok: true, id: 'test', test: true }; }
+        const r = await api('/api/bots/' + botId + '/app/pay', 'POST', { amount, title, payload: a.payload });
+        setMars(r.mars, r.unlimited);
+        try { navigator.vibrate && navigator.vibrate([20, 30, 20]); } catch {}
+        toast('✅ Оплачено ' + amount + ' Mars');
+        return { ok: true, id: r.id };
+      } finally { payBusy = false; }
+    }
     if (m === 'sendData') { if (preview) { toast('🧪 Предпросмотр: данные «' + JSON.stringify(a.data).slice(0, 80) + '»'); return true; } await api('/api/bots/' + botId + '/app/data', 'POST', { data: a.data }); return true; }
     if (m === 'sendMessage') { if (preview) { toast('🧪 Бот написал бы: ' + String(a.text).slice(0, 80)); return true; } await api('/api/bots/' + botId + '/app/message', 'POST', { text: a.text }); return true; }
     if (m === 'storageAll' || m === 'storageGet' || m === 'storageSet') {
@@ -7720,6 +7802,151 @@ window.hbPaintAppBtn = c => {
   const cb = document.getElementById('circBtn'); if (cb) cb.style.display = show ? 'none' : ''; // в чате с ботом место отдаём кнопке приложения
   if (show) { hbAppBtn.textContent = '🚀 ' + c.peer.app; hbAppBtn.onclick = () => hbOpenApp(c.peer.id); }
 };
+
+</script>
+
+<!-- ===== Оплата в Mars и боты в группах ===== -->
+<style id="sg-pay">
+/* ===== Оплата и подсказки команд ===== */
+#hbPay{position:fixed;inset:0;z-index:19000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0);transition:background .25s}
+#hbPay.on{background:rgba(0,0,0,.55)}
+#hbPay .hp-card{width:100%;max-width:440px;background:var(--bg);border-radius:30px 30px 0 0;padding:22px 20px calc(18px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .4s var(--ease);text-align:center;box-shadow:0 -10px 40px rgba(0,0,0,.4)}
+html[data-theme="dark"] #hbPay .hp-card{background:#16212d}
+#hbPay.on .hp-card{transform:none}
+.hp-bot{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:600;text-align:left}
+.hp-bot small{display:block;color:var(--t2);font-weight:400;font-size:12.5px}
+.hp-title{margin:16px 0 4px;font-size:16px;color:var(--t2)}
+.hp-sum{display:flex;align-items:baseline;justify-content:center;gap:8px;margin:2px 0 16px}
+.hp-sum b{font-size:46px;letter-spacing:-1.5px;background:linear-gradient(135deg,#ff8a3d,#ff3d8b,#7b5cff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hp-sum span{font-size:17px;font-weight:600;color:var(--t2)}
+.hp-rows{border-radius:18px;background:rgba(127,140,160,.1);padding:4px 14px;margin-bottom:12px}
+.hp-rows div{display:flex;justify-content:space-between;padding:10px 0;font-size:14.5px}
+.hp-rows div+div{border-top:1px solid rgba(127,140,160,.15)}
+.hp-rows span{color:var(--t2)}
+.hp-bad{color:#ff5a50!important}
+.hp-note{font-size:13px;color:var(--t2);margin:-2px 0 10px}
+.hp-go{width:100%;height:54px;border:0;border-radius:27px;font:700 16.5px/1 Roboto,sans-serif;color:#fff;cursor:pointer;background:linear-gradient(135deg,#ff8a3d,#ff3d8b,#7b5cff);box-shadow:0 8px 24px rgba(255,61,139,.4);transition:transform .2s var(--spring)}
+.hp-go:active{transform:scale(.97)}
+.hp-go:disabled{opacity:.45;box-shadow:none}
+.hp-no{width:100%;border:0;background:none;color:var(--t2);font:600 15px/1 inherit;padding:16px;cursor:pointer}
+.hp-safe{font-size:12px;color:var(--t2);opacity:.8}
+.hb-pay{display:flex;align-items:center;gap:12px;padding:11px 14px}
+.hb-pay+.hb-pay{border-top:1px solid rgba(127,140,160,.14)}
+.hb-pay .tx{flex:1;min-width:0}.hb-pay .tx b{display:block;font-size:15px}.hb-pay .tx small{display:block;color:var(--t2);font-size:12.5px}
+.hb-pay .amt{font-weight:700;color:#34c77b;white-space:nowrap}
+.hb-pay.ref .amt{color:var(--t2);text-decoration:line-through}
+.hb-stat.money{grid-column:1/-1;background:linear-gradient(135deg,#ff8a3d,#ff3d8b,#7b5cff)!important;color:#fff}
+.hb-stat.money small{color:rgba(255,255,255,.85)}
+#hbCmdPop{position:absolute;left:10px;right:10px;bottom:84px;z-index:6;background:var(--glass);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border-radius:22px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.3);max-height:320px;overflow:auto;animation:sgPopUp .25s var(--spring)}
+#hbCmdPop[hidden]{display:none}
+#hbCmdPop button{display:flex;align-items:baseline;gap:10px;width:100%;border:0;background:none;padding:11px 12px;border-radius:15px;cursor:pointer;color:var(--t);font:inherit;text-align:left}
+#hbCmdPop button.on,#hbCmdPop button:hover{background:rgba(79,141,255,.16)}
+.hc-c{font-weight:700;color:var(--sg1);font-family:ui-monospace,Menlo,monospace;font-size:14.5px}
+.hc-d{color:var(--t2);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-botrm{border:0;background:rgba(255,69,58,.14);color:#ff5a50;border-radius:12px;padding:6px 10px;font:600 12.5px/1 inherit;cursor:pointer;margin-left:auto}
+
+</style>
+<script>
+// ===================================================================
+//  Оплата в Mars в мини-приложениях + боты в группах + подсказки «/»
+// ===================================================================
+
+/* ---------- Окно подтверждения оплаты (рисует сам Saimongram, не приложение) ---------- */
+function hbPayConfirm({ amount, title, bot, preview }) {
+  return new Promise(resolve => {
+    $('#hbPay')?.remove();
+    const bal = me.unlimited ? Infinity : (me.mars || 0), enough = bal >= amount;
+    const ov = document.createElement('div'); ov.id = 'hbPay';
+    ov.innerHTML = `<div class="hp-card">
+<div class="hp-bot">${hbAv(bot, 's')}<span>${esc(bot.name)}<small>@${esc(bot.handle)}</small></span></div>
+<div class="hp-title">${esc(title)}</div>
+<div class="hp-sum"><b>${amount.toLocaleString('ru-RU')}</b><span>Mars 👽</span></div>
+<div class="hp-rows"><div><span>Ваш баланс</span><b>${me.unlimited ? '∞' : bal.toLocaleString('ru-RU')} Mars</b></div>
+<div><span>После оплаты</span><b class="${enough ? '' : 'hp-bad'}">${me.unlimited ? '∞' : (bal - amount).toLocaleString('ru-RU')} Mars</b></div></div>
+${preview ? '<div class="hp-note">🧪 Предпросмотр: Mars не спишутся</div>' : ''}
+${enough ? '' : '<div class="hp-note hp-bad">Не хватает Mars для оплаты</div>'}
+<button type="button" class="hp-go" ${enough || preview ? '' : 'disabled'}>Оплатить ${amount.toLocaleString('ru-RU')} Mars</button>
+<button type="button" class="hp-no">Отмена</button>
+<div class="hp-safe">🔒 Оплата подтверждается Saimongram, а не ботом</div></div>`;
+    document.body.appendChild(ov);
+    requestAnimationFrame(() => ov.classList.add('on'));
+    const done = v => { ov.classList.remove('on'); setTimeout(() => ov.remove(), 260); resolve(v); };
+    ov.querySelector('.hp-no').onclick = () => done(false);
+    ov.onclick = e => { if (e.target === ov) done(false); };
+    ov.querySelector('.hp-go').onclick = () => done(true);
+  });
+}
+
+/* ---------- Боты в группах ---------- */
+function hbAddBotToGroup(gid) {
+  closeModal();
+  const sh = sgSheet(`<div class="hb-form"><div class="hb-at"><span>@</span><input id="hbGB" autocapitalize="off" autocomplete="off" placeholder="юзернейм бота, например pizza_bot"></div>
+<div class="hb-hint" id="hbGBh">Бот будет отвечать на свои команды, упоминание @бота и ответы на его сообщения</div>
+<div class="sgfl" id="hbGBl"></div></div>`, { title: '🤖 Добавить бота в группу' });
+  sh.style.touchAction = 'pan-y';
+  const inp2 = sh.querySelector('#hbGB'), list = sh.querySelector('#hbGBl'), hint = sh.querySelector('#hbGBh');
+  const draw = bots => { list.innerHTML = bots.map(u => `<button type="button" data-h="${esc(u.handle)}">${uav(u, 's', false)}<span><b>${esc(u.username)}</b><small>@${esc(u.handle)}${u.ownerId === me.id ? ' · ваш бот' : ''}</small></span></button>`).join('') || '<div class="sg-note">Ботов не найдено</div>';
+    list.querySelectorAll('[data-h]').forEach(b => b.onclick = () => add(b.dataset.h)); };
+  const add = async h => {
+    try { const g = await api('/api/groups/' + encodeURIComponent(gid) + '/bots', 'POST', { handle: h }); putChat(g); sgSheetClose(); toast('🤖 Бот добавлен в группу'); }
+    catch (x) { hint.textContent = x.message; hint.classList.remove('ok'); }
+  };
+  let t;
+  const search = async () => { const q = inp2.value.trim().replace(/^@/, ''); try { const r = await api('/api/users/search?q=' + encodeURIComponent(q || 'bot')); draw(r.filter(u => u.custom)); } catch {} };
+  inp2.oninput = () => { clearTimeout(t); t = setTimeout(search, 250); };
+  inp2.onkeydown = e => { if (e.key === 'Enter') add(inp2.value); };
+  // сначала — свои боты
+  api('/api/hours/bots').then(mine => { if (!inp2.value) draw(mine.map(b => ({ id: b.id, username: b.name, handle: b.handle, avatar: b.avatar, ownerId: me.id, bot: true, custom: true }))); }).catch(search);
+  setTimeout(() => inp2.focus(), 350);
+}
+async function hbRemoveBotFromGroup(gid, botId) {
+  if (!confirm('Убрать бота из группы?')) return;
+  try { const g = await api('/api/groups/' + encodeURIComponent(gid) + '/bots/' + botId, 'DELETE'); putChat(g); closeModal(); toast('Бот убран'); } catch (x) { toast(x.message); }
+}
+
+/* ---------- Подсказки команд «/» ---------- */
+const hbCmdCache = new Map();
+const hbCmdBox = document.createElement('div'); hbCmdBox.id = 'hbCmdPop'; hbCmdBox.hidden = true;
+$('#room').appendChild(hbCmdBox);
+let hbCmdList = [], hbCmdSel = 0;
+function hbChatBots(c) {
+  if (!c) return [];
+  if (c.type === 'direct') return c.peer && c.peer.custom ? [c.peer] : [];
+  return (c.members || []).filter(u => u.custom);
+}
+async function hbCmds(bot) {
+  if (!hbCmdCache.has(bot.id)) hbCmdCache.set(bot.id, api('/api/bots/' + bot.id + '/commands').catch(() => []));
+  return hbCmdCache.get(bot.id);
+}
+async function hbCmdPaint() {
+  const c = chats.get(cur), bots = hbChatBots(c);
+  const m = inp.value.match(/^\/([a-z0-9_]*)$/i);
+  if (!m || !bots.length) { hbCmdBox.hidden = true; return; }
+  const q = m[1].toLowerCase(), group = c.type !== 'direct';
+  const all = (await Promise.all(bots.map(async b => (await hbCmds(b)).map(x => ({ ...x, bot: b }))))).flat();
+  hbCmdList = all.filter(x => x.cmd.slice(1).startsWith(q)).slice(0, 8);
+  if (!hbCmdList.length || inp.value !== '/' + m[1]) { hbCmdBox.hidden = true; return; }
+  hbCmdSel = Math.min(hbCmdSel, hbCmdList.length - 1);
+  hbCmdBox.innerHTML = hbCmdList.map((x, i) => `<button type="button" data-i="${i}" class="${i === hbCmdSel ? 'on' : ''}"><span class="hc-c">${esc(x.cmd)}</span><span class="hc-d">${esc(x.desc || '')}${group ? ` · ${esc(x.bot.username)}` : ''}</span></button>`).join('');
+  hbCmdBox.hidden = false;
+}
+function hbCmdPick(i) {
+  const x = hbCmdList[i]; if (!x) return;
+  const c = chats.get(cur), multi = c && c.type !== 'direct' && hbChatBots(c).length > 1;
+  inp.value = x.cmd + (multi ? '@' + x.bot.handle : '');
+  hbCmdBox.hidden = true;
+  $('#form').requestSubmit();
+}
+inp.addEventListener('input', hbCmdPaint);
+inp.addEventListener('blur', () => setTimeout(() => { hbCmdBox.hidden = true; }, 180));
+inp.addEventListener('keydown', e => {
+  if (hbCmdBox.hidden) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); hbCmdSel = (hbCmdSel + (e.key === 'ArrowDown' ? 1 : -1) + hbCmdList.length) % hbCmdList.length; hbCmdPaint(); }
+  else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); hbCmdPick(hbCmdSel); }
+  else if (e.key === 'Escape') hbCmdBox.hidden = true;
+}, true);
+hbCmdBox.addEventListener('pointerdown', e => e.preventDefault());
+hbCmdBox.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) hbCmdPick(+b.dataset.i); });
 
 </script>
 </body>

@@ -146,7 +146,21 @@ function checkpoint() {
 setInterval(checkpoint, 20000).unref();
 
 // Отдаём только страницу и загруженные файлы (но не папку data целиком)
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+// Страница всегда свежая: не кэшируем и подставляем номер сборки — устаревшая вкладка сама перезагрузится
+let INDEX_HTML = '', BUILD = '';
+function loadIndex() {
+    try {
+        const raw = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+        BUILD = crypto.createHash('sha1').update(raw).digest('hex').slice(0, 12);
+        INDEX_HTML = raw.replace('__SG_BUILD__', BUILD);
+    } catch (e) { console.error('index.html:', e.message); }
+}
+loadIndex();
+app.get('/', (req, res) => {
+    if (process.env.NODE_ENV !== 'production') loadIndex();
+    res.set({ 'Cache-Control': 'no-store, no-cache, must-revalidate', Pragma: 'no-cache', Expires: '0' });
+    res.type('html').send(INDEX_HTML);
+});
 app.get('/uploads/:name', async (req, res) => {
     const name = req.params.name;
     if (!/^[\w-]+\.(jpg|png|webp|gif|mp4|webm|mov|weba|m4a|ogg|mp3)$/.test(name)) return res.sendStatus(404);
@@ -553,7 +567,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const STT_KEY = process.env.STT_API_KEY || process.env.OPENAI_API_KEY || '';
 const STT_URL = process.env.STT_URL || 'https://api.openai.com/v1/audio/transcriptions';
 const STT_MODEL = process.env.STT_MODEL || 'whisper-1';
-app.get('/api/config', (req, res) => res.json({ vapidKey: vapid ? vapid.pub : '', stt: !!STT_KEY }));
+app.get('/api/config', (req, res) => res.json({ vapidKey: vapid ? vapid.pub : '', stt: !!STT_KEY, build: BUILD }));
 
 // ---------- Уведомления (Web Push, без внешних библиотек) ----------
 // Ключи VAPID создаются при первом запуске и хранятся рядом с остальными данными (meta).
@@ -1643,9 +1657,9 @@ const ownBot = (req, res) => {
 };
 const botOut = (bot, cfg, full) => ({
     id: bot.id, name: bot.username, handle: bot.handle, avatar: bot.avatar || '', about: bot.bio || '', createdAt: bot.createdAt,
-    stats: { users: cfg.stats.users.length, msgs: cfg.stats.msgs, opens: cfg.stats.opens, broadcasts: cfg.stats.broadcasts || 0 },
+    stats: { users: cfg.stats.users.length, msgs: cfg.stats.msgs, opens: cfg.stats.opens, broadcasts: cfg.stats.broadcasts || 0, revenue: cfg.stats.revenue || 0 },
     hasApp: !!cfg.html, commands: cfg.commands.length,
-    ...(full && { start: cfg.start, fallback: cfg.fallback, commandsList: cfg.commands, html: cfg.html, appTitle: cfg.appTitle, appBtn: cfg.appBtn, forward: cfg.forward, inbox: (cfg.inbox || []).slice(-30).reverse() })
+    ...(full && { start: cfg.start, fallback: cfg.fallback, commandsList: cfg.commands, html: cfg.html, appTitle: cfg.appTitle, appBtn: cfg.appBtn, forward: cfg.forward, groups: cfg.groups !== false, inbox: (cfg.inbox || []).slice(-30).reverse(), payments: (cfg.payments || []).slice(-50).reverse() })
 });
 
 // ---------- Hours_bot: чат ----------
@@ -1680,13 +1694,14 @@ app.post('/api/bots/:id/click', async (req, res) => {
     const uid = req.uid, id = Number(req.params.id);
     const bot = read(F.users).find(u => u.id === id);
     if (!isCustomBot(bot)) return res.status(404).json({ error: 'Бот не найден' });
-    const msg = read(F.messages).find(m => m.id === String(req.body.messageId) && m.senderId === id && m.chatId === directId(uid, id));
-    const b = msg && msg.buttons && (msg.buttons[Number(req.body.row)] || [])[Number(req.body.col)];
+    const msg = read(F.messages).find(m => m.id === String(req.body.messageId) && m.senderId === id);
+    const chat = msg && read(F.chats).find(c => c.id === msg.chatId && c.members.includes(uid) && c.members.includes(id));
+    const b = chat && msg.buttons && (msg.buttons[Number(req.body.row)] || [])[Number(req.body.col)];
     if (!b || b.k !== 'cmd') return res.status(400).json({ error: 'Кнопка устарела' });
     const db = botsDb(), cfg = db[id];
     if (!cfg) return res.status(404).json({ error: 'Бот не настроен' });
     cfg.stats.msgs++; trackUser(cfg, uid); write(F.bots, db);
-    botSend(bot, cfg, uid, botAnswer(cfg, b.v) || { text: 'Команда ' + b.v + ' пока не настроена', buttons: [] });
+    botReplyIn(bot, chat, uid, botAnswer(cfg, b.v) || { text: 'Команда ' + b.v + ' пока не настроена', buttons: [] });
     res.json({ success: true });
 });
 
@@ -1731,6 +1746,7 @@ app.put('/api/hours/bots/:id', async (req, res) => {
     if (b.fallback !== undefined) cfg.fallback = cleanReply(b.fallback);
     if (b.commands !== undefined) cfg.commands = cleanCommands(b.commands);
     if (b.forward !== undefined) cfg.forward = !!b.forward;
+    if (b.groups !== undefined) cfg.groups = !!b.groups;
     if (b.appTitle !== undefined) cfg.appTitle = clean(b.appTitle, 40);
     if (b.appBtn !== undefined) cfg.appBtn = clean(b.appBtn, 24).trim() || 'Открыть';
     if (b.html !== undefined) {
@@ -1841,6 +1857,135 @@ app.put('/api/bots/:id/app/storage', async (req, res) => {
         mine[key] = v;
     }
     write(F.bots, o.db);
+    res.json({ success: true });
+});
+
+// ---------- Боты в группах ----------
+function botPostToChat(botId, chat, text, buttons, extra = {}) {
+    const msg = { id: crypto.randomUUID(), chatId: chat.id, senderId: botId, text: String(text || '').slice(0, 4000), timestamp: new Date().toISOString(), ...(buttons && buttons.length && { buttons }), ...extra };
+    const msgs = read(F.messages); msgs.push(msg); write(F.messages, msgs);
+    sendTo(chat.members.filter(id => id !== botId), { type: 'message', data: outMsg(msg, chat) });
+    notifyMessage(chat, msg);
+    return msg;
+}
+const fillName = (s, uid) => String(s || '').replace(/\{name\}/g, (read(F.users).find(u => u.id === uid) || {}).username || '');
+// ответ бота туда, где его спросили: в личку или в группу
+function botReplyIn(bot, chat, uid, reply) {
+    if (!reply || !(reply.text || (reply.buttons || []).length)) return;
+    if (!chat || chat.type === 'direct') return botSend(bot, botsDb()[bot.id], uid, reply);
+    setTimeout(() => { const c = read(F.chats).find(x => x.id === chat.id); if (c && c.members.includes(bot.id)) { botPostToChat(bot.id, c, fillName(reply.text, uid) || '⬇️', reply.buttons || []); persist(); } }, 250);
+}
+// Сообщение в группе: бот отвечает на свои команды, упоминание @бота и ответ на его сообщение
+function onGroupBotMessage(chat, uid, msg) {
+    if (chat.type !== 'group' || !msg.text) return;
+    const users = read(F.users), db = botsDb();
+    const bots = chat.members.map(id => users.find(u => u.id === id)).filter(b => isCustomBot(b) && b.id !== uid && db[b.id]);
+    if (!bots.length) return;
+    const t = msg.text.trim(), low = t.toLowerCase(), isCmd = t.startsWith('/');
+    const replyTo = msg.reply && read(F.messages).find(m => m.id === msg.reply.id);
+    let changed = false;
+    for (const bot of bots) {
+        const cfg = db[bot.id];
+        const mentioned = low.includes('@' + bot.handle) || (replyTo && replyTo.senderId === bot.id);
+        if (isCmd) { const target = low.split(/\s/)[0].split('@')[1]; if (target && target !== bot.handle) continue; }
+        else if (!mentioned) continue;
+        const q = isCmd ? t : t.replace(new RegExp('@' + bot.handle, 'ig'), '').trim();
+        const ans = botAnswer(cfg, q);
+        if (!ans || (ans === cfg.fallback && !mentioned)) continue;
+        cfg.stats.msgs++; trackUser(cfg, uid); changed = true;
+        botReplyIn(bot, chat, uid, ans);
+    }
+    if (changed) write(F.bots, db);
+}
+const botByHandle = h => read(F.users).find(u => isCustomBot(u) && (u.handles || [u.handle]).includes(String(h || '').trim().replace(/^@/, '').toLowerCase()));
+app.post('/api/groups/:id/bots', async (req, res) => {
+    const chats = read(F.chats), g = chats.find(c => c.id === req.params.id && c.type === 'group');
+    if (!g || !g.members.includes(req.uid)) return res.status(403).json({ error: 'Нет доступа' });
+    const bot = botByHandle(req.body.handle), cfg = bot && botsDb()[bot.id];
+    if (!bot || !cfg) return res.status(404).json({ error: 'Бот не найден. Проверьте @юзернейм' });
+    if (cfg.groups === false && bot.ownerId !== req.uid) return res.status(400).json({ error: 'Владелец запретил добавлять этого бота в группы' });
+    if (g.members.includes(bot.id)) return res.status(400).json({ error: 'Бот уже в группе' });
+    if (g.members.filter(id => { const u = read(F.users).find(x => x.id === id); return isCustomBot(u); }).length >= 10) return res.status(400).json({ error: 'В группе может быть до 10 ботов' });
+    g.members.push(bot.id);
+    g.botsBy = { ...(g.botsBy || {}), [bot.id]: req.uid };
+    const last = read(F.messages).filter(m => m.chatId === g.id).pop();
+    g.reads = g.reads || {}; g.reads[bot.id] = last ? last.timestamp : '';
+    write(F.chats, chats);
+    const me = read(F.users).find(u => u.id === req.uid) || {};
+    const m = { id: crypto.randomUUID(), chatId: g.id, senderId: req.uid, sys: 'bot', text: `🤖 ${me.username || 'Участник'} добавил(а) бота ${bot.username} (@${bot.handle})`, timestamp: new Date().toISOString() };
+    const msgs = read(F.messages); msgs.push(m); write(F.messages, msgs);
+    sendTo(g.members, { type: 'message', data: m }); sendTo(g.members, { type: 'chat' });
+    await persist();
+    res.json(one(g, req.uid));
+});
+app.delete('/api/groups/:id/bots/:botId', async (req, res) => {
+    const chats = read(F.chats), g = chats.find(c => c.id === req.params.id && c.type === 'group');
+    const botId = Number(req.params.botId), bot = read(F.users).find(u => u.id === botId);
+    if (!g || !g.members.includes(req.uid) || !isCustomBot(bot) || !g.members.includes(botId)) return res.status(404).json({ error: 'Бот не найден в группе' });
+    if (req.uid !== g.creator && (g.botsBy || {})[botId] !== req.uid && bot.ownerId !== req.uid) return res.status(403).json({ error: 'Убрать бота может создатель группы или тот, кто его добавил' });
+    g.members = g.members.filter(id => id !== botId);
+    if (g.botsBy) delete g.botsBy[botId];
+    write(F.chats, chats);
+    const me = read(F.users).find(u => u.id === req.uid) || {};
+    const m = { id: crypto.randomUUID(), chatId: g.id, senderId: req.uid, sys: 'bot', text: `🤖 ${me.username || 'Участник'} убрал(а) бота ${bot.username}`, timestamp: new Date().toISOString() };
+    const msgs = read(F.messages); msgs.push(m); write(F.messages, msgs);
+    sendTo(g.members, { type: 'message', data: m }); sendTo(g.members, { type: 'chat' });
+    await persist();
+    res.json(one(g, req.uid));
+});
+// Список команд бота — для подсказок «/» в поле ввода
+app.get('/api/bots/:id/commands', (req, res) => {
+    const bot = read(F.users).find(u => u.id === Number(req.params.id)), cfg = bot && botsDb()[bot.id];
+    if (!isCustomBot(bot) || !cfg) return res.status(404).json({ error: 'Бот не найден' });
+    res.json([{ cmd: '/start', desc: 'Запустить бота' }, ...cfg.commands.filter(c => c.cmd).map(c => ({ cmd: c.cmd, desc: c.desc || '' })), ...(cfg.commands.some(c => c.cmd === '/help') ? [] : [{ cmd: '/help', desc: 'Список команд' }])]);
+});
+
+// ---------- Оплата в Mars в мини-приложениях ----------
+const PAY_MAX = 100000;
+app.post('/api/bots/:id/app/pay', async (req, res) => {
+    const o = botForApp(req, res); if (!o) return;
+    const amount = Math.floor(Number(req.body.amount));
+    const title = clean(req.body.title, 80).trim() || 'Оплата';
+    const payload = clean(typeof req.body.payload === 'string' ? req.body.payload : JSON.stringify(req.body.payload ?? ''), 500);
+    if (!Number.isFinite(amount) || amount < 1 || amount > PAY_MAX) return res.status(400).json({ error: `Сумма — от 1 до ${PAY_MAX} Mars` });
+    if (req.uid === o.bot.ownerId) return res.status(400).json({ error: 'Это ваш бот — платить самому себе нельзя. Проверьте оплату в предпросмотре.' });
+    if (!rateOk('p' + o.bot.id + ':' + req.uid, 2000)) return res.status(429).json({ error: 'Подождите пару секунд' });
+    const users = read(F.users), payer = users.find(u => u.id === req.uid), owner = users.find(u => u.id === o.bot.ownerId);
+    if (!payer || !owner) return res.status(400).json({ error: 'Оплата недоступна' });
+    if (!isUnlimited(payer) && (payer.mars || 0) < amount) return res.status(400).json({ error: `Не хватает Mars: нужно ${amount}, у вас ${payer.mars || 0}` });
+    if (!isUnlimited(payer)) payer.mars = (payer.mars || 0) - amount;
+    if (!isUnlimited(owner)) owner.mars = (owner.mars || 0) + amount;
+    write(F.users, users);
+    const pay = { id: 'p_' + crypto.randomUUID().slice(0, 12), from: payer.id, name: payer.username, handle: payer.handle, amount, title, payload, at: new Date().toISOString() };
+    o.cfg.payments = [...(o.cfg.payments || []), pay].slice(-500);
+    o.cfg.stats.revenue = (o.cfg.stats.revenue || 0) + amount;
+    trackUser(o.cfg, payer.id);
+    write(F.bots, o.db);
+    sendTo([payer.id], { type: 'wallet', data: walletOf(payer) });
+    sendTo([owner.id], { type: 'wallet', data: walletOf(owner) });
+    botPost(o.bot.id, payer.id, `🧾 Оплата прошла\n${title}\n\n−${amount} Mars · чек ${pay.id}`);
+    hoursSay(owner.id, `💰 +${amount} Mars через @${o.bot.handle}\nот ${payer.username}${payer.handle ? ' (@' + payer.handle + ')' : ''}\n«${title}»${payload ? '\n\nДанные: ' + payload : ''}`, [[hb('↩️ Ответить от имени бота', 'reply', `${o.bot.id}:${payer.id}`)]]);
+    await persist();
+    res.json({ success: true, id: pay.id, amount, ...walletOf(payer) });
+});
+// Возврат платежа владельцем
+app.post('/api/hours/bots/:id/refund', async (req, res) => {
+    const o = ownBot(req, res); if (!o) return;
+    const cfg = o.db[o.bot.id], pay = (cfg.payments || []).find(p => p.id === String(req.body.payId));
+    if (!pay) return res.status(404).json({ error: 'Платёж не найден' });
+    if (pay.refunded) return res.status(400).json({ error: 'Уже возвращён' });
+    const owner = o.users.find(u => u.id === req.uid), payer = o.users.find(u => u.id === pay.from);
+    if (!payer) return res.status(400).json({ error: 'Покупатель удалил аккаунт' });
+    if (!isUnlimited(owner) && (owner.mars || 0) < pay.amount) return res.status(400).json({ error: `Для возврата нужно ${pay.amount} Mars на вашем балансе` });
+    if (!isUnlimited(owner)) owner.mars -= pay.amount;
+    if (!isUnlimited(payer)) payer.mars = (payer.mars || 0) + pay.amount;
+    pay.refunded = new Date().toISOString();
+    cfg.stats.revenue = Math.max(0, (cfg.stats.revenue || 0) - pay.amount);
+    write(F.users, o.users); write(F.bots, o.db);
+    sendTo([payer.id], { type: 'wallet', data: walletOf(payer) });
+    sendTo([owner.id], { type: 'wallet', data: walletOf(owner) });
+    botPost(o.bot.id, payer.id, `↩️ Возврат: +${pay.amount} Mars\n«${pay.title}» · чек ${pay.id}`);
+    await persist();
     res.json({ success: true });
 });
 
@@ -3058,6 +3203,7 @@ wss.on('connection', ws => {
                 sendTo(chat.members, { type: 'message', data: outMsg(msg, chat), cid: m.cid ? String(m.cid).slice(0, 40) : undefined }); // только участникам чата; cid — чтобы отправитель заменил своё временное
                 notifyMessage(chat, msg);
                 if (chat.type === 'direct') onCustomBotMessage(chat, uid, msg);
+                else if (chat.type === 'group') onGroupBotMessage(chat, uid, msg);
 
             } else if (m.type === 'read') {
                 if (chat.type === 'channel' && !chat.open) markViews(chat, uid);
