@@ -7802,7 +7802,7 @@ ${b.inbox && b.inbox.length ? `<div class="tgp-card">${b.inbox.map(x => `<div cl
     card.querySelectorAll('[data-cmd]').forEach(r => r.onclick = () => hbCmdEditor(r.dataset.cmd === 'new' ? -1 : +r.dataset.cmd));
   } else if (tab === 'app') {
     const ta = card.querySelector('#hbHtml'), size = card.querySelector('#hbSize');
-    const paint = () => { size.textContent = sgFmtBytes(new Blob([ta.value]).size) + ' из 300 КБ'; };
+    const paint = () => { size.textContent = sgFmtBytes(new Blob([ta.value]).size) + ' из 2 МБ'; };
     ta.oninput = paint; paint();
     ta.onkeydown = e => { if (e.key === 'Tab') { e.preventDefault(); const p = ta.selectionStart; ta.setRangeText('  ', p, ta.selectionEnd, 'end'); } };
     card.querySelectorAll('[data-tpl]').forEach(t => t.onclick = () => { if (ta.value.trim() && !confirm('Заменить текущий код шаблоном?')) return; ta.value = HB_TEMPLATES[t.dataset.tpl].html; paint(); });
@@ -10466,6 +10466,123 @@ ${opt.fmt === 'zip' ? '<div class="ex-note">Распакуйте архив и �
         document.querySelector('#card [data-a="export"]').onclick = () => { closeModal(); setTimeout(() => exportSheet(c), 200); };
       }
     } catch (x) { console.warn(x); }
+    return r;
+  };
+})();
+</script>
+<style>
+/* ===== Мини-приложение бота: загрузка .html файлом ===== */
+.hb-files{display:flex;gap:8px;margin:2px 14px 10px}
+.hb-files button{flex:1;border:0;border-radius:14px;padding:11px 8px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;background:var(--card-bg2,#fff);color:var(--t);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+html[data-theme="dark"] .hb-files button{--card-bg2:#18232f}
+.hb-files button.pri{background:linear-gradient(135deg,#7b5cff,#4f8dff);color:#fff}
+.hb-drop{margin:-4px 14px 8px;font-size:12.5px;color:var(--t2);line-height:1.4}
+.hb-code.drag{outline:3px dashed #7b5cff;outline-offset:-3px;background:rgba(123,92,255,.08)!important}
+.hb-warn{margin:0 14px 10px;padding:10px 12px;border-radius:14px;background:rgba(255,160,0,.13);color:#b86e00;font-size:13px;line-height:1.4}
+html[data-theme="dark"] .hb-warn{color:#ffb547}
+.hb-ok{margin:0 14px 10px;padding:10px 12px;border-radius:14px;background:rgba(52,199,123,.13);color:#1f8f55;font-size:13px;line-height:1.4}
+html[data-theme="dark"] .hb-ok{color:#5fdc98}
+</style>
+<script>
+// ===================================================================
+//  Hours Studio → Приложение: загрузить .html файлом (+ встроить CSS, JS и картинки)
+// ===================================================================
+const HB_MAX = 2 * 1024 * 1024;
+const hbExt = n => ((String(n).toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1] || '');
+const hbBase = u => decodeURIComponent(String(u || '').split(/[?#]/)[0].replace(/\\/g, '/').split('/').pop() || '').toLowerCase();
+const hbLocal = u => { u = String(u || '').trim(); return !!u && !/^(https?:|data:|blob:|mailto:|tel:|javascript:|#|\/\/|about:)/i.test(u); };
+async function hbReadText(f) {
+  const buf = await f.arrayBuffer();
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^﻿/, ''); }
+  catch { return new TextDecoder('windows-1251').decode(buf); } // старые сайты в кодировке 1251
+}
+const hbDataUrl = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+async function hbBuildFromFiles(list) {
+  const files = [...list];
+  const html = files.find(f => /^html?$/.test(hbExt(f.name)));
+  if (!html) throw new Error('Выберите .html файл (можно вместе с его CSS, JS и картинками)');
+  const others = new Map(files.filter(f => f !== html).map(f => [f.name.toLowerCase(), f]));
+  let text = await hbReadText(html);
+  const used = new Set(), missing = new Set();
+  if (!others.size) { // один файл — оставляем как есть, только подскажем про недостающие
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    doc.querySelectorAll('script[src],link[rel~="stylesheet"][href],img[src],source[src],audio[src],video[src],link[rel~="icon"][href]').forEach(el => { const u = el.getAttribute('src') || el.getAttribute('href'); if (hbLocal(u)) missing.add(hbBase(u)); });
+    return { html: text, name: html.name, used, missing };
+  }
+  const get = u => { if (!hbLocal(u)) return null; const f = others.get(hbBase(u)); if (f) used.add(f.name); else missing.add(hbBase(u)); return f || null; };
+  const cssInline = async css => {
+    const urls = [...new Set([...css.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)].map(m => m[2]))];
+    for (const u of urls) { const f = get(u); if (f) { const d = await hbDataUrl(f); css = css.split(u).join(d); } }
+    return css;
+  };
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  for (const l of [...doc.querySelectorAll('link[rel~="stylesheet"][href]')]) {
+    const f = get(l.getAttribute('href')); if (!f) continue;
+    const st = doc.createElement('style'); st.textContent = await cssInline(await hbReadText(f));
+    if (l.media) st.media = l.media;
+    l.replaceWith(st);
+  }
+  for (const st of [...doc.querySelectorAll('style')]) st.textContent = await cssInline(st.textContent);
+  for (const s of [...doc.querySelectorAll('script[src]')]) {
+    const f = get(s.getAttribute('src')); if (!f) continue;
+    s.removeAttribute('src'); s.textContent = (await hbReadText(f)).replace(/<\/script/gi, '<\\/script');
+  }
+  for (const el of [...doc.querySelectorAll('img[src],source[src],audio[src],video[src],input[type=image][src],link[rel~="icon"][href],video[poster]')]) {
+    for (const a of ['src', 'href', 'poster']) { const u = el.getAttribute(a); if (!u) continue; const f = get(u); if (f) el.setAttribute(a, await hbDataUrl(f)); }
+  }
+  for (const el of [...doc.querySelectorAll('[style*="url("]')]) el.setAttribute('style', await cssInline(el.getAttribute('style')));
+  const dt = /^\s*<!doctype[^>]*>/i.exec(text);
+  return { html: (dt ? dt[0] : '<!doctype html>') + '\n' + doc.documentElement.outerHTML, name: html.name, used, missing };
+}
+function hbAppFileUi() {
+  const ta = document.getElementById('hbHtml'); if (!ta || ta.dataset.files) return;
+  ta.dataset.files = '1';
+  const size = document.getElementById('hbSize');
+  const paint = () => { const n = new Blob([ta.value]).size; size.textContent = sgFmtBytes(n) + ' из 2 МБ'; size.style.color = n > HB_MAX ? '#ff5a50' : ''; };
+  ta.oninput = paint; paint();
+  const tpls = document.querySelector('.hb-tpls');
+  const box = document.createElement('div');
+  box.innerHTML = `<div class="hb-files"><button type="button" class="pri" data-hbup>📂 Загрузить .html</button><button type="button" data-hbdl>⬇️ Скачать .html</button></div>
+<div class="hb-drop">Можно выбрать сразу HTML вместе с его CSS, JS и картинками — всё встроится в одну страницу.${matchMedia('(pointer:fine)').matches ? ' Или перетащите файлы прямо в поле с кодом.' : ''}</div><div data-hbmsg></div>
+<input type="file" data-hbf multiple hidden accept=".html,.htm,.css,.js,.mjs,.json,.svg,.png,.jpg,.jpeg,.gif,.webp,.ico,.mp3,.wav,.ogg,.woff,.woff2,.ttf,text/html">`;
+  (tpls || ta).parentNode.insertBefore(box, (tpls ? tpls.nextSibling : ta));
+  const inp = box.querySelector('[data-hbf]'), msg = box.querySelector('[data-hbmsg]');
+  const load = async files => {
+    if (!files || !files.length) return;
+    msg.innerHTML = '<div class="hb-ok">⏳ Читаю файлы…</div>';
+    try {
+      const r = await hbBuildFromFiles(files);
+      const n = new Blob([r.html]).size;
+      if (n > HB_MAX) { msg.innerHTML = `<div class="hb-warn">😕 Получилось ${sgFmtBytes(n)} — это больше 2 МБ. Сожмите картинки или вынесите их на сайт и подключите по ссылке https://…</div>`; return; }
+      if (ta.value.trim() && ta.value !== r.html && !confirm('Заменить текущий код содержимым файла «' + r.name + '»?')) { msg.innerHTML = ''; return; }
+      ta.value = r.html; paint();
+      const extra = r.used.size ? ` + встроено ${r.used.size} ${plural(r.used.size, ['файл', 'файла', 'файлов'])}` : '';
+      msg.innerHTML = `<div class="hb-ok">✅ «${esc(r.name)}» загружен${extra} · ${sgFmtBytes(n)}. Проверьте в «Предпросмотре» и нажмите «Сохранить».</div>`
+        + (r.missing.size ? `<div class="hb-warn">⚠️ Не хватает файлов: <b>${[...r.missing].slice(0, 8).map(esc).join(', ')}</b>${r.missing.size > 8 ? ' и др.' : ''}. Выберите их вместе с HTML — иначе стили, скрипты или картинки не загрузятся.</div>` : '');
+    } catch (x) { msg.innerHTML = `<div class="hb-warn">😕 ${esc(x.message || 'Не удалось прочитать файл')}</div>`; }
+    inp.value = '';
+  };
+  box.querySelector('[data-hbup]').onclick = () => inp.click();
+  inp.onchange = () => load(inp.files);
+  box.querySelector('[data-hbdl]').onclick = () => {
+    if (!ta.value.trim()) return toast('Код пока пустой');
+    const a = document.createElement('a'), u = URL.createObjectURL(new Blob([ta.value], { type: 'text/html;charset=utf-8' }));
+    a.href = u; a.download = ((hbBot && hbBot.handle) || 'bot') + '-app.html'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 30000); toast('⬇️ Файл сохраняется');
+  };
+  ta.addEventListener('dragover', e => { if ([...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); ta.classList.add('drag'); } });
+  ta.addEventListener('dragleave', () => ta.classList.remove('drag'));
+  ta.addEventListener('drop', e => { if (!e.dataTransfer.files.length) return; e.preventDefault(); ta.classList.remove('drag'); load(e.dataTransfer.files); });
+  // сохранение больше 2 МБ — сразу понятная ошибка
+  const save = document.getElementById('hbSaveApp');
+  if (save) save.addEventListener('click', e => { if (new Blob([ta.value]).size > HB_MAX) { e.stopImmediatePropagation(); toast('Код больше 2 МБ — сожмите картинки'); } }, true);
+}
+(() => {
+  const he = window.hbEditor;
+  if (typeof he !== 'function') return;
+  window.hbEditor = async function (id, tab) {
+    const r = await he.apply(this, arguments);
+    try { if (tab === 'app') hbAppFileUi(); } catch (x) { console.warn(x); }
     return r;
   };
 })();

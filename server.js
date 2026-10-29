@@ -16,7 +16,9 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+// Обычные запросы — до 1 МБ; сохранение мини-приложения бота (HTML с встроенными картинками) — до 4 МБ
+const jsonSmall = express.json({ limit: '1mb' }), jsonBig = express.json({ limit: '4mb' });
+app.use((req, res, next) => (req.method === 'PUT' && /^\/api\/hours\/bots\/[^/]+$/.test(req.path) ? jsonBig : jsonSmall)(req, res, next));
 
 // Каждый запрос к /api (кроме входа и регистрации) подписан токеном. Личность берём из токена,
 // а не из userId, который прислал клиент: иначе можно действовать от чужого имени (и тратить чужие Mars).
@@ -1834,6 +1836,7 @@ app.post('/api/hours/bots', async (req, res) => {
     await persist();
     res.json(botOut(bot, db[bot.id], true));
 });
+const HB_APP_MAX = 2 * 1024 * 1024; // мини-приложение: HTML + встроенные CSS/JS/картинки
 app.put('/api/hours/bots/:id', async (req, res) => {
     const o = ownBot(req, res); if (!o) return;
     const { users, bot, db } = o, cfg = db[bot.id], b = req.body;
@@ -1849,7 +1852,7 @@ app.put('/api/hours/bots/:id', async (req, res) => {
     if (b.appBtn !== undefined) cfg.appBtn = clean(b.appBtn, 24).trim() || 'Открыть';
     if (b.html !== undefined) {
         const h = String(b.html || '');
-        if (h.length > 300000) return res.status(400).json({ error: 'HTML слишком большой (максимум 300 КБ)' });
+        if (Buffer.byteLength(h) > HB_APP_MAX) return res.status(400).json({ error: `Приложение слишком большое (максимум ${Math.round(HB_APP_MAX / 1048576)} МБ)` });
         cfg.html = h;
     }
     bot.botApp = cfg.html ? cfg.appBtn : undefined;
