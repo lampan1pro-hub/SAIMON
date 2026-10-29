@@ -382,7 +382,7 @@ function sentSet() {
     _sentCache = { raw, set };
     return set;
 }
-const isContact = (owner, otherId) => !!otherId && (!!(owner.contactNames && owner.contactNames[otherId]) || sentSet().has(directId(owner.id, otherId) + ':' + owner.id));
+const isContact = (owner, otherId) => !!otherId && (!!(owner.contactNames && owner.contactNames[otherId]) || (Array.isArray(owner.contacts) && owner.contacts.includes(Number(otherId))) || sentSet().has(directId(owner.id, otherId) + ':' + owner.id));
 const PRIV_MODES = ['everybody', 'contacts', 'nobody'];
 function privOk(owner, field, viewer) {
     const mode = owner[field] || 'everybody';
@@ -723,11 +723,21 @@ app.post('/api/register', async (req, res) => {
         email, password: hashPass(password),
         bio: '', avatar: '', mars: START_MARS, createdAt: new Date().toISOString()
     };
+    // Пришёл по ссылке-приглашению (?u=юзернейм) — сразу добавляем друг друга в контакты
+    const refH = String(req.body.ref || '').trim().replace(/^@/, '').toLowerCase();
+    const inviter = refH ? users.find(x => !x.fake && !x.bot && !x.banned && (x.handles || [x.handle]).includes(refH)) : null;
+    if (inviter) {
+        user.invitedBy = inviter.id;
+        user.contacts = [inviter.id];
+        inviter.contacts = [...new Set([...(inviter.contacts || []), user.id])];
+        if (inviter.contactsHidden) inviter.contactsHidden = inviter.contactsHidden.filter(x => x !== user.id);
+    }
     users.push(user);
     write(F.users, users);
     const token = newSession(user.id, req);
     await persist();
     saimonChatNotify(user.id, req, 'register');
+    if (inviter) { try { scBotSay(inviter.id, `🎉 ${username} (@${handle}) присоединился к SAIMON по вашему приглашению и уже у вас в контактах. Напишите первым!`); } catch {} }
     res.json({ success: true, user: self(user), token });
 });
 
@@ -2299,8 +2309,47 @@ app.put('/api/contacts/:userId', (req, res) => {
     const name = String(req.body.name || '').trim().slice(0, 40);
     u.contactNames = u.contactNames || {};
     if (name) u.contactNames[target] = name; else delete u.contactNames[target];
+    if (name && u.contactsHidden) u.contactsHidden = u.contactsHidden.filter(x => x !== target);
     write(F.users, users);
     res.json(u.contactNames);
+});
+
+// ---------- Список контактов ----------
+// Контакт = добавлен вручную, или задано своё имя, или есть личная переписка. Убранные вручную скрываются.
+function contactIds(u) {
+    const ids = new Set([...(u.contacts || []), ...Object.keys(u.contactNames || {}).map(Number)]);
+    read(F.chats).forEach(c => { if (c.type === 'direct' && (c.members || []).includes(u.id)) c.members.forEach(m => { if (m !== u.id) ids.add(m); }); });
+    (u.contactsHidden || []).forEach(id => { if (!(u.contacts || []).includes(id)) ids.delete(id); });
+    return ids;
+}
+app.get('/api/contacts/list', (req, res) => {
+    const users = read(F.users), me = users.find(x => x.id === req.uid);
+    if (!me) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    const ids = contactIds(me);
+    const list = users.filter(u => ids.has(u.id) && !u.bot && !u.fake && !u.banned && u.id !== me.id).map(u => ({ ...pub(u), added: (me.contacts || []).includes(u.id), invited: u.invitedBy === me.id }));
+    res.json({ list, invited: users.filter(u => u.invitedBy === me.id && !u.banned).length });
+});
+app.post('/api/contacts/add', (req, res) => {
+    const users = read(F.users), me = users.find(x => x.id === req.uid);
+    if (!me) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    const h = String((req.body || {}).handle || '').trim().replace(/^@/, '').toLowerCase();
+    const id = Number((req.body || {}).targetUserId);
+    const t = users.find(u => !u.fake && !u.bot && !u.banned && (id ? u.id === id : (u.handles || [u.handle]).includes(h)));
+    if (!t) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (t.id === me.id) return res.status(400).json({ error: 'Это вы 🙂' });
+    me.contacts = [...new Set([...(me.contacts || []), t.id])].slice(-2000);
+    if (me.contactsHidden) me.contactsHidden = me.contactsHidden.filter(x => x !== t.id);
+    write(F.users, users);
+    res.json({ success: true, user: { ...pub(t), added: true } });
+});
+app.post('/api/contacts/:id/remove', (req, res) => {
+    const users = read(F.users), me = users.find(x => x.id === req.uid), id = Number(req.params.id);
+    if (!me) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    me.contacts = (me.contacts || []).filter(x => x !== id);
+    if (me.contactNames) delete me.contactNames[id];
+    me.contactsHidden = [...new Set([...(me.contactsHidden || []), id])].slice(-2000);
+    write(F.users, users);
+    res.json({ success: true, names: me.contactNames || {} });
 });
 
 app.get('/api/blocks', (req, res) => {
@@ -2996,6 +3045,37 @@ const sharedTabs = m => {
     if (m.text && LP_URL_RE.test(m.text)) out.push('links');
     return out;
 };
+// ---------- Экспорт чата: вся история по страницам (в хронологическом порядке) ----------
+app.get('/api/chats/:id/export', (req, res) => {
+    const me = req.uid;
+    const chat = read(F.chats).find(c => String(c.id) === req.params.id);
+    if (!chat || !chat.members.includes(me)) return res.status(403).json({ error: 'Нет доступа' });
+    const clr = (chat.cleared || {})[me] || '';
+    const since = /^\d{4}-\d\d-\d\dT/.test(String(req.query.since || '')) ? String(req.query.since) : '';
+    const limit = Math.max(1, Math.min(2000, Number(req.query.limit) || 1000));
+    const all = read(F.messages).filter(m => m.chatId === chat.id && m.timestamp > clr && (!since || m.timestamp >= since));
+    // курсор — id последнего полученного сообщения; если его удалили во время экспорта — продолжаем по времени
+    let start = 0;
+    const after = String(req.query.after || ''), afterTs = String(req.query.afterTs || '');
+    if (after) {
+        const i = all.findIndex(m => m.id === after);
+        start = i >= 0 ? i + 1 : (afterTs ? all.findIndex(m => m.timestamp > afterTs) : all.length);
+        if (start < 0) start = all.length;
+    }
+    const page = all.slice(start, start + limit);
+    const users = read(F.users), uix = new Map(users.map(u => [u.id, u]));
+    const people = {};
+    page.forEach(m => { const u = uix.get(m.senderId); if (u && !people[u.id]) people[u.id] = { id: u.id, name: u.username, handle: u.handle || '' }; });
+    const items = page.map(m => { const o = outMsg(m, chat); const { viewers, fv, comments, ca, ...rest } = o; return rest; });
+    let info;
+    if (start === 0) {
+        const peer = chat.type === 'direct' ? uix.get(chat.members.find(x => x !== me)) : null;
+        info = { id: chat.id, type: chat.type, title: chat.type === 'saved' ? 'Избранное' : chat.type === 'direct' ? (peer ? peer.username : 'Удалённый аккаунт') : (chat.name || 'Чат'),
+            handle: chat.type === 'direct' ? (peer && peer.handle) || '' : chat.handle || '', members: (chat.members || []).length, createdAt: chat.createdAt || null };
+    }
+    res.json({ total: all.length, items, users: people, done: start + page.length >= all.length, ...(info && { chat: info }) });
+});
+
 app.get('/api/chats/:id/shared', (req, res) => {
     const me = req.uid;
     const chat = read(F.chats).find(c => String(c.id) === req.params.id);
@@ -3231,6 +3311,8 @@ let spamSaveT = null;
 function spamCheck(uid, chat, text) {
     if (isAdminUid(uid)) return null;
     const now = Date.now();
+    const mu = meta.mutes && meta.mutes[uid];
+    if (mu && mu > now) return `🔇 По жалобам вам запрещено писать сообщения ещё ${spamFmt(mu - now)}`;
     let st = SPAM.get(uid);
     if (!st) { st = { t: [], h: [], until: 0, strikes: 0, lastStrike: 0 }; SPAM.set(uid, st); }
     if (now < st.until) return `🧯 Отправка сообщений приостановлена ещё на ${spamFmt(st.until - now)} — похоже на спам`;
@@ -3259,12 +3341,139 @@ function spamCheck(uid, chat, text) {
 app.get('/api/admin/spam', adminOnly, (req, res) => {
     const now = Date.now(), users = read(F.users);
     const active = [...SPAM].filter(([, st]) => st.until > now).map(([uid, st]) => { const u = users.find(x => x.id === uid); return { uid, name: u ? u.username : '?', handle: u ? u.handle || '' : '', left: st.until - now, strikes: st.strikes }; });
+    for (const [k, until] of Object.entries(meta.mutes || {})) { const uid = Number(k); if (until > now && !active.some(a => a.uid === uid)) { const u = users.find(x => x.id === uid); active.push({ uid, name: u ? u.username : '?', handle: u ? u.handle || '' : '', left: until - now, strikes: 0, report: true }); } }
     res.json({ active, log: (meta.spamLog || []).slice(-50).reverse() });
 });
 app.post('/api/admin/spam/:uid/unmute', adminOnly, (req, res) => {
     const st = SPAM.get(Number(req.params.uid));
     if (st) { st.until = 0; st.strikes = 0; st.t = []; st.h = []; }
+    if (meta.mutes && meta.mutes[req.params.uid]) { delete meta.mutes[req.params.uid]; saveMeta(); }
     res.json({ success: true });
+});
+
+// ---------- Жалобы ----------
+// Пользователь жалуется на сообщение или на человека → жалоба попадает в админ-панель (только @saimon).
+// Жалобы на одно и то же объединяются; админ решает: отклонить, удалить сообщение, предупредить, запретить писать, заблокировать.
+const REPORT_REASONS = { spam: 'Спам', abuse: 'Оскорбления, травля', scam: 'Мошенничество', nsfw: '18+ или жестокость', fake: 'Выдаёт себя за другого', other: 'Другое' };
+const repRate = new Map(); // uid → [время]
+const repKey = r => r.kind === 'msg' ? 'm:' + r.msgId : 'u:' + r.targetUid;
+const repOpen = () => (meta.reports || []).filter(r => r.status === 'open');
+function repNotifyAdmins() {
+    const n = repOpen().length;
+    const admins = read(F.users).filter(u => ADMIN_HANDLES.includes(u.handle)).map(u => u.id);
+    sendTo(admins, { type: 'reports', data: { open: n } });
+    return admins;
+}
+app.post('/api/reports', async (req, res) => {
+    const me = req.uid, b = req.body || {};
+    const users = read(F.users), meU = users.find(u => u.id === me);
+    if (!meU || meU.banned) return res.status(403).json({ error: 'Нет доступа' });
+    const reason = REPORT_REASONS[b.reason] ? b.reason : null;
+    if (!reason) return res.status(400).json({ error: 'Выберите причину' });
+    const note = String(b.note || '').trim().slice(0, 500);
+    const now = Date.now();
+    const rl = (repRate.get(me) || []).filter(t => now - t < 3600000);
+    if (rl.length >= 15) return res.status(429).json({ error: 'Слишком много жалоб, попробуйте позже' });
+    let rep;
+    if (b.msgId) {
+        const msg = read(F.messages).find(m => m.id === String(b.msgId));
+        if (!msg) return res.status(404).json({ error: 'Сообщение не найдено' });
+        const chat = chatOf(msg.chatId);
+        if (!chat || !(chat.members || []).includes(me)) return res.status(403).json({ error: 'Нет доступа к этому чату' });
+        if (msg.senderId === me) return res.status(400).json({ error: 'Нельзя пожаловаться на своё сообщение' });
+        const au = users.find(u => u.id === msg.senderId);
+        if (!au || au.bot || isAdminUid(au.id)) return res.status(400).json({ error: 'На это сообщение пожаловаться нельзя' });
+        rep = { kind: 'msg', msgId: msg.id, chatId: chat.id, targetUid: msg.senderId,
+            chatName: chat.type === 'direct' ? 'Личный чат' : (chat.name || 'Чат'), chatType: chat.type,
+            msg: { text: String(msg.text || '').slice(0, 1000), media: msg.media ? { kind: msg.media.kind, url: msg.media.url } : null, at: msg.timestamp } };
+    } else {
+        const uid = Number(b.targetUserId);
+        const tu = users.find(u => u.id === uid);
+        if (!tu || tu.bot || tu.fake) return res.status(404).json({ error: 'Пользователь не найден' });
+        if (uid === me) return res.status(400).json({ error: 'Нельзя пожаловаться на себя' });
+        if (isAdminUid(uid)) return res.status(400).json({ error: 'На этот аккаунт пожаловаться нельзя' });
+        rep = { kind: 'user', targetUid: uid };
+    }
+    meta.reports = meta.reports || [];
+    const key = repKey(rep);
+    let r = meta.reports.find(x => x.status === 'open' && x.key === key);
+    const first = !r;
+    if (!r) { r = { id: crypto.randomUUID().slice(0, 12), key, ...rep, status: 'open', by: [], createdAt: new Date(now).toISOString() }; meta.reports.push(r); }
+    if (r.by.some(x => x.uid === me)) return res.json({ success: true, already: true });
+    r.by.push({ uid: me, reason, note, at: new Date(now).toISOString() });
+    r.updatedAt = new Date(now).toISOString();
+    rl.push(now); repRate.set(me, rl);
+    // храним последние 1000: сначала выкидываем закрытые
+    if (meta.reports.length > 1000) { const closed = meta.reports.filter(x => x.status !== 'open'); const drop = new Set(closed.slice(0, meta.reports.length - 1000).map(x => x.id)); meta.reports = meta.reports.filter(x => !drop.has(x.id)); }
+    await saveMeta();
+    const admins = repNotifyAdmins();
+    if (first) {
+        const tu = users.find(u => u.id === r.targetUid);
+        const who = tu ? `${tu.username}${tu.handle ? ' (@' + tu.handle + ')' : ''}` : 'пользователя';
+        admins.forEach(a => scBotSay(a, `🚩 Новая жалоба: ${REPORT_REASONS[reason]} — на ${r.kind === 'msg' ? 'сообщение ' : ''}${who}. Откройте Админ-панель → Жалобы.`));
+    }
+    res.json({ success: true });
+});
+const repUser = (users, id) => { const u = users.find(x => x.id === id); if (!u) return { id, name: '?' }; const name = u.banned && u.banBackup ? u.banBackup.username : u.username, handle = u.banned && u.banBackup ? u.banBackup.handle : u.handle; return { id, name, handle: handle || '', avatar: u.banned ? '' : (u.avatar || ''), banned: !!u.banned, createdAt: u.createdAt }; };
+app.get('/api/admin/reports/count', (req, res) => {
+    if (!isAdminUid(req.uid)) return res.status(403).json({ error: 'Нет доступа' });
+    res.json({ open: repOpen().length });
+});
+app.get('/api/admin/reports', adminOnly, (req, res) => {
+    const users = read(F.users), done = req.query.status === 'done';
+    const all = meta.reports || [];
+    const list = all.filter(r => done ? r.status !== 'open' : r.status === 'open')
+        .sort((a, b) => done ? String(b.closedAt).localeCompare(String(a.closedAt)) : (b.by.length - a.by.length) || String(b.updatedAt).localeCompare(String(a.updatedAt)))
+        .slice(0, 100)
+        .map(r => {
+            const prev = all.filter(x => x.targetUid === r.targetUid && x.status === 'done' && x.action && x.action !== 'dismiss').length;
+            const mu = meta.mutes && meta.mutes[r.targetUid];
+            return { ...r, target: repUser(users, r.targetUid), prev, mutedLeft: mu && mu > Date.now() ? mu - Date.now() : 0,
+                msgGone: r.kind === 'msg' && !read(F.messages).some(m => m.id === r.msgId),
+                by: r.by.map(x => ({ ...x, reasonName: REPORT_REASONS[x.reason], user: repUser(users, x.uid) })) };
+        });
+    res.json({ list, open: repOpen().length, reasons: REPORT_REASONS });
+});
+app.post('/api/admin/reports/:id/act', adminOnly, async (req, res) => {
+    const r = (meta.reports || []).find(x => x.id === req.params.id);
+    if (!r) return res.status(404).json({ error: 'Жалоба не найдена' });
+    if (r.status !== 'open') return res.status(400).json({ error: 'Жалоба уже рассмотрена' });
+    const act = String((req.body || {}).action || '');
+    const ACTS = { dismiss: 'Отклонена', delete: 'Сообщение удалено', warn: 'Предупреждение', mute1: 'Запрет писать на 1 день', mute7: 'Запрет писать на 7 дней', ban: 'Аккаунт заблокирован' };
+    if (!ACTS[act]) return res.status(400).json({ error: 'Неизвестное действие' });
+    const del = act !== 'dismiss' && r.kind === 'msg' && ((req.body || {}).del !== false);
+    if (del) {
+        const messages = read(F.messages), msg = messages.find(m => m.id === r.msgId);
+        if (msg) {
+            write(F.messages, messages.filter(m => m !== msg));
+            const chat = chatOf(msg.chatId);
+            if (chat) sendTo(chat.members, { type: 'messageDeleted', data: { chatId: msg.chatId, messageId: msg.id } });
+        }
+    }
+    const reasonName = REPORT_REASONS[r.by[0] && r.by[0].reason] || 'нарушение правил';
+    if (act === 'warn') scBotSay(r.targetUid, `⚠️ Предупреждение от администрации SAIMON.\nНа вас пожаловались: ${reasonName.toLowerCase()}.${del ? ' Сообщение удалено.' : ''}\nПри повторных нарушениях отправка сообщений будет ограничена, а аккаунт — заблокирован.`);
+    if (act === 'mute1' || act === 'mute7') {
+        const days = act === 'mute1' ? 1 : 7;
+        meta.mutes = meta.mutes || {};
+        meta.mutes[r.targetUid] = Math.max(meta.mutes[r.targetUid] || 0, Date.now() + days * 864e5);
+        scBotSay(r.targetUid, `🔇 По жалобам пользователей (${reasonName.toLowerCase()}) вы не можете отправлять сообщения ${days === 1 ? '1 день' : '7 дней'}.${del ? ' Сообщение удалено.' : ''}`);
+    }
+    if (act === 'ban') { const err = await banUser(r.targetUid); if (err) return res.status(400).json({ error: err }); }
+    const closeOne = (x, a) => { x.status = 'done'; x.action = a; x.closedAt = new Date().toISOString(); x.closedBy = req.uid; };
+    closeOne(r, act);
+    if (del) r.deleted = true;
+    // при бане закрываем и остальные жалобы на этого человека
+    if (act === 'ban') (meta.reports || []).forEach(x => { if (x.status === 'open' && x.targetUid === r.targetUid) closeOne(x, 'ban'); });
+    if (act !== 'dismiss') {
+        const thanked = new Set();
+        (meta.reports || []).filter(x => x.closedAt && x.targetUid === r.targetUid && x.action === act && (x === r || act === 'ban')).forEach(x => x.by.forEach(b => {
+            if (thanked.has(b.uid)) return; thanked.add(b.uid);
+            try { scBotSay(b.uid, '✅ Спасибо за жалобу! Мы её рассмотрели и приняли меры.'); } catch {}
+        }));
+    }
+    await saveMeta(); await persist();
+    repNotifyAdmins();
+    res.json({ success: true, label: ACTS[act] });
 });
 
 // ---------- Статистика сервера (админ) ----------
@@ -3380,11 +3589,12 @@ app.get('/api/admin/users', adminOnly, (req, res) => {
 
 // Блокировка: аккаунт остаётся в чатах (сообщения сохраняются), но без имени, юзернеймов,
 // аватарки, профиля и входа. Для всех он отображается как призрак «Аккаунт заблокирован».
-app.post('/api/admin/users/:id/block', adminOnly, async (req, res) => {
-    const id = Number(req.params.id);
+// Блокировка аккаунта (админ-панель и жалобы). Возвращает текст ошибки или null.
+async function banUser(id) {
     const users = read(F.users), u = users.find(x => x.id === id);
-    if (!u || u.bot || u.fake) return res.status(404).json({ error: 'Пользователь не найден' });
-    if (ADMIN_HANDLES.includes(u.handle)) return res.status(400).json({ error: 'Нельзя заблокировать администратора' });
+    if (!u || u.bot || u.fake) return 'Пользователь не найден';
+    if (ADMIN_HANDLES.includes(u.handle)) return 'Нельзя заблокировать администратора';
+    if (u.banned) return null;
     syncHandles(u);
     // резервная копия для разблокировки; юзернеймы остаются занятыми
     u.banBackup = { username: u.username, handle: u.handle, handles: [...u.handles], bio: u.bio || '', avatar: u.avatar || '', acc: u.acc || null, contactNames: u.contactNames || {} };
@@ -3405,6 +3615,11 @@ app.post('/api/admin/users/:id/block', adminOnly, async (req, res) => {
     sockets.get(id)?.forEach(s => { try { s.close(); } catch {} });
     broadcast({ type: 'chat' });
     await persist();
+    return null;
+}
+app.post('/api/admin/users/:id/block', adminOnly, async (req, res) => {
+    const err = await banUser(Number(req.params.id));
+    if (err) return res.status(err === 'Пользователь не найден' ? 404 : 400).json({ error: err });
     res.json({ success: true });
 });
 
