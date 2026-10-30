@@ -3364,7 +3364,7 @@ function analysisHandle(uid, raw, name) {
     if (!verify) {
         const N = (L.notes = L.notes || []); let added = 0, dup = 0;
         paras.forEach(p => { const t = p.replace(/[ \t]*\n[ \t]*/g, '\n'); if (N.some(n => n.t === t)) dup++; else { N.push({ t, at: Date.now() }); added++; } });
-        if (N.length > 2000) N.splice(0, N.length - 2000);
+        
         touch();
         return `📝 Запомнил пунктов: ${added}${dup ? ` (уже были: ${dup})` : ''}. Всего в памяти: ${N.length}.\n\n` + paras.slice(0, 20).map((p, i) => `${i + 1}. ${p.replace(/\s+/g, ' ').slice(0, 70)}${p.length > 70 ? '…' : ''}`).join('\n') + (paras.length > 20 ? `\n…и ещё ${paras.length - 20}` : '') + '\n\nСпросите меня по любому из них — отвечу из запомненного. «список» — показать, «удали пункт N» — убрать, «проверь: текст» — проверить на верность.';
     }
@@ -3385,15 +3385,47 @@ function analysisHandle(uid, raw, name) {
 }
 
 
-function notesRecall(uid, raw) {
+const NR_TR = { а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'j',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sh',ъ:'',ы:'i',ь:'',э:'e',ю:'u',я:'a' };
+const NR_STOP = new Set('что это такое такой такая такие какой какая какое какие кто как почему зачем где когда сколько расскажи скажи знаешь объясни напомни про есть был была было были будет может могут для или при над под между через также только очень можно нужно ли же бы мне тебе ты мы вы он она они оно его ее их то эта этот эти тот те и в на с по к у о из за от до не но а я what is are the a an of in on to do does how why who when where tell me about mean means meaning define explain'.split(' '));
+const NR_EN = { game: 'игр', games: 'игр', engine: 'движок', server: 'сервер', player: 'игрок', players: 'игрок', level: 'уровен', quest: 'квест', boss: 'босс', mod: 'мод', bug: 'баг', lag: 'лаг', platform: 'платформ', console: 'консол', genre: 'жанр', shooter: 'шутер', strategy: 'стратег', skin: 'скин', inventory: 'инвентар', match: 'матч', lobby: 'лобби', tournament: 'турнир', cheat: 'чит', multiplayer: 'мультиплеер', singleplayer: 'синглплеер', coop: 'кооператив', map: 'карта', currency: 'валют', economy: 'эконом', physics: 'физик', balance: 'баланс', update: 'обновлен', achievement: 'достижен', experience: 'опыт', checkpoint: 'чекпоинт', respawn: 'респаун', story: 'сюжет', plot: 'сюжет', variable: 'переменн', function: 'функци', array: 'массив', loop: 'цикл', class: 'класс', object: 'объект', database: 'баз данных', browser: 'браузер', website: 'сайт', password: 'парол', language: 'язык', programming: 'программир' };
+function nrKey(w) { let t = ''; for (const ch of String(w).toLowerCase()) t += NR_TR[ch] !== undefined ? NR_TR[ch] : ch; t = t.replace(/ks/g, 'x').replace(/ck/g, 'k').replace(/c(?=[aouklrt])/g, 'k').replace(/ph/g, 'f').replace(/c(?![h])/g, 's').replace(/w/g, 'v').replace(/kh/g, 'h').replace(/(.)\1+/g, '$1'); return t.replace(/[^a-z0-9#+]/g, ''); }
+function nrSkel(k) { return k.replace(/[aeiouy]/g, ''); }
+function nrToks(text) { return String(text).toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9#+\s-]/g, ' ').split(/[\s-]+/).filter(w => w && !NR_STOP.has(w)); }
+function nrSim(a, b) { // слова похожи? (регистр/суффиксы/транслит/опечатка на 1 букву)
+    if (a === b) return 1;
+    const ka = nrKey(a), kb = nrKey(b); if (!ka || !kb) return 0;
+    if (ka === kb) return 1;
+    const m = Math.min(ka.length, kb.length);
+    { let cp = 0; while (cp < m && ka[cp] === kb[cp]) cp++; const req = m <= 4 ? m - 1 : Math.max(5, m - 1); if (m >= 4 && cp >= req) return 0.9; }
+    const sa = nrSkel(ka), sb = nrSkel(kb);
+    if (sa.length >= 3 && sb.length >= 3) { if (sa === sb) return 0.85; const n2 = Math.min(sa.length, sb.length); if (n2 >= 5 && (sa.startsWith(sb.slice(0, n2 - 1)) || sb.startsWith(sa.slice(0, n2 - 1)))) return 0.7; }
+    if (m >= 5 && Math.abs(ka.length - kb.length) <= 1) { let d = 0, i = 0, j = 0; while (i < ka.length && j < kb.length && d < 2) { if (ka[i] === kb[j]) { i++; j++; } else { d++; if (ka.length > kb.length) i++; else if (ka.length < kb.length) j++; else { i++; j++; } } } d += (ka.length - i) + (kb.length - j); if (d <= 1) return 0.8; }
+    return 0;
+}
+function notesRecall(uid, raw, force) {
     const N = L.notes; if (!N || !N.length) return null;
-    const q = nz(raw).replace(/[^a-zа-я0-9+#\s]/g, ' ').split(/\s+/).filter(w => w.length > 3);
-    if (!q.length || q.length > 14) return null;
-    if (!/\?\s*$/.test(raw) && !/^(что|кто|как|почему|зачем|где|когда|сколько|какой|какая|какое|какие|расскажи|скажи|знаешь|объясни|напомни)/.test(nz(raw).trim())) return null;
-    const qs = q.map(anStem); let best = [];
-    N.forEach(n => { const nt = nz(n.t); const hit = qs.filter(w => nt.includes(w)).length; if (hit >= Math.min(2, qs.length) && hit / qs.length >= 0.5) best.push([hit / qs.length + hit * 0.1, n]); });
-    if (!best.length) return null; best.sort((a, b) => b[0] - a[0]);
-    return '🧠 Из запомненного:\n\n' + best.slice(0, 3).map(x => x[1].t).join('\n\n');
+    const low = nz(raw).trim();
+    if (low.length > 220) return null;
+    const isQ = /\?\s*$/.test(raw) || /^(что|кто|как|почему|зачем|где|когда|сколько|какой|какая|какое|какие|расскажи|скажи|знаешь|объясни|напомни|what|who|how|why|where|when|tell|explain|define|is|are|does|do)(\s|$)/.test(low) || /(что такое|что значит|что означает|кто такой|кто такая|значение слова)/.test(low);
+    const bare = !isQ && !force && !/[.!,;:]/.test(raw) && nrToks(raw).length >= 1 && nrToks(raw).length <= 2;
+    if (!isQ && !force && !bare) return null;
+    let q = nrToks(raw); if (!q.length) return null; if (q.length > 12) return null;
+    q = q.map(w => NR_EN[w] || w);
+    const scored = [];
+    N.forEach((n, idx) => {
+        const nt = nrToks(n.t); if (!nt.length) return;
+        let sum = 0, hit = 0, subj = 0;
+        q.forEach(w => { let best = 0, pos = -1; for (let i = 0; i < nt.length; i++) { const x = nt[i]; const sm = nrSim(w, x); if (sm > best) { best = sm; pos = i; } } if (best >= 0.7) { hit++; sum += best; if (pos <= 1) subj += 1; } });
+        if (!hit) return;
+        const frac = hit / q.length;
+        if (q.length >= 2 && frac < 0.5) return;
+        if (bare && !(subj && frac === 1)) return;
+        scored.push([sum + subj * 0.8 + frac - nt.length * 0.01, n, idx]);
+    });
+    if (!scored.length) return null;
+    scored.sort((a, b) => b[0] - a[0]);
+    const top = scored[0][0]; const pick = scored.filter(x => x[0] >= top - 0.9).slice(0, 3);
+    return '🧠 Из запомненного:\n\n' + pick.map(x => x[1].t).join('\n\n');
 }
 function gameBuildMenu() {
     return '🎮 Какую игру сделать? Все варианты — готовый HTML-файл, который открывается в браузере (в том числе на телефоне):\n\n• змейка\n• кликер (с улучшениями)\n• найди пару (память)\n• понг против бота\n• flappy bird\n• арканоид\n• крестики-нолики (с умным ботом)\n• угадай число\n• тетрис\n• 2048\n• сапёр\n• космический шутер\n• поймай крота\n• бегун (как динозаврик)\n• виселица\n• четыре в ряд (с ботом)\n• саймон\n• кости\n\nИ приложения: заметки, помодоро-таймер, рисовалка, конвертер величин, викторина, список дел, калькулятор, секундомер, форма регистрации, лендинг.\n\nНапишите, например: «змейка на html» или «сделай арканоид». Нужно что-то своё — опишите правила, подскажу, как построить: цикл игры, управление, столкновения и счёт.';
