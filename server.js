@@ -2376,6 +2376,15 @@ K('chat-app', 'js', ['сделать чат', 'сделай чат', 'чат н�
 K('learn-html', 'html', ['как выучить html', 'с чего начать html', 'изучить html', 'научиться верстать', 'научиться html', 'html для начинающих', 'html с нуля', 'учить html', 'учим html', 'обучение html', 'roadmap фронтенд', 'путь фронтендера', 'стать фронтендером'], `🎓 Как выучить HTML/CSS/JS за пару месяцев\n\n1) HTML: теги, ссылки, картинки, списки, формы, семантика (неделя)\n2) CSS: селекторы, блочная модель, flexbox, grid, адаптив (2–3 недели)\n3) Практика: сверстайте 3 страницы — визитку, лендинг, интернет-магазин (карточки)\n4) JavaScript: переменные, функции, DOM, события, fetch (1–2 месяца)\n5) Проекты: список дел, калькулятор, игра, погода по API\n6) Git + публикация на GitHub Pages\n7) Дальше: React/Vue, TypeScript, Node.js\n\nПравило: 30% теории, 70% практики; каждый день хоть 30 минут. Напишите «сделай игру» или «лендинг» — дам рабочие примеры, которые можно разобрать по строчкам.`);
 K('api-sdk', null, ['sdk', 'чем отличается api от sdk', 'api и sdk', 'api sdk', 'что такое sdk', 'sdk и библиотека', 'отличие sdk от api'], `🧰 API и SDK\n\n• API — «меню» возможностей сервиса: набор запросов/функций, которые можно вызвать (например, HTTP-запросы к серверу)\n• SDK — готовый «набор инструментов» для разработчика: библиотеки, примеры, документация, иногда утилиты; обычно внутри уже обёртка над API, чтобы не писать запросы руками\n\nПример: API Telegram — HTTP-запросы к серверам Telegram; библиотека/SDK для Python или Node.js оборачивает их в удобные функции (bot.send_message). Можно работать и напрямую через API, и через SDK — SDK просто удобнее.`);
 K('bot-howto', 'py', ['бот телеграм', 'телеграм бот', 'telegram bot', 'дискорд бот', 'discord bot', 'как сделать бота', 'создать бота', 'написать бота', 'бот на python', 'бот на питоне', 'бот на js', 'чат бот', 'чат-бот', 'botfather'], `🤖 Как сделать бота — напишите «хочу сделать бота», я уточню платформу (Telegram/Discord) и язык (Python/JavaScript) и дам готовую заготовку с запуском.`);
+K('html-intro', 'html', ['что такое html','html это что','html это','хтмл это','что такое хтмл','расскажи про html','расскажи о html','что за html','html для начинающих','html для чайников','что такое html и css','что такое верстка','html что это','зачем нужен html','html язык'], `🌐 HTML — что это\n\nHTML (HyperText Markup Language — «язык гипертекстовой разметки») — это язык, которым описывают СТРУКТУРУ веб-страницы: где заголовок, где абзац, картинка, ссылка, кнопка, список. Это не язык программирования (в нём нет логики и вычислений), а «скелет» страницы.\n\nУстройство: страница состоит из тегов — «скобочек» вида <тег>содержимое</тег>. Теги вкладываются друг в друга, образуя дерево.\n\n${code('html', `<h1>Привет, мир!</h1>            <!-- заголовок -->
+<p>Это <b>абзац</b> текста.</p>    <!-- параграф, внутри жирное слово -->
+<a href="https://example.com">Ссылка</a>
+<img src="cat.jpg" alt="Кот">     <!-- картинка (тег без закрытия) -->
+<button>Нажми меня</button>`)}\nТри кита сайта:\n• HTML — структура и содержимое («что на странице»)\n• CSS — внешний вид («как выглядит»: цвета, шрифты, расположение)\n• JavaScript — поведение («что происходит»: клики, игры, анимации)\n\nКак попробовать за минуту: создайте файл index.html, вставьте код выше, откройте двойным кликом в браузере. Файл можно писать в любом редакторе (Блокнот, VS Code).\n\nДальше можно спросить: «шаблон html страницы», «теги html», «как сделать форму», «сделай сайт», «сделай игру».`, 2.5);
+K('css-intro', 'css', ['что такое css','css это что','css это','расскажи про css','расскажи о css','что за css','css для начинающих','css для чайников','зачем нужен css','каскадные таблицы стилей','css что это'], `🎨 CSS — что это\n\nCSS (Cascading Style Sheets — «каскадные таблицы стилей») отвечает за ВНЕШНИЙ ВИД страницы: цвета, шрифты, отступы, размеры, расположение блоков, анимации, адаптацию под телефон. HTML говорит «что на странице», CSS — «как это выглядит».\n\nЗапись: селектор { свойство: значение; }\n\n${code('css', `h1 { color: tomato; font-size: 32px; }          /* все заголовки h1 */
+.card { background: #fff; padding: 16px; border-radius: 12px; }   /* элементы с class="card" */
+#menu a:hover { text-decoration: underline; }        /* ссылки в #menu при наведении */
+@media (max-width: 600px) { .card { padding: 8px; } }  /* только на узких экранах */`)}\nПодключение: в <head> — <link rel="stylesheet" href="style.css"> (или тег <style> прямо в странице).\n\nС чего начать: селекторы → блочная модель (margin/padding/border) → flexbox → grid → адаптив. Спросите: «блочная модель», «flexbox», «как отцентровать», «адаптивная вёрстка».`, 2.5);
 // ---- Алгоритмы и теория
 K('bigo', null, ['o(n', 'сложность алгоритм', 'big o', 'асимптотик', 'временная сложность', 'вычислительная сложность'], `📈 Сложность алгоритмов (Big O)\n\nO(1) — константа: доступ к элементу массива по индексу\nO(log n) — бинарный поиск\nO(n) — один проход по данным\nO(n log n) — хорошая сортировка (merge, quick, встроенная)\nO(n²) — вложенные циклы, пузырьковая сортировка\nO(2ⁿ) — наивные перебор подмножеств, рекурсивный Фибоначчи\nO(n!) — перебор перестановок\n\nПравило: смотрим, как растёт время при росте входа, константы отбрасываем. Для 10⁶ элементов O(n²) — это ~10¹² операций, то есть слишком долго.`);
 K('recursion', null, ['рекурси', 'recursion', 'стек вызовов', 'stack overflow', 'переполнение стека'], `🔁 Рекурсия\n\nФункция вызывает сама себя. Нужны две вещи: базовый случай (когда остановиться) и шаг, приближающий к нему.\n\n${code('javascript', `function sum(n) {\n  if (n === 0) return 0;      // базовый случай\n  return n + sum(n - 1);      // шаг рекурсии\n}\nsum(4); // 4 + 3 + 2 + 1 + 0 = 10`)}\n\nБез базового случая получите «Maximum call stack size exceeded» (stack overflow). Глубокую рекурсию заменяйте циклом или явным стеком.`);
@@ -2668,6 +2677,32 @@ build();
 </script></body></html>`;
 
 
+
+T.tapper=(o)=>HEAD(o.title,o.bg)+`<canvas id="c" width="640" height="300"></canvas><p>Тапайте/кликайте по экрану или нажимайте пробел — чем чаще, тем быстрее едет ${o.player}. Доехать до финиша 🏁</p><button id="rs">Заново</button><script>
+const c=document.getElementById('c'),x=c.getContext('2d');${BEST}
+const P='${o.player}',LEN=1000;let pos,v,t0,done,best2=0,taps,last=performance.now();
+try{best2=+localStorage.getItem('bt_'+document.title)||0}catch(e){}
+function reset(){pos=0;v=0;done=false;t0=null;taps=0;document.getElementById('s').textContent=0}
+function tap(){if(done){return}if(!t0)t0=performance.now();taps++;v=Math.min(v+1.1*M.speed,16*M.speed)}
+function loop(now){const dt=Math.min((now-last)/16.7,3);last=now;
+if(!done&&t0){v=Math.max(0,v-.04*dt*M.enemy**0);pos+=v*dt;document.getElementById('s').textContent=Math.floor(pos/10)+' м';
+if(pos>=LEN){done=true;const T=(performance.now()-t0)/1000;if(!best2||T<best2){best2=T;try{localStorage.setItem('bt_'+document.title,T)}catch(e){}}document.getElementById('b').textContent=best2.toFixed(2)+' c';fin=T}}
+x.fillStyle='${o.road}';x.fillRect(0,0,640,300);
+x.fillStyle='${o.line}';for(let i=-1;i<20;i++)x.fillRect(((i*60-pos*3)%1200+1200)%1200-60,198,30,5);
+x.fillStyle='#ffffff22';x.fillRect(20,265,600,12);x.fillStyle='#4c8dff';x.fillRect(20,265,600*Math.min(pos/LEN,1),12);
+x.font='46px serif';x.textAlign='center';x.textBaseline='middle';x.fillText('🏁',620,160);
+const shake=v>8?Math.sin(now/30)*1.5:0;x.fillText(P,90,160+shake);
+if(v>1){x.font='28px serif';x.fillText('💨',90-30-v,165)}
+x.fillStyle='#fff';x.font='16px sans-serif';x.textAlign='left';x.fillText('Скорость: '+(v*10).toFixed(0)+' км/ч · тапов: '+taps,20,28);
+if(done){x.fillStyle='rgba(0,0,0,.6)';x.fillRect(0,0,640,300);x.fillStyle='#fff';x.font='26px sans-serif';x.textAlign='center';x.fillText('Финиш! '+fin.toFixed(2)+' c · тапов: '+taps,320,140);x.font='18px sans-serif';x.fillText('Нажмите «Заново»',320,180)}
+requestAnimationFrame(loop)}
+let fin=0;
+c.addEventListener('pointerdown',tap);addEventListener('keydown',e=>{if(e.code==='Space'){tap();e.preventDefault()}});
+document.getElementById('rs').onclick=reset;
+document.getElementById('b').textContent=best2?best2.toFixed(2)+' c':'0';
+reset();requestAnimationFrame(loop);
+</script></body></html>`;
+
 const THEMES = [
     [/космос|космич|звезд|планет|галактик|ракет|нло|пришельц|инопланет/, { n: 'Космос', player: '🚀', enemy: '☄️', enemy2: '👾', good: '⭐', good2: '🪐', bg: '#070720', road: '#1a1a3a', line: '#8888ff' }],
     [/море|морск|океан|подводн|рыб|акул|корабл|пират|остров/, { n: 'Море', player: '🐠', enemy: '🦈', enemy2: '🪼', good: '🐚', good2: '🦐', bg: '#0b3d6b', road: '#1c5a8c', line: '#9fd8ff' }],
@@ -2688,6 +2723,7 @@ const THEMES = [
     [/школ|учеб|урок|студент|математик|знани/, { n: 'Школа', player: '🎒', enemy: '📝', enemy2: '⏰', good: '📚', good2: '⭐', bg: '#20304a', road: '#34507a', line: '#d9e8ff' }],
 ];
 const GENRES = [
+    ['tapper', /(тап(ать|ай|нуть|ы)|тыка|кликать|кликай|нажима(ть|й)|долби|жать|жми)/],
     ['racing', /гонк|гонч|гоноч|гонщ|машин|автомоб|мотоцикл|байк|трасс|такси|race|racing|заезд/],
     ['maze', /лабиринт|maze|найди выход|найти выход|выход из|пройти путь/],
     ['platformer', /платформер|платформ|прыга|прыжк|марио|mario|приключен|бегать и прыгать|ходилк|перепрыг/],
@@ -2695,7 +2731,7 @@ const GENRES = [
 ];
 let lastGenre = null;
 function customGame(n) {
-    const wantsGame = /(игр|game|гонк|платформер|лабиринт|ходилк|аркад|приложен)/.test(n);
+    const wantsGame = /(игр|game|гонк|платформер|лабиринт|ходилк|аркад|приложен)/.test(n) || (/(тап(ать|ай)|тыка|кликать|нажима(ть|й)|жать)/.test(n) && /(машин|гонк|ракет|лошад|лодк|самол|бег|скорост|ускор)/.test(n));
     const ask = /(сдела|напиш|созда|хочу|нужн|придума|давай|можешь|умеешь|сможешь|накидай|запили|собери|сваргань|скинь|покажи)/.test(n);
     if (!wantsGame || !(ask || /^(игр|гонк|платформер|лабиринт)/.test(n))) return null;
     let genre = null; for (const [g, re] of GENRES) if (re.test(n)) { genre = g; break; }
@@ -2703,13 +2739,13 @@ function customGame(n) {
     if (!genre && !theme) return null;
     if (!genre) genre = /(космос|космич|ракет)/.test(n) ? 'catcher' : /(лес|море|подводн|еда|фрукт|кот|собак|зим|хэллоуин)/.test(n) ? 'catcher' : /(замок|рыцар|дракон|сокровищ|клад|зомби|робот)/.test(n) ? 'platformer' : 'catcher';
     if (!theme) theme = THEMES.find(t => t[1].n === { racing: 'Гонки', maze: 'Сокровища', platformer: 'Фэнтези', catcher: 'Еда' }[genre])[1];
-    const gw = { racing: 'гонка', maze: 'лабиринт', platformer: 'платформер', catcher: 'лови и уворачивайся' }[genre];
+    const gw = { racing: 'гонка', maze: 'лабиринт', platformer: 'платформер', catcher: 'лови и уворачивайся', tapper: 'тап-гонка' }[genre];
     lastGenre = genre;
     const o = Object.assign({}, theme, { title: theme.n.toLowerCase() === gw || (genre === 'racing' && theme.n === 'Гонки') ? theme.n : theme.n + ' — ' + gw });
     // для лабиринта цель — сокровище, а не «бонус»
     const html = T[genre](o);
-    const G = { racing: 'Гонка', maze: 'Лабиринт', platformer: 'Платформер', catcher: 'Ловля предметов' }[genre];
-    const how = { racing: 'Стрелки ←/→ или касание левой/правой половины. Подбирайте бонусы ' + o.good + ', объезжайте препятствия — скорость растёт.', maze: 'Стрелки/WASD или свайпы. Каждый уровень — новый лабиринт побольше.', platformer: 'Стрелки — ходьба, пробел — прыжок (можно дважды), прыжок сверху убивает врага ' + o.enemy + '.', catcher: 'Двигайте мышью/пальцем или ←/→. Ловите ' + o.good + ' и ' + o.good2 + ', не трогайте ' + o.enemy + '. Три жизни.' }[genre];
+    const G = { racing: 'Гонка', maze: 'Лабиринт', platformer: 'Платформер', catcher: 'Ловля предметов', tapper: 'Тап-гонка' }[genre];
+    const how = { tapper: 'Тапайте по полю или жмите пробел — машина разгоняется, но скорость постепенно падает. Доедьте до финиша как можно быстрее. Рекорд — лучшее время.', racing: 'Стрелки ←/→ или касание левой/правой половины. Подбирайте бонусы ' + o.good + ', объезжайте препятствия — скорость растёт.', maze: 'Стрелки/WASD или свайпы. Каждый уровень — новый лабиринт побольше.', platformer: 'Стрелки — ходьба, пробел — прыжок (можно дважды), прыжок сверху убивает врага ' + o.enemy + '.', catcher: 'Двигайте мышью/пальцем или ←/→. Ловите ' + o.good + ' и ' + o.good2 + ', не трогайте ' + o.enemy + '. Три жизни.' }[genre];
     return `✅ ${o.player} Игра «${o.title}» (${G}, тема: ${theme.n.toLowerCase()}) — весь код в одном HTML-файле\n\n${code('html', html)}\n\n💾 Сохраните как game.html и откройте в браузере (работает и на телефоне). ${how}\n\n🛠 Как поменять под себя: эмодзи героя/врагов — в начале скрипта (константы P, E/BAD/GOOD), цвета — в стиле canvas. Хотите другую тему или жанр? Напишите, например: «игру про динозавров, где надо ловить еду» или «платформер про космос». Рекорд сохраняется в браузере.`;
 }
 
@@ -2911,7 +2947,7 @@ function botReply(plat, lg) {
     return `🤖 Бот для ${pn} на ${ln} — минимальная заготовка:\n\n${code(hl, src)}\n\nКак запустить: 1) получите токен (${pn === 'Telegram' ? 'в Telegram напишите @BotFather → /newbot' : 'на discord.com/developers создайте приложение и бота'}); 2) подставьте токен; 3) установите библиотеку командой из первой строки; 4) запустите файл. ⚠️ Токен — как пароль: не публикуйте его в открытом коде (храните в переменной окружения: process.env.TOKEN / os.environ["TOKEN"]).\n\nДальше можно добавить кнопки, команды, базу данных и хостинг. Что дальше?`;
 }
 function langOnly(toks, raw) {
-    const lg = detectLang(toks, raw); if (!lg) return null;
+    const lg = detectLang(toks, raw); if (!lg || lg === 'html' || lg === 'css') return null;
     const rest = toks.filter(t => !FILLW.has(t) && !LANGS[lg].kw.some(k => k.endsWith('*') ? t.startsWith(k.slice(0, -1)) : t === k) && !/^(питон\w*|пайтон\w*|джаваскрипт\w*|плюсах|плюсы|шарп\w*|джав\w*)$/.test(t));
     return rest.length === 0 && toks.length <= 5 ? lg : null;
 }
@@ -2997,6 +3033,85 @@ function dialogFlow(uid, raw, n, s, name, ctx) {
       } }
     // ── «не знаю что делать»
     if (/^(не знаю|даже не знаю|хз|не понимаю) (что|чем|с чего|как)( мне)? (делать|заняться|начать|дальше)\??$/.test(n)) return 'Давайте подумаем вместе 💡 Что вам ближе: 1) научиться программировать, 2) сделать сайт или игру, 3) решить конкретную задачу/ошибку, 4) просто поболтать или поиграть? Выберите номер или опишите своими словами.';
+    return null;
+}
+
+
+// ═════ ВАЙБ: подстройка под манеру общения («бро» → «братишка», «подруня» → «заюшь») ═════
+const VIBE = {
+    bro: { calls: ['братишка', 'бро', 'братан', 'брат'], hi: ['Здарова, братишка! 😎', 'Ооо, здорова, бро! 🤝', 'Привет-привет, братан! 😎'], tail: [' 😎', ' 🤝', ' 🔥', ''] },
+    girl: { calls: ['заюшь', 'зайка', 'солнышко', 'красотка', 'подруга'], hi: ['Приветик, заюшь! 💖', 'Ой, приветик, зайка! ✨', 'Приветики, солнышко! 💖'], tail: [' 💖', ' ✨', ' 🥰', ''] },
+    dude: { calls: ['чел', 'чувак'], hi: ['Здарова, чувак! 😎', 'Йоу, чел! 🤙'], tail: [' 😎', ' 🤙', ''] },
+    friend: { calls: ['дружище', 'друг'], hi: ['Привет, дружище! 🙂', 'О, привет, друг! 👋'], tail: [' 🙂', ' 👍', ''] },
+};
+const VIBE_RE = [
+    ['bro', 'бро|брат|братан|братишка|братишь|братуха|братка|братец|братик|брателла|bro|бруда|бродяга'],
+    ['girl', 'подруня|подруга|подружка|подруженция|подружайка|сеструха|сестра|сестрёнка|сестренка|зай|зайка|заюшь|заюша|заинька|малыш|малышка|солнышко|котик|кошечка|красотка|милая|детка|лапочка|принцесса'],
+    ['dude', 'чел|чувак|мужик|пацан|кореш|чувачок|дружбан'],
+    ['friend', 'дружище|друг|дружок|товарищ'],
+];
+function detectVibe(raw) {
+    const t = ' ' + norm(raw).replace(/[,!?.…]+/g, ' , ').replace(/\s+/g, ' ').trim() + ' ';
+    for (const [k, words] of VIBE_RE) {
+        const first = new RegExp('^ (?:' + words + ') ');           // обращение в начале
+        const last = new RegExp(' (?:' + words + ') $');              // в конце
+        const comma = new RegExp(', (?:' + words + ') ');             // после запятой
+        const comma2 = new RegExp(' (?:' + words + ') ,');            // перед запятой
+        if (first.test(t) || last.test(t) || comma.test(t) || comma2.test(t)) {
+            if (k === 'friend' && /(мой друг|друг (мой|детства)|лучший друг|друг друга|друга )/.test(t)) continue;
+            return k;
+        }
+    }
+    return null;
+}
+const TY = [['Расскажите', 'Расскажи'], ['Напишите', 'Напиши'], ['Пришлите', 'Пришли'], ['Опишите', 'Опиши'], ['Уточните', 'Уточни'], ['Попробуйте', 'Попробуй'], ['Скажите', 'Скажи'], ['Спросите', 'Спроси'], ['Выберите', 'Выбери'], ['Назовите', 'Назови'], ['Проверьте', 'Проверь'], ['Добавьте', 'Добавь'], ['Сохраните', 'Сохрани'], ['Откройте', 'Открой'], ['Используйте', 'Используй'], ['Нажмите', 'Нажми'], ['Подумайте', 'Подумай'], ['Задайте', 'Задай'], ['Возвращайтесь', 'Возвращайся'], ['Обращайтесь', 'Обращайся'], ['Присылайте', 'Присылай'], ['Пишите', 'Пиши'], ['Можете', 'Можешь'], ['Хотите', 'Хочешь'], ['Знаете', 'Знаешь'], ['Помните', 'Помнишь'], ['Научите', 'Научи'], ['Ответьте', 'Ответь'], ['Давайте', 'Давай'], ['Смотрите', 'Смотри'], ['Заходите', 'Заходи'], ['Приятно познакомиться', 'Приятно познакомиться'], ['вас', 'тебя'], ['вам', 'тебе'], ['вами', 'тобой'], ['ваш', 'твой'], ['ваша', 'твоя'], ['ваше', 'твоё'], ['ваши', 'твои'], ['вашего', 'твоего'], ['вашу', 'твою'], ['вашей', 'твоей'], ['вашем', 'твоём'], ['вашим', 'твоим']];
+function toTy(txt) {
+    let r = txt;
+    for (const [a, b] of TY) { const re = new RegExp('(?<![а-яёА-ЯЁ])' + a + '(?![а-яёА-ЯЁ])', 'g'); r = r.replace(re, b); const A = a[0].toUpperCase() + a.slice(1), B = b[0].toUpperCase() + b.slice(1); if (A !== a) r = r.replace(new RegExp('(?<![а-яёА-ЯЁ])' + A + '(?![а-яёА-ЯЁ])', 'g'), B); }
+    r = r.replace(/(?<![а-яёА-ЯЁ])Вы (про|имели|хотели|говорили|спрашивали|делаете|пишете|сказали|написали|просили)/g, (m, v) => 'Ты ' + ({ имели: 'имел(а)', хотели: 'хотел(а)', говорили: 'говорил(а)', спрашивали: 'спрашивал(а)', делаете: 'делаешь', пишете: 'пишешь', сказали: 'сказал(а)', написали: 'написал(а)', просили: 'просил(а)', про: 'про' }[v]));
+    return r;
+}
+function fem(r) { return r.replace(/хотел\(а\)/g, 'хотела').replace(/имел\(а\)/g, 'имела').replace(/говорил\(а\)/g, 'говорила').replace(/спрашивал\(а\)/g, 'спрашивала').replace(/сказал\(а\)/g, 'сказала').replace(/написал\(а\)/g, 'написала').replace(/просил\(а\)/g, 'просила'); }
+function mas(r) { return r.replace(/(хотел|имел|говорил|спрашивал|сказал|написал|просил)\(а\)/g, '$1'); }
+function vibeApply(uid, r) {
+    if (typeof r !== 'string') return r;
+    let k; try { k = (userMem(uid).vibe || {}).k; } catch (e) { return r; }
+    if (!k || !VIBE[k]) return r;
+    if (/```/.test(r) || r.length > 900 || /^(🧮|🔎|📚|🌐|🧯|✅)/.test(r) || /(\n\s*[•\d]\)?[.)]?\s)/.test(r) && r.length > 450) return r;
+    const V = VIBE[k], st = sessions.get(uid) || {};
+    const call = V.calls[(st.vibeI = ((st.vibeI || 0) + 1)) % V.calls.length];
+    let out = toTy(r).replace(/Что бы вы хотели/g, 'Что бы ты хотел(а)').replace(/что вы думаете/gi, 'что ты думаешь').replace(/Как вы к этому относитесь/g, 'Как ты к этому относишься'); out = k === 'girl' ? fem(out) : mas(out);
+    // приветствие
+    const hi = V.hi[st.vibeI % V.hi.length];
+    out = out.replace(/^(Здравствуйте|Добрый (?:день|вечер)|Доброе утро|Привет|Приветствую|Добро пожаловать)[^!\n]{0,40}!(\s*👋)?/, hi);
+    out = out.replace(/(Приятно познакомиться|Рад знакомству),\s*[^!]{1,25}!/, (m, a) => a + ', ' + call + '!');
+    // обращение в конце коротких ответов
+    const has = new RegExp(V.calls.join('|')).test(out);
+    if (!has && out.length < 170 && !/[«»]/.test(out) && !/\n/.test(out.replace(/\n\n\(.*$/s, '')) && Math.random() < .6) {
+        const tail = V.tail[Math.floor(Math.random() * V.tail.length)];
+        const par = (out.match(/\n\n\([\s\S]*\)\s*$/) || [''])[0];
+        let body = par ? out.slice(0, out.length - par.length) : out;
+        const m2 = body.match(/^([\s\S]*?)([.!?…]+)(\s*[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]+)?\s*$/u);
+        if (m2 && !m2[3]) body = m2[1] + ', ' + call + m2[2] + tail;
+        out = body + par;
+    }
+    return out;
+}
+function vibeHandle(uid, raw, n, s, name) {
+    const k = detectVibe(raw);
+    const U = userMem(uid);
+    if (k) { if (!U.vibe || U.vibe.k !== k) { U.vibe = { k, at: Date.now() }; touch(); } else if (Date.now() - U.vibe.at > 3600e3) { U.vibe.at = Date.now(); } }
+    if (/^(обращайся|говори|общайся|давай)( со мной| мне| на)? (на )?вы(?=\s|$)|^говори(те)? вежливо|^без (братан|бро|панибратства|фамильярности)|^не называй меня так|^перестань (меня )?называть|^хватит (меня )?называть/.test(n) || /^(обращайся|говори) (ко мне )?на вы/.test(n)) { if (U.vibe) { delete U.vibe; touch(); } return 'Хорошо, перехожу на «вы» 🙂 Если захотите проще — просто обратитесь «бро» или «подруга»: подстроюсь.'; }
+    if (!k) return null;
+    const rest = norm(raw).replace(new RegExp('(^|\\s)(' + VIBE_RE.find(x => x[0] === k)[1] + ')(?=\\s|$|[,.!?])', 'g'), ' ').replace(/\s+/g, ' ').trim();
+    const V = VIBE[k], call = V.calls[Math.floor(Math.random() * V.calls.length)];
+    if (!rest || /^(привет|приветик|привет привет|здарова|здорово|здаров|хай|ку|здравствуй|йо|йоу|ау|эй|алло|ты тут|тут|слушай|слышь|ну|ну привет|добрый (день|вечер)|доброе утро)$/.test(rest)) {
+        const tail = k === 'bro' ? ' Чё как, что мутим — код, игру или просто потрещим?' : k === 'girl' ? ' Как ты? Чем займёмся — кодом, игрой или просто поболтаем?' : ' Чем займёмся — кодом, игрой или поболтаем?';
+        return V.hi[Math.floor(Math.random() * V.hi.length)] + tail;
+    }
+    if (/^(как дела|как ты|как сам|как жизнь|как оно|че как|чё как|как настроение|как сама|как ты там)$/.test(rest)) return k === 'girl' ? `У меня всё чудесно, ${call}! 💖 Сервер не греется, баги не кусаются. А ты как?` : `Да всё огонь, ${call}! 😎 Сервер не греется, баги обходят стороной. Сам как?`;
+    if (/^(спасибо|спс|благодарю|сенкс)$/.test(rest)) return k === 'girl' ? `Не за что, ${call}! 🥰 Обращайся.` : `Да не за что, ${call}! 🤝 Обращайся.`;
+    if (/^(пока|до свидания|бывай|давай|споки|пока пока)$/.test(rest)) return k === 'girl' ? `Пока-пока, ${call}! 💖 Заходи ещё.` : `Давай, ${call}! 🤝 Заглядывай ещё.`;
     return null;
 }
 
@@ -3807,7 +3922,23 @@ function reply0(uid, text, name, ctx) {
     const clean = prepare(raw);          // без слов-паразитов («ну», «типо», «короче»…), сленг приведён к обычным словам
     const n = norm(clean);
     { s.genMod = false; const tm = tryModify(uid, raw, n, s); if (tm) { s.quiz = null; return tm; } }
+    { const vb = vibeHandle(uid, raw, n, s, name); if (vb) return vb; }
+    { // «расскажи о html», «css это что», «объясни про git» → «что такое …»
+        const nn0 = n.replace(/^(эм+|ну|так|слушай|а|и|эй|ой|хм+)\s+/g, '').replace(/^(ты что|ты чего)\s+/, '').replace(/^(ну|а)\s+/, '').trim();
+        let mt = nn0.match(/^(?:расскажи|объясни|поясни|опиши|скажи)(?: мне| пожалуйста)? (?:о|об|про|что такое) ([a-zа-яё0-9+#. -]{2,35}?)(?: это что| это такое| подробнее| простыми словами| на пальцах)?$/) || nn0.match(/^([a-zа-яё0-9+#.-]{2,25}) (?:это что|это такое|что это|что за зверь|что значит)$/);
+        if (mt) { const tg = mt[1].trim(); if (!/^(себе|тебе|вас|вам|нас|жизни|погоде|дне|тебя|мне|себя|шутку|анекдот|факт|что|как|кто|смешное|интересное|новое|что нибудь|что-нибудь)$/.test(tg) && !/^(что|как|кто) /.test(tg)) { const r2 = reply0(uid, 'что такое ' + tg + (/ это что$/.test(nn0) ? '' : ''), name, ctx); if (r2 && !/Хочу ответить точно|Не знаю точно|Не совсем уверен|Тут я не уверен|вне моей базы|Пока не нашёл|Хороший вопрос/.test(r2)) return r2; } }
+    }
     { const df = dialogFlow(uid, raw, n, s, name, ctx); if (df) { s.quiz = null; return df; } }
+    // HTML-страница, присланная целиком (без ```): разбор
+    if (!/```/.test(raw) && raw.length > 80 && looksLikeHtml(raw) && !/^(напиши|сделай|создай|покажи)/.test(n)) {
+        const wantsExp = /(объясни|что делает|как работает|построчно|по блокам|разбери)/.test(n.slice(0, 60));
+        s.htmlSrc = { at: Date.now(), src: raw };
+        s.lang = s.lang || 'js';
+        if (wantsExp) return explainHtml(raw);
+        s.offer = { at: Date.now(), fn: () => explainHtml(raw) };
+        return analyzeHtml(raw);
+    }
+    if (s.htmlSrc && Date.now() - s.htmlSrc.at < 30 * 60 * 1000 && /^(объясни|объясни по блокам|по блокам|разбери|что (это )?(делает|тут)|как (это )?работает|да)\W*$/.test(n) && !/```/.test(raw)) { const r = explainHtml(s.htmlSrc.src); s.offer = null; return r; }
     // ожидание кода/ошибки от пользователя («щас скину ошибку», «ну код»)
     {
         const aw = s.await && Date.now() - s.await.at < 15 * 60 * 1000 ? s.await : null;
@@ -3829,6 +3960,7 @@ function reply0(uid, text, name, ctx) {
             }
             if (aw && (aw.type === 'code' || aw.type === 'error' || aw.type === 'any') && raw.length >= 12 && (codeish || (aw.type === 'error' && /error|exception|ошибк|traceback|undefined|cannot|failed|не найден|uncaught/i.test(raw))) && !/^(как|что|почему|зачем|где|когда|сколько)\s/.test(n)) {
                 s.await = null;
+                if (looksLikeHtml(raw)) { s.htmlSrc = { at: Date.now(), src: raw }; s.offer = { at: Date.now(), fn: () => explainHtml(raw) }; return analyzeHtml(raw); }
                 const ee = explainError(raw);
                 if (ee) { setLast(s, 'err', 'err', clean, tokens(clean)); return ee; }
                 return reply0(uid, '```\n' + raw + '\n```', name, ctx);
@@ -3950,6 +4082,7 @@ function reply0(uid, text, name, ctx) {
 
     // 1. присланный код → разбор (если нет явной просьбы написать новый)
     const ec = extractCode(raw);
+    if (ec && ec.src.length > 60 && (ec.lang === 'html' || looksLikeHtml(ec.src)) && !/(объясни|что делает|построчно)/.test(clean.replace(/```[\s\S]*?```/g, ' '))) { s.htmlSrc = { at: Date.now(), src: ec.src }; s.offer = { at: Date.now(), fn: () => explainHtml(ec.src) }; return analyzeHtml(ec.src); }
     if (ec && ec.src.length > 6) {
         const hint = ec.lang && LANGS[ec.lang] ? ec.lang : s.lang;
         const g = guessLang(ec.src) || hint; if (g) s.lang = g;
@@ -4574,8 +4707,75 @@ const ERRS = [
     [/npm err!|err_pnpm|eresolve|peer dep|enoent.*package\.json|could not resolve dependency/i, () => '🧯 Ошибка npm\n\nЧастые лечения:\n' + code('bash', `rm -rf node_modules package-lock.json\nnpm cache verify\nnpm install\n# конфликт peer-зависимостей:\nnpm install --legacy-peer-deps`) + 'Проверьте, что вы в папке с package.json и что версия Node подходит (node -v). Прочитайте первую строку после «npm ERR!» — там причина.'],
     [/traceback \(most recent call last\)/i, raw => { const lines = raw.trim().split('\n').filter(Boolean); const last = lines[lines.length - 1]; const file = (raw.match(/File "([^"]+)", line (\d+)/g) || []).pop(); return `🧯 Python Traceback — как читать\n\nЧитайте СНИЗУ вверх: последняя строка — тип и причина ошибки:\n«${cut(last, 120)}»\n${file ? 'Место в вашем коде: ' + file.replace('File ', '') + '\n' : ''}Выше — цепочка вызовов. Пришлите саму строку ошибки или код — объясню подробнее.`; }],
 ];
+
+function looksLikeHtml(raw) { return /^\s*(<!doctype html|<html[\s>])/i.test(raw) || (/<(body|head|div|script|style|canvas|button|h1|p|ul|form|input|span|a)\b[^>]*>/i.test(raw) && /<\/(body|head|div|script|style|canvas|button|h1|p|ul|form|span|a)>/i.test(raw) && raw.length > 60); }
+function analyzeHtml(src) {
+    const out = [], bad = [], ok = [];
+    const title = (src.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1];
+    out.push(`🔎 Разбор HTML-страницы${title ? ' «' + title.trim() + '»' : ''}: ${src.split('\n').length} строк, ${(src.match(/<[a-z][a-z0-9]*[\s>\/]/gi) || []).length} тегов.`);
+    const hasDoc = /<!doctype html/i.test(src);
+    if (hasDoc) { if (!/<html[^>]*\blang=/i.test(src)) bad.push('у <html> нет lang="ru" (нужно для поисковиков и скринридеров)'); if (!/<meta[^>]*charset/i.test(src)) bad.push('нет <meta charset="UTF-8"> — русские буквы могут «поплыть»'); if (!/<meta[^>]*viewport/i.test(src)) bad.push('нет <meta name="viewport" …> — на телефоне страница будет мелкой'); if (!title) bad.push('нет <title>'); }
+    // баланс тегов
+    const VOID = new Set(['meta', 'link', 'br', 'hr', 'img', 'input', 'source', 'area', 'base', 'col', 'embed', 'param', 'track', 'wbr', '!doctype']);
+    const body = src.replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/gi, m => m.replace(/<(?!\/?script)/g, '&lt;')).replace(/<style[\s\S]*?<\/style>/gi, '<style></style>');
+    const st = []; let prob = null; const line = idx => body.slice(0, idx).split('\n').length;
+    for (const m of body.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {
+        const close = m[1] === '/', tag = m[2].toLowerCase(); if (VOID.has(tag) || /\/\s*$/.test(m[3])) continue;
+        if (!close) st.push([tag, m.index]);
+        else { const k = st.map(x => x[0]).lastIndexOf(tag); if (k < 0) { prob = prob || `лишний закрывающий </${tag}> (строка ${line(m.index)})`; } else { if (k !== st.length - 1 && !prob) prob = `тег <${st[st.length - 1][0]}> (строка ${line(st[st.length - 1][1])}) не закрыт перед </${tag}>`; st.length = k; } }
+    }
+    if (!prob && st.length && !/^(html|body|head|p|li)$/.test(st[st.length - 1][0])) prob = `тег <${st[st.length - 1][0]}> (строка ${line(st[st.length - 1][1])}) не закрыт`;
+    if (prob) bad.push(prob); else ok.push('теги расставлены корректно');
+    const ids = [...src.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)].map(m => m[1]); const dup = ids.filter((x, i) => ids.indexOf(x) !== i);
+    if (dup.length) bad.push('повторяются id: ' + [...new Set(dup)].join(', ') + ' (id должен быть уникальным)');
+    for (const m of src.matchAll(/<img\b[^>]*>/gi)) if (!/\balt\s*=/.test(m[0])) { bad.push('у картинки нет alt (описание для доступности и SEO)'); break; }
+    if (/<(div|span)[^>]*\bonclick/i.test(src)) bad.push('клики на <div>/<span> — лучше использовать <button> (работает с клавиатуры)');
+    // JS
+    const scripts = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).filter(t => t.trim());
+    let jsAll = ''; let syn = null;
+    scripts.forEach((js, i) => { jsAll += '\n' + js; try { new (require('vm').Script)(js); } catch (e) { syn = syn || `синтаксическая ошибка в скрипте №${i + 1}: ${e.message}`; } });
+    if (scripts.length) { if (syn) bad.push(syn); else ok.push('JavaScript без синтаксических ошибок (проверено без запуска)'); }
+    // id из JS
+    const used = [...jsAll.matchAll(/getElementById\(\s*['"]([^'"]+)['"]\s*\)/g)].map(m => m[1]).concat([...jsAll.matchAll(/querySelector\(\s*['"]#([\w-]+)['"]\s*\)/g)].map(m => m[1]));
+    const missing = [...new Set(used.filter(x => !ids.includes(x)))];
+    if (missing.length) bad.push('скрипт ищет элементы, которых нет в HTML (id): ' + missing.join(', ') + ' — вернёт null и сломается');
+    // обработчики
+    const handlers = [...src.matchAll(/\bon(?:click|change|input|submit|keydown|keyup)\s*=\s*["']\s*([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]);
+    const defined = new Set([...jsAll.matchAll(/function\s+([\w$]+)/g)].map(m => m[1]).concat([...jsAll.matchAll(/(?:const|let|var)\s+([\w$]+)\s*=/g)].map(m => m[1])));
+    const nodef = [...new Set(handlers.filter(h => !defined.has(h) && !/^(alert|confirm|prompt|console|window|document|this|event|location)$/.test(h)))];
+    if (nodef.length) bad.push('в атрибутах on… вызываются функции, которых нет в скрипте: ' + nodef.join(', '));
+    if (/\binnerHTML\s*[+]?=/.test(jsAll) && /(value|prompt|location|input)/i.test(jsAll)) bad.push('innerHTML с пользовательскими данными опасен (XSS) — вставляйте текст через textContent');
+    if (/\balert\(/.test(jsAll)) ok.push('есть alert() — для игр лучше выводить сообщения на странице');
+    // что делает
+    const feat = []; if (/<canvas/i.test(src)) feat.push('рисует на canvas (игра/графика)'); if (/addEventListener\(\s*['"]key|onkeydown/.test(jsAll)) feat.push('управление с клавиатуры'); if (/touchstart|pointerdown/.test(jsAll)) feat.push('поддержка касаний'); if (/localStorage/.test(jsAll)) feat.push('сохраняет данные в браузере'); if (/setInterval|requestAnimationFrame/.test(jsAll)) feat.push('есть игровой цикл/таймер'); if (/fetch\(|XMLHttpRequest/.test(jsAll)) feat.push('делает запросы к серверу'); if (/<form/i.test(src)) feat.push('содержит форму'); if (/@media/.test(src)) feat.push('адаптивные стили');
+    if (feat.length) out.push('Что делает страница: ' + feat.join(', ') + '.');
+    if (ok.length) out.push('✅ ' + ok.join('; ') + '.');
+    out.push(bad.length ? '⚠️ Замечания:\n' + bad.map((b, i) => `${i + 1}) ${b}`).join('\n') : '✅ Критичных проблем не нашёл — код выглядит аккуратно.');
+    out.push('Скажите, что нужно: «объясни по блокам», «добавь звук/паузу» (если это моя игра — применю сразу), либо опишите, что хотите изменить или что не работает — разберу конкретно.');
+    return out.join('\n\n');
+}
+function explainHtml(src) {
+    const parts = [];
+    const head = (src.match(/<head[\s\S]*?<\/head>/i) || [''])[0], st = (src.match(/<style[^>]*>([\s\S]*?)<\/style>/i) || [])[1] || '';
+    const rules = (st.match(/\{/g) || []).length;
+    parts.push('📚 По блокам:\n');
+    parts.push(`1) <head>: служебная информация — кодировка, адаптация под телефон, заголовок вкладки${rules ? `; <style>: ${rules} CSS-правил (оформление: цвета, расположение, шрифты)` : ''}.`);
+    const bodyTags = [...new Set([...((src.match(/<body[\s\S]*<\/body>/i) || [src])[0].matchAll(/<([a-z][a-z0-9]*)\b/gi))].map(m => m[1].toLowerCase()).filter(t => !['body', 'script', 'style'].includes(t)))];
+    parts.push(`2) <body>: видимая часть страницы. Элементы: ${bodyTags.slice(0, 12).map(t => '<' + t + '>').join(', ')}.`);
+    const js = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
+    if (js.trim()) { const fns = [...new Set([...js.matchAll(/function\s+([\w$]+)/g)].map(m => m[1]).concat([...js.matchAll(/(?:const|let)\s+([\w$]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g)].map(m => m[1])))]; const vars = [...new Set([...js.matchAll(/(?:let|const|var)\s+([\w$]+)/g)].map(m => m[1]))].slice(0, 10);
+        parts.push(`3) <script>: логика. Переменные состояния: ${vars.join(', ') || '—'}. Функции: ${fns.join(', ') || '—'}.`);
+        if (/getElementById|querySelector/.test(js)) parts.push('   • скрипт находит элементы по id/селектору и меняет их (textContent, style, classList);');
+        if (/addEventListener|onclick|onkeydown/.test(js)) parts.push('   • обработчики событий: реагируют на клики/клавиши — это «ввод» программы;');
+        if (/setInterval|requestAnimationFrame/.test(js)) parts.push('   • цикл (setInterval/requestAnimationFrame): каждый кадр обновляет состояние и перерисовывает;');
+        if (/localStorage/.test(js)) parts.push('   • localStorage: хранит данные между запусками (рекорды, настройки).'); }
+    parts.push('\nСпросите про любую часть — объясню подробнее («что делает функция render?»).');
+    return parts.join('\n');
+}
+
 function explainError(raw) {
     if (raw.length > 4000) return null;
+    if ((raw.split('\n').length >= 6 || /<(html|body|script|div|head)\b|<!doctype/i.test(raw)) && !/(traceback|^\s*[A-Za-z]*Error:|uncaught |exception in|\bat .*:\d+:\d+)/mi.test(raw)) return null;   // это код, а не сообщение об ошибке
     for (const [re, fn] of ERRS) { const m = raw.match(re); if (m) { try { return fn(m, raw); } catch { return fn([''], raw); } } }
     return null;
 }
@@ -4709,6 +4909,7 @@ function chatTalk(uid, raw, clean, n0, s, name, phase, prog, langId) {
                 s.cx = null;
             } else if (cx.type === 'howru') {
                 s.cx = null;
+                if (/^(расскажи|покажи|сделай|напиши|объясни|помоги|дай|скажи|что такое|как |почему|зачем|найди|посчитай|сколько|давай|хочу|нужн|включи|анекдот|шутк|факт|игр|загад)/.test(nn)) return null;
                 const sc = sentiment(nn) + (/^(ха)+/.test(nn) ? 1 : 0);
                 if (sc > 0 && toks.length <= 8) { noteMood(uid, 1, 'howru'); return pickNew(s, ['Здорово это слышать! 😊 Тогда давайте займёмся чем-нибудь интересным: код, игра, загадка?', 'Отлично! Позитивное настроение — лучшее топливо для программирования 🚀', 'Рад за вас! Что на сегодня в планах?']); }
                 if (sc < 0 && toks.length <= 10) { noteMood(uid, -1, 'howru'); chatSet(s, 'support'); return pickNew(s, ['Жаль, что так 💛 Хотите рассказать, что случилось? Или можно просто отвлечься — игра, загадка, шутка?', 'Понимаю. Если хочется поговорить — я слушаю. Если отвлечься — могу предложить игру или анекдот 🫶']); }
@@ -5185,6 +5386,7 @@ function reply(uid, text, name, ctx) {
     trackUser(uid, text);
     try { r = reply0(uid, text, name, ctx); } catch (e) { console.error('aibot error:', e); r = 'Что-то пошло не так 😵 Попробуйте переформулировать вопрос.'; }
     if (typeof r === 'string' && FALLBACK_RE.test(r)) r += TEACH_HINT;
+    try { r = vibeApply(uid, r); } catch (e) {}
     try { const s0 = sessions.get(uid); if (s0 && typeof r === 'string' && !s0.genMod && /^✅/.test(r) && /весь код в одном HTML/.test(r)) { const mm = r.match(/```html\n([\s\S]*?)\n```/); if (mm) s0.gen = { base: mm[1], mods: {}, at: Date.now(), kind: /<canvas/.test(mm[1]) ? 'game' : 'app', genre: /игру|Игра «/.test(r) && /\(Гонка|\(Лабиринт|\(Платформер|\(Ловля/.test(r) ? lastGenre : null }; } } catch (e) {}
     try {
         const s = sessions.get(uid), U = L.users[uid];
