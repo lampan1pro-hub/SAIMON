@@ -1734,8 +1734,977 @@ function botSend(bot, cfg, uid, reply) {
 function trackUser(cfg, uid) { if (!cfg.stats.users.includes(uid)) cfg.stats.users.push(uid); }
 
 // Пользователь написал своему (кастомному) боту
+
+// ---------- Ai_bot (@ai_bot): локальный помощник по программированию, работает БЕЗ внешних API ----------
+// Вся логика ответов («мозг») встроена ниже в этот же файл.
+const AIBOT_ID = 104;
+const AIBOT_HANDLE = 'ai_bot';
+const AIBOT_NAME = 'Ai_bot';
+const AIBOT_AVATAR = 'data:image/svg+xml;base64,' + Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a5cff"/><stop offset="1" stop-color="#00c2ff"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><line x1="50" y1="20" x2="50" y2="31" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="17" r="5" fill="#fff"/><rect x="24" y="31" width="52" height="42" rx="13" fill="#fff"/><circle cx="39" cy="50" r="6.5" fill="#6a5cff"/><circle cx="61" cy="50" r="6.5" fill="#6a5cff"/><rect x="39" y="62" width="22" height="4" rx="2" fill="#6a5cff"/><rect x="16" y="45" width="6" height="14" rx="3" fill="#fff"/><rect x="78" y="45" width="6" height="14" rx="3" fill="#fff"/></svg>`).toString('base64');
+VERIFIED.add(AIBOT_HANDLE);
+// ── «Мозг» Ai_bot: встроен прямо сюда, отдельные файлы не нужны ──
+const aiBrain = (() => {
+'use strict';
+const module = { exports: {} };
+/**
+ * Ai_bot — локальный «умный» помощник по программированию.
+ * Работает полностью офлайн, без каких-либо внешних API.
+ *
+ * Как устроен «мозг»:
+ *  1. Нормализация текста + токены (опечатки прощаются через расстояние Левенштейна).
+ *  2. Определение языка программирования и контекста диалога (помнит, о чём шла речь).
+ *  3. Модули: калькулятор, генератор кода по задаче, разбор присланного кода,
+ *     база знаний (JS, Python, HTML/CSS, SQL, Git, Node, алгоритмы, безопасность…), small talk.
+ *
+ * Использование:  const ai = require('./aibot');  ai.reply(uid, 'как работает async await', 'Имя')  ->  string
+ */
+
+const F = '```';
+const code = (lang, src) => `${F}${lang}\n${String(src).replace(/^\n+|\s+$/g, '')}\n${F}`;
+
+// ───────────────────────────── утилиты текста ─────────────────────────────
+const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е');
+
+function lev(a, b) {
+    if (a === b) return 0;
+    if (Math.abs(a.length - b.length) > 2) return 3;
+    const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+    for (let i = 1; i <= a.length; i++)
+        for (let j = 1; j <= b.length; j++)
+            dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return dp[a.length][b.length];
+}
+
+function tokens(text) {
+    let t = norm(text).replace(/(?<![a-zа-я0-9])[cс]\+\+/g, ' cpp ').replace(/(?<![a-zа-я0-9])[cс]#/g, ' csharp ').replace(/\.net\b/g, ' dotnet ');
+    return (t.match(/[a-zа-я0-9_]+/g) || []);
+}
+
+// слово-ключ vs токен: короткие — точное совпадение, длинные — по префиксу (русские окончания), с запасом на опечатку
+function kwMatch(kw, tok) {
+    if (kw.length <= 3) return tok === kw;
+    if (tok.startsWith(kw)) return true;
+    if (kw.length >= 6 && tok.length >= 5) {
+        const k = kw.length;
+        if (lev(tok.slice(0, k), kw) <= 1) return true;
+    }
+    return false;
+}
+
+// ───────────────────────────── языки ─────────────────────────────
+const LANGS = {
+    js: { name: 'JavaScript', kw: ['javascript', 'js', 'джаваскрипт*', 'жс', 'node', 'нода', 'nodejs', 'ноде', 'джс'] },
+    ts: { name: 'TypeScript', kw: ['typescript', 'ts', 'тайпскрипт'] },
+    py: { name: 'Python', kw: ['python', 'питон*', 'пайтон*', 'пито', 'py', 'python3'] },
+    html: { name: 'HTML', kw: ['html', 'хтмл*'] },
+    css: { name: 'CSS', kw: ['css', 'цсс', 'стил'] },
+    sql: { name: 'SQL', kw: ['sql', 'скл', 'sqlite', 'mysql', 'postgres', 'postgresql', 'постгрес'] },
+    cpp: { name: 'C++', kw: ['cpp', 'плюс*'] },
+    c: { name: 'C', kw: ['си'] },
+    java: { name: 'Java', kw: ['java', 'джава', 'джаве', 'джаву', 'джавы'] },
+    cs: { name: 'C#', kw: ['csharp', 'шарп*', 'dotnet'] },
+    go: { name: 'Go', kw: ['golang', 'го', 'go'] },
+    rust: { name: 'Rust', kw: ['rust', 'раст', 'расте'] },
+    php: { name: 'PHP', kw: ['php', 'пхп'] },
+    bash: { name: 'Bash', kw: ['bash', 'баш', 'shell', 'терминал', 'linux', 'линукс'] },
+    kt: { name: 'Kotlin', kw: ['kotlin', 'котлин*'] },
+    swift: { name: 'Swift', kw: ['swift', 'свифт*'] },
+    lua: { name: 'Lua', kw: ['lua', 'луа'] },
+};
+
+function detectLang(toks, raw) {
+    const hit = [];
+    for (const [id, l] of Object.entries(LANGS)) {
+        if (id === 'c' || id === 'go') continue;           // слишком короткие/неоднозначные — отдельно ниже
+        if (l.kw.some(k => k.endsWith('*') ? toks.some(t => t.startsWith(k.slice(0, -1))) : toks.includes(k))) hit.push(id);
+    }
+    if (!hit.length) {
+        if (/\bна c\b|\bязык[е]? c\b|\bна си\b/.test(norm(raw))) hit.push('c');
+        if (/\bна go\b|\bna go\b|\bgolang\b|\bна го\b/.test(norm(raw))) hit.push('go');
+    }
+    return hit[0] || null;
+}
+
+// ───────────────────────────── калькулятор ─────────────────────────────
+function calc(expr) {
+    const src = norm(expr)
+        .replace(/,/g, '.').replace(/×|х(?=\s*\d)|\bumnozh\b/g, '*').replace(/÷/g, '/').replace(/\^/g, '**')
+        .replace(/корень из\s*([\d.]+)/g, 'sqrt($1)').replace(/(\d+(?:\.\d+)?)\s*%\s*от\s*(\d+(?:\.\d+)?)/g, '($1/100*$2)')
+        .replace(/(^|\s)пи(?=\s|$|[)*+\-/])/g, '$1pi').replace(/\s*в степени\s*/g, '**');
+    const re = /\s*(\d+\.?\d*|\.\d+|\*\*|[-+*/%()]|[a-z]+)/y;
+    const out = []; let m; re.lastIndex = 0;
+    while (re.lastIndex < src.length && (m = re.exec(src))) out.push(m[1]);
+    if (re.lastIndex < src.trimEnd().length) return null;
+    let i = 0;
+    const FN = { sqrt: Math.sqrt, sin: Math.sin, cos: Math.cos, tan: Math.tan, log: Math.log10, ln: Math.log, abs: Math.abs, round: Math.round, floor: Math.floor, ceil: Math.ceil };
+    const CONST = { pi: Math.PI, e: Math.E };
+    const peek = () => out[i], next = () => out[i++];
+    function expr_() { let v = term(); while (peek() === '+' || peek() === '-') { const o = next(); const r = term(); v = o === '+' ? v + r : v - r; } return v; }
+    function term() { let v = pow(); while (peek() === '*' || peek() === '/' || peek() === '%') { const o = next(); const r = pow(); v = o === '*' ? v * r : o === '/' ? v / r : v % r; } return v; }
+    function pow() { const b = unary(); if (peek() === '**') { next(); return Math.pow(b, pow()); } return b; }
+    function unary() { if (peek() === '-') { next(); return -unary(); } if (peek() === '+') { next(); return unary(); } return atom(); }
+    function atom() {
+        const t = next();
+        if (t === undefined) throw 0;
+        if (t === '(') { const v = expr_(); if (next() !== ')') throw 0; return v; }
+        if (/^[\d.]/.test(t)) return parseFloat(t);
+        if (CONST[t] !== undefined) return CONST[t];
+        if (FN[t]) { if (next() !== '(') throw 0; const v = expr_(); if (next() !== ')') throw 0; return FN[t](v); }
+        throw 0;
+    }
+    try { const v = expr_(); if (i !== out.length || !isFinite(v)) return null; return v; } catch { return null; }
+}
+const fmtNum = v => (Number.isInteger(v) ? String(v) : String(+v.toPrecision(12)));
+
+// ───────────────────────────── генератор кода по задачам ─────────────────────────────
+// TASKS[id] = { kw: [...], title, js, py, cpp, java, go, ... , note }
+const TASKS = {
+    hello: {
+        kw: ['hello', 'хелло', 'привет мир', 'hello world', 'хелло ворлд'], title: 'Hello, World!',
+        js: `console.log('Hello, World!');`, py: `print("Hello, World!")`,
+        cpp: `#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}`,
+        c: `#include <stdio.h>\n\nint main(void) {\n    printf("Hello, World!\\n");\n    return 0;\n}`,
+        java: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}`,
+        go: `package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, World!")\n}`,
+        cs: `using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hello, World!");\n    }\n}`,
+        rust: `fn main() {\n    println!("Hello, World!");\n}`,
+        php: `<?php\necho "Hello, World!";`, bash: `echo "Hello, World!"`, kt: `fun main() {\n    println("Hello, World!")\n}`,
+        swift: `print("Hello, World!")`, lua: `print("Hello, World!")`, html: `<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="utf-8"><title>Hello</title></head>\n<body>\n  <h1>Hello, World!</h1>\n</body>\n</html>`,
+        ts: `const msg: string = 'Hello, World!';\nconsole.log(msg);`
+    },
+    factorial: {
+        kw: ['факториал', 'factorial'], title: 'Факториал числа',
+        js: `function factorial(n) {\n  if (n < 0) throw new Error('n должно быть >= 0');\n  let r = 1;\n  for (let i = 2; i <= n; i++) r *= i;\n  return r;\n}\n\nconsole.log(factorial(5)); // 120`,
+        py: `def factorial(n: int) -> int:\n    if n < 0:\n        raise ValueError("n должно быть >= 0")\n    r = 1\n    for i in range(2, n + 1):\n        r *= i\n    return r\n\nprint(factorial(5))  # 120`,
+        cpp: `#include <iostream>\n\nunsigned long long factorial(int n) {\n    unsigned long long r = 1;\n    for (int i = 2; i <= n; ++i) r *= i;\n    return r;\n}\n\nint main() {\n    std::cout << factorial(5) << "\\n"; // 120\n}`,
+        java: `public class Main {\n    static long factorial(int n) {\n        long r = 1;\n        for (int i = 2; i <= n; i++) r *= i;\n        return r;\n    }\n    public static void main(String[] a) {\n        System.out.println(factorial(5)); // 120\n    }\n}`,
+        go: `package main\n\nimport "fmt"\n\nfunc factorial(n int) int {\n    r := 1\n    for i := 2; i <= n; i++ {\n        r *= i\n    }\n    return r\n}\n\nfunc main() {\n    fmt.Println(factorial(5)) // 120\n}`,
+        cs: `static long Factorial(int n) {\n    long r = 1;\n    for (int i = 2; i <= n; i++) r *= i;\n    return r;\n}`,
+        rust: `fn factorial(n: u64) -> u64 {\n    (1..=n).product()\n}`,
+        php: `<?php\nfunction factorial(int $n): int {\n    $r = 1;\n    for ($i = 2; $i <= $n; $i++) $r *= $i;\n    return $r;\n}\necho factorial(5); // 120`,
+        note: 'Для больших n в JS используйте BigInt, в Python числа и так неограниченные.'
+    },
+    fibonacci: {
+        kw: ['фибоначчи', 'fibonacci', 'фибоначи'], title: 'Числа Фибоначчи',
+        js: `function fib(n) {\n  let [a, b] = [0, 1];\n  for (let i = 0; i < n; i++) [a, b] = [b, a + b];\n  return a;\n}\n\nconsole.log(fib(10)); // 55\n\n// первые 10 чисел\nconsole.log(Array.from({ length: 10 }, (_, i) => fib(i)));`,
+        py: `def fib(n: int) -> int:\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n\nprint(fib(10))  # 55\nprint([fib(i) for i in range(10)])`,
+        cpp: `#include <iostream>\n\nlong long fib(int n) {\n    long long a = 0, b = 1;\n    for (int i = 0; i < n; ++i) { long long t = a + b; a = b; b = t; }\n    return a;\n}\n\nint main() { std::cout << fib(10); }`,
+        java: `static long fib(int n) {\n    long a = 0, b = 1;\n    for (int i = 0; i < n; i++) { long t = a + b; a = b; b = t; }\n    return a;\n}`,
+        go: `func fib(n int) int {\n    a, b := 0, 1\n    for i := 0; i < n; i++ {\n        a, b = b, a+b\n    }\n    return a\n}`,
+        note: 'Итеративный вариант работает за O(n). Наивная рекурсия fib(n-1)+fib(n-2) — это O(2ⁿ), на n > 40 уже «зависает».'
+    },
+    prime: {
+        kw: ['простое', 'простых', 'простого', 'простое число', 'prime', 'простые'], title: 'Проверка на простое число',
+        js: `function isPrime(n) {\n  if (n < 2) return false;\n  for (let i = 2; i * i <= n; i++) {\n    if (n % i === 0) return false;\n  }\n  return true;\n}\n\nconsole.log(isPrime(17)); // true\nconsole.log(isPrime(18)); // false`,
+        py: `def is_prime(n: int) -> bool:\n    if n < 2:\n        return False\n    i = 2\n    while i * i <= n:\n        if n % i == 0:\n            return False\n        i += 1\n    return True\n\nprint(is_prime(17))  # True`,
+        cpp: `bool isPrime(int n) {\n    if (n < 2) return false;\n    for (int i = 2; (long long)i * i <= n; ++i)\n        if (n % i == 0) return false;\n    return true;\n}`,
+        java: `static boolean isPrime(int n) {\n    if (n < 2) return false;\n    for (int i = 2; (long) i * i <= n; i++)\n        if (n % i == 0) return false;\n    return true;\n}`,
+        go: `func isPrime(n int) bool {\n    if n < 2 {\n        return false\n    }\n    for i := 2; i*i <= n; i++ {\n        if n%i == 0 {\n            return false\n        }\n    }\n    return true\n}`,
+        note: 'Достаточно проверять делители до √n — сложность O(√n). Для списка простых до N используйте «решето Эратосфена».'
+    },
+    sieve: {
+        kw: ['решето', 'эратосфен', 'sieve'], title: 'Решето Эратосфена',
+        js: `function sieve(n) {\n  const is = new Array(n + 1).fill(true);\n  is[0] = is[1] = false;\n  for (let i = 2; i * i <= n; i++)\n    if (is[i]) for (let j = i * i; j <= n; j += i) is[j] = false;\n  return is.reduce((acc, v, i) => (v ? [...acc, i] : acc), []);\n}\n\nconsole.log(sieve(30)); // [2,3,5,7,11,13,17,19,23,29]`,
+        py: `def sieve(n: int) -> list[int]:\n    is_p = [True] * (n + 1)\n    is_p[0:2] = [False, False]\n    for i in range(2, int(n ** 0.5) + 1):\n        if is_p[i]:\n            for j in range(i * i, n + 1, i):\n                is_p[j] = False\n    return [i for i, v in enumerate(is_p) if v]\n\nprint(sieve(30))`,
+        note: 'Сложность O(n log log n).'
+    },
+    palindrome: {
+        kw: ['палиндром', 'palindrome'], title: 'Проверка на палиндром',
+        js: `function isPalindrome(s) {\n  const t = s.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '');\n  return t === [...t].reverse().join('');\n}\n\nconsole.log(isPalindrome('А роза упала на лапу Азора')); // true`,
+        py: `def is_palindrome(s: str) -> bool:\n    t = "".join(ch.lower() for ch in s if ch.isalnum())\n    return t == t[::-1]\n\nprint(is_palindrome("А роза упала на лапу Азора"))  # True`,
+        cpp: `#include <algorithm>\n#include <string>\n\nbool isPalindrome(std::string s) {\n    std::string r(s.rbegin(), s.rend());\n    return s == r;\n}`,
+        java: `static boolean isPalindrome(String s) {\n    return new StringBuilder(s).reverse().toString().equals(s);\n}`,
+        go: `func isPalindrome(s string) bool {\n    r := []rune(s)\n    for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {\n        if r[i] != r[j] {\n            return false\n        }\n    }\n    return true\n}`
+    },
+    reverse: {
+        kw: ['перевернуть строку', 'развернуть строку', 'reverse string', 'перевернуть', 'реверс', 'развернуть'], title: 'Разворот строки',
+        js: `const reverse = s => [...s].reverse().join('');\n\nconsole.log(reverse('привет')); // "тевирп"`,
+        py: `def reverse(s: str) -> str:\n    return s[::-1]\n\nprint(reverse("привет"))  # тевирп`,
+        cpp: `#include <algorithm>\n#include <string>\n\nstd::string reverse(std::string s) {\n    std::reverse(s.begin(), s.end());\n    return s;\n}`,
+        java: `static String reverse(String s) {\n    return new StringBuilder(s).reverse().toString();\n}`,
+        go: `func reverse(s string) string {\n    r := []rune(s)\n    for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {\n        r[i], r[j] = r[j], r[i]\n    }\n    return string(r)\n}`
+    },
+    sort: {
+        kw: ['сортировк', 'отсортировать', 'sort', 'пузырьк', 'bubble', 'quicksort', 'быстрая сортировка', 'сортировать'], title: 'Сортировка',
+        js: `// встроенная (числа нужно сравнивать явно!)\nconst nums = [5, 2, 9, 1, 10];\nnums.sort((a, b) => a - b);\nconsole.log(nums); // [1, 2, 5, 9, 10]\n\n// быстрая сортировка (quicksort)\nfunction quickSort(arr) {\n  if (arr.length < 2) return arr;\n  const [p, ...rest] = arr;\n  return [\n    ...quickSort(rest.filter(x => x < p)),\n    p,\n    ...quickSort(rest.filter(x => x >= p)),\n  ];\n}\nconsole.log(quickSort([5, 2, 9, 1, 10]));`,
+        py: `nums = [5, 2, 9, 1, 10]\nprint(sorted(nums))                # новый список\nnums.sort(reverse=True)            # на месте, по убыванию\n\n# быстрая сортировка\ndef quick_sort(a):\n    if len(a) < 2:\n        return a\n    p, *rest = a\n    return quick_sort([x for x in rest if x < p]) + [p] + quick_sort([x for x in rest if x >= p])\n\nprint(quick_sort([5, 2, 9, 1, 10]))`,
+        cpp: `#include <algorithm>\n#include <vector>\n\nstd::vector<int> v = {5, 2, 9, 1, 10};\nstd::sort(v.begin(), v.end());`,
+        java: `import java.util.Arrays;\n\nint[] a = {5, 2, 9, 1, 10};\nArrays.sort(a);\nSystem.out.println(Arrays.toString(a));`,
+        go: `import "sort"\n\nnums := []int{5, 2, 9, 1, 10}\nsort.Ints(nums)`,
+        note: 'Встроенная сортировка — O(n log n). Пузырёк и вставки — O(n²), их используют только для обучения.'
+    },
+    bsearch: {
+        kw: ['бинарный поиск', 'бинарного поиска', 'binary search', 'двоичный поиск'], title: 'Бинарный поиск',
+        js: `function binarySearch(arr, x) {\n  let lo = 0, hi = arr.length - 1;\n  while (lo <= hi) {\n    const mid = (lo + hi) >> 1;\n    if (arr[mid] === x) return mid;\n    if (arr[mid] < x) lo = mid + 1;\n    else hi = mid - 1;\n  }\n  return -1;\n}\n\nconsole.log(binarySearch([1, 3, 5, 7, 9], 7)); // 3`,
+        py: `def binary_search(a, x):\n    lo, hi = 0, len(a) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if a[mid] == x:\n            return mid\n        if a[mid] < x:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n\nprint(binary_search([1, 3, 5, 7, 9], 7))  # 3`,
+        cpp: `int binarySearch(const std::vector<int>& a, int x) {\n    int lo = 0, hi = (int)a.size() - 1;\n    while (lo <= hi) {\n        int mid = lo + (hi - lo) / 2;\n        if (a[mid] == x) return mid;\n        if (a[mid] < x) lo = mid + 1; else hi = mid - 1;\n    }\n    return -1;\n}`,
+        note: 'Массив должен быть отсортирован. Сложность O(log n).'
+    },
+    fizzbuzz: {
+        kw: ['fizzbuzz', 'физбазз', 'fizz buzz', 'физзбазз'], title: 'FizzBuzz',
+        js: `for (let i = 1; i <= 100; i++) {\n  let s = '';\n  if (i % 3 === 0) s += 'Fizz';\n  if (i % 5 === 0) s += 'Buzz';\n  console.log(s || i);\n}`,
+        py: `for i in range(1, 101):\n    s = ""\n    if i % 3 == 0: s += "Fizz"\n    if i % 5 == 0: s += "Buzz"\n    print(s or i)`,
+        cpp: `#include <iostream>\n\nint main() {\n    for (int i = 1; i <= 100; ++i) {\n        if (i % 15 == 0) std::cout << "FizzBuzz\\n";\n        else if (i % 3 == 0) std::cout << "Fizz\\n";\n        else if (i % 5 == 0) std::cout << "Buzz\\n";\n        else std::cout << i << "\\n";\n    }\n}`,
+        java: `for (int i = 1; i <= 100; i++) {\n    if (i % 15 == 0) System.out.println("FizzBuzz");\n    else if (i % 3 == 0) System.out.println("Fizz");\n    else if (i % 5 == 0) System.out.println("Buzz");\n    else System.out.println(i);\n}`,
+        go: `for i := 1; i <= 100; i++ {\n    switch {\n    case i%15 == 0:\n        fmt.Println("FizzBuzz")\n    case i%3 == 0:\n        fmt.Println("Fizz")\n    case i%5 == 0:\n        fmt.Println("Buzz")\n    default:\n        fmt.Println(i)\n    }\n}`
+    },
+    sum: {
+        kw: ['сумму массива', 'сумма массива', 'сумма элементов', 'сумму элементов', 'сумму чисел', 'sum of array', 'сложить числа', 'сумма чисел'], title: 'Сумма элементов массива',
+        js: `const sum = arr => arr.reduce((acc, x) => acc + x, 0);\n\nconsole.log(sum([1, 2, 3, 4])); // 10`,
+        py: `nums = [1, 2, 3, 4]\nprint(sum(nums))  # 10`,
+        cpp: `#include <numeric>\n#include <vector>\n\nstd::vector<int> v = {1, 2, 3, 4};\nint s = std::accumulate(v.begin(), v.end(), 0);`,
+        java: `int s = Arrays.stream(new int[]{1, 2, 3, 4}).sum();`,
+        go: `sum := 0\nfor _, x := range []int{1, 2, 3, 4} {\n    sum += x\n}`
+    },
+    max: {
+        kw: ['максимум', 'максимальн', 'наибольш', 'найти максимум', 'max of'], title: 'Максимальный элемент',
+        js: `const arr = [3, 9, 2, 7];\nconsole.log(Math.max(...arr)); // 9`,
+        py: `arr = [3, 9, 2, 7]\nprint(max(arr))  # 9`,
+        cpp: `#include <algorithm>\n\nint m = *std::max_element(v.begin(), v.end());`,
+        java: `int m = Arrays.stream(arr).max().getAsInt();`,
+        go: `m := arr[0]\nfor _, x := range arr {\n    if x > m {\n        m = x\n    }\n}`
+    },
+    unique: {
+        kw: ['уникальн', 'дубликат', 'убрать повтор', 'удалить повтор', 'без повторов', 'unique', 'remove duplicates'], title: 'Уникальные элементы (убрать дубликаты)',
+        js: `const unique = arr => [...new Set(arr)];\n\nconsole.log(unique([1, 2, 2, 3, 3, 3])); // [1, 2, 3]`,
+        py: `nums = [1, 2, 2, 3, 3, 3]\nprint(list(dict.fromkeys(nums)))  # [1, 2, 3] — порядок сохраняется\nprint(set(nums))                  # {1, 2, 3} — порядок не гарантирован`
+    },
+    wordcount: {
+        kw: ['сколько слов', 'подсчитать слова', 'посчитать слова', 'количество слов', 'частота слов', 'word count', 'считать слова'], title: 'Подсчёт слов и их частоты',
+        js: `function wordFreq(text) {\n  const freq = {};\n  for (const w of text.toLowerCase().match(/[a-zа-яё0-9]+/gi) || []) {\n    freq[w] = (freq[w] || 0) + 1;\n  }\n  return freq;\n}\n\nconsole.log(wordFreq('раз два раз')); // { раз: 2, два: 1 }`,
+        py: `import re\nfrom collections import Counter\n\ndef word_freq(text: str) -> Counter:\n    return Counter(re.findall(r"\\w+", text.lower()))\n\nprint(word_freq("раз два раз"))  # Counter({'раз': 2, 'два': 1})`
+    },
+    anagram: {
+        kw: ['анаграмм', 'anagram'], title: 'Проверка на анаграмму',
+        js: `const isAnagram = (a, b) =>\n  [...a.toLowerCase()].sort().join('') === [...b.toLowerCase()].sort().join('');\n\nconsole.log(isAnagram('лес', 'сел')); // true`,
+        py: `def is_anagram(a: str, b: str) -> bool:\n    return sorted(a.lower()) == sorted(b.lower())\n\nprint(is_anagram("лес", "сел"))  # True`
+    },
+    gcd: {
+        kw: ['нод', 'наибольший общий делитель', 'gcd', 'евклид'], title: 'НОД (алгоритм Евклида)',
+        js: `const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));\nconst lcm = (a, b) => (a / gcd(a, b)) * b;\n\nconsole.log(gcd(48, 18)); // 6\nconsole.log(lcm(4, 6));   // 12`,
+        py: `from math import gcd, lcm\n\nprint(gcd(48, 18))  # 6\nprint(lcm(4, 6))    # 12\n\n# своя реализация\ndef my_gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a`
+    },
+    evenodd: {
+        kw: ['четное', 'чётное', 'нечетное', 'четность', 'even', 'odd'], title: 'Чётное или нечётное',
+        js: `const isEven = n => n % 2 === 0;\nconsole.log(isEven(4), isEven(7)); // true false`,
+        py: `def is_even(n: int) -> bool:\n    return n % 2 == 0\n\nprint(is_even(4), is_even(7))  # True False`,
+        cpp: `bool isEven(int n) { return n % 2 == 0; }`,
+        java: `static boolean isEven(int n) { return n % 2 == 0; }`
+    },
+    swap: {
+        kw: ['поменять местами', 'обменять', 'swap'], title: 'Обмен значений двух переменных',
+        js: `let a = 1, b = 2;\n[a, b] = [b, a];\nconsole.log(a, b); // 2 1`,
+        py: `a, b = 1, 2\na, b = b, a\nprint(a, b)  # 2 1`,
+        cpp: `#include <utility>\n\nint a = 1, b = 2;\nstd::swap(a, b);`,
+        go: `a, b := 1, 2\na, b = b, a`
+    },
+    debounce: {
+        kw: ['debounce', 'дебаунс', 'throttle', 'троттл'], title: 'debounce и throttle',
+        js: `// debounce — вызвать функцию после паузы в событиях (поиск при вводе)\nfunction debounce(fn, ms = 300) {\n  let t;\n  return (...args) => {\n    clearTimeout(t);\n    t = setTimeout(() => fn(...args), ms);\n  };\n}\n\n// throttle — не чаще раза в ms (скролл, resize)\nfunction throttle(fn, ms = 200) {\n  let last = 0;\n  return (...args) => {\n    const now = Date.now();\n    if (now - last >= ms) { last = now; fn(...args); }\n  };\n}\n\ninput.addEventListener('input', debounce(e => search(e.target.value), 400));`
+    },
+    server: {
+        kw: ['веб сервер', 'веб-сервер', 'http сервер', 'http-сервер', 'создать сервер', 'написать сервер', 'express', 'экспресс', 'flask', 'фласк', 'fastapi'], title: 'Простой веб-сервер',
+        js: `// npm i express\nconst express = require('express');\nconst app = express();\napp.use(express.json());\n\napp.get('/', (req, res) => res.send('Привет!'));\napp.get('/api/hello/:name', (req, res) => res.json({ hello: req.params.name }));\napp.post('/api/echo', (req, res) => res.json({ you_sent: req.body }));\n\napp.listen(3000, () => console.log('http://localhost:3000'));`,
+        py: `# pip install flask\nfrom flask import Flask, jsonify, request\n\napp = Flask(__name__)\n\n@app.get("/")\ndef index():\n    return "Привет!"\n\n@app.get("/api/hello/<name>")\ndef hello(name):\n    return jsonify(hello=name)\n\n@app.post("/api/echo")\ndef echo():\n    return jsonify(you_sent=request.get_json())\n\nif __name__ == "__main__":\n    app.run(port=3000)`,
+        go: `package main\n\nimport (\n    "fmt"\n    "net/http"\n)\n\nfunc main() {\n    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {\n        fmt.Fprint(w, "Привет!")\n    })\n    http.ListenAndServe(":3000", nil)\n}`
+    },
+    http: {
+        kw: ['запрос на сервер', 'отправить запрос', 'http запрос', 'fetch', 'фетч', 'requests', 'get запрос', 'post запрос', 'axios'], title: 'HTTP-запрос',
+        js: `// fetch работает и в браузере, и в Node 18+\nasync function load() {\n  const res = await fetch('https://api.example.com/items');\n  if (!res.ok) throw new Error('HTTP ' + res.status);\n  return res.json();\n}\n\nasync function send(data) {\n  const res = await fetch('https://api.example.com/items', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(data),\n  });\n  return res.json();\n}`,
+        py: `# pip install requests\nimport requests\n\nr = requests.get("https://api.example.com/items", timeout=10)\nr.raise_for_status()\nprint(r.json())\n\nr = requests.post("https://api.example.com/items", json={"name": "test"}, timeout=10)\nprint(r.status_code)`
+    },
+    file: {
+        kw: ['прочитать файл', 'читать файл', 'записать в файл', 'записать файл', 'открыть файл', 'работа с файлами', 'работа с файлом', 'read file', 'write file'], title: 'Чтение и запись файлов',
+        js: `const fs = require('fs');\n\nconst text = fs.readFileSync('data.txt', 'utf8');   // прочитать\nfs.writeFileSync('out.txt', 'Привет!');              // записать\nfs.appendFileSync('out.txt', '\\nещё строка');         // дописать\n\n// асинхронно\nconst fsp = require('fs/promises');\nconst data = await fsp.readFile('data.txt', 'utf8');`,
+        py: `# чтение\nwith open("data.txt", encoding="utf-8") as f:\n    text = f.read()          # всё сразу\n    # for line in f: ...     # построчно\n\n# запись ("w" — перезаписать, "a" — дописать)\nwith open("out.txt", "w", encoding="utf-8") as f:\n    f.write("Привет!\\n")`,
+        cpp: `#include <fstream>\n#include <string>\n\nstd::ifstream in("data.txt");\nstd::string line;\nwhile (std::getline(in, line)) { /* ... */ }\n\nstd::ofstream out("out.txt");\nout << "Привет!\\n";`,
+        java: `import java.nio.file.*;\n\nString text = Files.readString(Path.of("data.txt"));\nFiles.writeString(Path.of("out.txt"), "Привет!");`
+    },
+    class: {
+        kw: ['класс', 'class', 'объект', 'ооп', 'oop'], title: 'Класс и наследование',
+        js: `class Animal {\n  constructor(name) { this.name = name; }\n  speak() { return this.name + ' издаёт звук'; }\n}\n\nclass Dog extends Animal {\n  speak() { return this.name + ' гавкает'; }\n}\n\nconst d = new Dog('Рекс');\nconsole.log(d.speak()); // Рекс гавкает`,
+        py: `class Animal:\n    def __init__(self, name):\n        self.name = name\n\n    def speak(self):\n        return f"{self.name} издаёт звук"\n\nclass Dog(Animal):\n    def speak(self):\n        return f"{self.name} гавкает"\n\nd = Dog("Рекс")\nprint(d.speak())  # Рекс гавкает`,
+        cpp: `#include <iostream>\n#include <string>\n\nclass Animal {\npublic:\n    explicit Animal(std::string n) : name(std::move(n)) {}\n    virtual ~Animal() = default;\n    virtual void speak() const { std::cout << name << " издаёт звук\\n"; }\nprotected:\n    std::string name;\n};\n\nclass Dog : public Animal {\npublic:\n    using Animal::Animal;\n    void speak() const override { std::cout << name << " гавкает\\n"; }\n};`,
+        java: `class Animal {\n    protected String name;\n    Animal(String name) { this.name = name; }\n    String speak() { return name + " издаёт звук"; }\n}\n\nclass Dog extends Animal {\n    Dog(String name) { super(name); }\n    @Override String speak() { return name + " гавкает"; }\n}`,
+        cs: `class Animal {\n    public string Name { get; }\n    public Animal(string name) => Name = name;\n    public virtual string Speak() => Name + " издаёт звук";\n}\n\nclass Dog : Animal {\n    public Dog(string name) : base(name) {}\n    public override string Speak() => Name + " гавкает";\n}`,
+        kt: `open class Animal(val name: String) {\n    open fun speak() = "$name издаёт звук"\n}\n\nclass Dog(name: String) : Animal(name) {\n    override fun speak() = "$name гавкает"\n}`
+    },
+    todo: {
+        kw: ['todo', 'туду', 'список дел', 'список задач', 'to-do', 'to do'], title: 'Мини-приложение «Список дел» (HTML + JS)',
+        html: `<!DOCTYPE html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>Список дел</title>\n<style>\n  body { font-family: system-ui, sans-serif; max-width: 420px; margin: 40px auto; padding: 0 16px; }\n  form { display: flex; gap: 8px; }\n  input { flex: 1; padding: 10px; font-size: 16px; }\n  li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #ddd; }\n  li.done span { text-decoration: line-through; opacity: .5; }\n</style>\n</head>\n<body>\n<h1>Список дел</h1>\n<form id="f"><input id="t" placeholder="Что сделать?" required><button>Добавить</button></form>\n<ul id="list"></ul>\n<script>\n  let todos = JSON.parse(localStorage.getItem('todos') || '[]');\n  const save = () => localStorage.setItem('todos', JSON.stringify(todos));\n  function render() {\n    list.innerHTML = '';\n    todos.forEach((t, i) => {\n      const li = document.createElement('li');\n      if (t.done) li.className = 'done';\n      const span = document.createElement('span');\n      span.textContent = t.text;            // textContent — защита от XSS\n      span.onclick = () => { t.done = !t.done; save(); render(); };\n      const del = document.createElement('button');\n      del.textContent = '✕';\n      del.onclick = () => { todos.splice(i, 1); save(); render(); };\n      li.append(span, del);\n      list.append(li);\n    });\n  }\n  f.onsubmit = e => { e.preventDefault(); todos.push({ text: t.value.trim(), done: false }); t.value = ''; save(); render(); };\n  render();\n</script>\n</body>\n</html>`
+    },
+    center: {
+        kw: ['центрировать', 'отцентровать', 'по центру', 'выровнять по центру', 'center div', 'центр'], title: 'Как отцентровать блок (CSS)',
+        css: `/* по горизонтали и вертикали — flex */\n.parent {\n  display: flex;\n  justify-content: center; /* по горизонтали */\n  align-items: center;     /* по вертикали */\n  min-height: 100vh;\n}\n\n/* то же через grid — самый короткий способ */\n.parent { display: grid; place-items: center; min-height: 100vh; }\n\n/* только по горизонтали у блока с шириной */\n.box { width: 300px; margin: 0 auto; }`
+    },
+    regexemail: {
+        kw: ['регулярк', 'regex', 'регэксп', 'регулярное выражение', 'регулярные выражения'], title: 'Регулярные выражения — шпаргалка',
+        js: `// частые шаблоны\nconst email = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nconst phone = /^\\+?\\d{10,15}$/;\nconst digits = /\\d+/g;\n\nconsole.log(email.test('a@b.ru'));              // true\nconsole.log('a1b22'.match(digits));            // ['1', '22']\nconsole.log('2026-10-30'.replace(/(\\d+)-(\\d+)-(\\d+)/, '$3.$2.$1')); // 30.10.2026`,
+        py: `import re\n\nprint(bool(re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", "a@b.ru")))  # True\nprint(re.findall(r"\\d+", "a1b22"))                               # ['1', '22']\nprint(re.sub(r"(\\d+)-(\\d+)-(\\d+)", r"\\3.\\2.\\1", "2026-10-30"))   # 30.10.2026`,
+        note: 'Шпаргалка: \\d цифра, \\w буква/цифра/_, \\s пробел, . любой символ, * 0+ раз, + 1+ раз, ? 0 или 1, {n,m} от n до m, ^ начало, $ конец, (...) группа, | или.'
+    },
+};
+
+const TASK_TRIGGERS = /(напиш|сделай|создай|покажи|дай|нужн|код|пример|реализ|сгенерир|как (?:сделать|написать|найти|получить|проверить|посчитать|вывести|прочитать|создать|отправить|подсчитать|отсортировать|перевернуть|убрать|удалить|отцентровать)|write|make|create|implement|example)/;
+
+function findTask(toks, raw) {
+    const n = norm(raw);
+    let best = null, bestScore = 0;
+    for (const [id, t] of Object.entries(TASKS)) {
+        let s = 0;
+        for (const k of t.kw) {
+            if (k.includes(' ')) { if (n.includes(k)) s += 3; }
+            else if (toks.some(tk => kwMatch(k, tk))) s += k.length >= 6 ? 2 : 1.2;
+        }
+        if (s > bestScore) { bestScore = s; best = id; }
+    }
+    return bestScore >= 1.2 ? best : null;
+}
+
+function renderTask(id, lang, userLang) {
+    const t = TASKS[id];
+    let L = lang || userLang;
+    if (!L || !t[L]) {
+        // подходящий язык по умолчанию
+        L = t[userLang] ? userLang : (t.js ? 'js' : t.py ? 'py' : t.css ? 'css' : t.html ? 'html' : Object.keys(t).find(k => LANGS[k]));
+    }
+    const missing = lang && !t[lang];
+    const fence = { js: 'javascript', py: 'python', cpp: 'cpp', c: 'c', java: 'java', go: 'go', cs: 'csharp', rust: 'rust', php: 'php', bash: 'bash', kt: 'kotlin', swift: 'swift', lua: 'lua', html: 'html', css: 'css', sql: 'sql', ts: 'typescript' }[L] || L;
+    let out = `✅ ${t.title}${LANGS[L] ? ' — ' + LANGS[L].name : ''}\n\n${code(fence, t[L])}`;
+    if (missing) out = `Для ${LANGS[lang].name} у меня нет готового шаблона этой задачи, вот ближайший вариант (${LANGS[L].name}) — логика переносится почти один в один:\n\n` + out.replace(/^✅[^\n]*\n\n/, `✅ ${t.title} — ${LANGS[L].name}\n\n`);
+    if (t.note) out += `\n\n💡 ${t.note}`;
+    const others = Object.keys(t).filter(k => LANGS[k] && k !== L).map(k => LANGS[k].name);
+    if (others.length) out += `\n\nЕсть также: ${others.join(', ')} — напишите «а на ${LANGS[others.includes('Python') ? 'py' : Object.keys(t).find(k => LANGS[k] && k !== L)].name}».`;
+    return out;
+}
+
+// ───────────────────────────── база знаний ─────────────────────────────
+// K(id, lang, ключевые_слова[], ответ)  — ключи: префиксы слов (рус/англ), фразы с пробелом ищутся в тексте
+const KB = [];
+const K = (id, lang, kws, text, weight = 1) => KB.push({ id, lang, kws, text, weight });
+
+// ---- JavaScript
+K('js-vars', 'js', ['var', 'let', 'const', 'переменн', 'объявить'], `📦 Переменные в JavaScript\n\n${code('javascript', `const PI = 3.14;      // нельзя переприсвоить\nlet count = 0;        // можно менять\nvar old = 1;          // устарело: область видимости функции + hoisting\n\ncount += 1;`)}\n\n• const — по умолчанию (для объектов можно менять содержимое, но не саму ссылку)\n• let — если значение будет меняться\n• var — не используйте: «всплывает» и ломает блочную область видимости`);
+K('js-eq', 'js', ['===', 'равенств', 'сравнен', 'сравнить', 'двойное равно', 'тройное равно', 'нестрог'], `⚖️ == против ===\n\n${code('javascript', `0 == '0'      // true  (приведение типов)\n0 === '0'     // false (типы разные)\nnull == undefined   // true\nnull === undefined  // false\nNaN === NaN   // false! используйте Number.isNaN(x)`)}\n\nПравило: всегда используйте ===, == только для проверки «x == null» (ловит и null, и undefined).`);
+K('js-closure', 'js', ['замыкан', 'closure'], `🔒 Замыкания (closures)\n\nЗамыкание — функция, которая «помнит» переменные из места, где была создана, даже после выхода из внешней функции.\n\n${code('javascript', `function counter() {\n  let n = 0;            // приватная переменная\n  return () => ++n;\n}\n\nconst c = counter();\nc(); // 1\nc(); // 2\nc(); // 3`)}\n\nПрименение: приватные данные, фабрики функций, debounce/throttle, колбэки.`);
+K('js-async', 'js', ['async', 'await', 'асинхрон', 'промис', 'promise', 'then', 'асинк'], `⏳ Promise и async/await\n\n${code('javascript', `const wait = ms => new Promise(r => setTimeout(r, ms));\n\nasync function main() {\n  try {\n    await wait(500);\n    const res = await fetch('/api/data');\n    const data = await res.json();\n    console.log(data);\n  } catch (err) {\n    console.error('Ошибка:', err);\n  } finally {\n    console.log('готово');\n  }\n}\n\n// параллельно, а не по очереди:\nconst [a, b] = await Promise.all([fetch('/a'), fetch('/b')]);`)}\n\n• await можно использовать только внутри async-функции (или на верхнем уровне ES-модуля)\n• Забыли await — получите Promise вместо данных, частая ошибка\n• Promise.all — если упал один, упадут все; Promise.allSettled — ждёт все`);
+K('js-eventloop', 'js', ['event loop', 'ивент луп', 'цикл событий', 'очередь задач', 'микрозадач', 'macrotask', 'microtask', 'однопоточн'], `🔄 Event Loop в JavaScript\n\nJS однопоточный: один стек вызовов. Асинхронные операции (таймеры, сеть) выполняет окружение, а колбэки возвращаются через очереди:\n\n1. Сначала весь синхронный код (стек)\n2. Затем микрозадачи (Promise.then, queueMicrotask) — все до единой\n3. Затем одна макрозадача (setTimeout, события), и снова п.2\n\n${code('javascript', `console.log(1);\nsetTimeout(() => console.log(2), 0);\nPromise.resolve().then(() => console.log(3));\nconsole.log(4);\n// 1, 4, 3, 2`)}`);
+K('js-arrays', 'js', ['map', 'filter', 'reduce', 'foreach', 'метод массив', 'методы массив', 'массив', 'массивы', 'array', 'find', 'some', 'every'], `📚 Методы массивов JavaScript\n\n${code('javascript', `const nums = [1, 2, 3, 4, 5];\n\nnums.map(x => x * 2);            // [2, 4, 6, 8, 10]  — преобразовать\nnums.filter(x => x % 2);         // [1, 3, 5]         — отфильтровать\nnums.reduce((a, x) => a + x, 0); // 15               — свернуть в одно значение\nnums.find(x => x > 3);           // 4                 — первый подходящий\nnums.some(x => x > 4);           // true              — хоть один\nnums.every(x => x > 0);          // true              — все\nnums.includes(3);                // true\nnums.slice(1, 3);                // [2, 3]  (не меняет)\nnums.splice(1, 2);               // удаляет на месте\n[...nums, 6];                    // добавить без мутации\n[3, 1, 2].sort((a, b) => a - b); // числовая сортировка`)}\n\nmap/filter/reduce возвращают новый массив и не меняют исходный.`);
+K('js-objects', 'js', ['деструктуризац', 'spread', 'rest', 'оператор распаковк', 'объект js', 'object.keys', 'entries', 'объекты'], `🧩 Объекты, деструктуризация, spread\n\n${code('javascript', `const user = { name: 'Аня', age: 25, city: 'Москва' };\n\nconst { name, age } = user;                 // деструктуризация\nconst { city: town = 'нет' } = user;        // переименование + значение по умолчанию\nconst copy = { ...user, age: 26 };          // копия с изменением\nconst [first, , third] = [1, 2, 3];         // из массива\n\nObject.keys(user);     // ['name','age','city']\nObject.values(user);\nObject.entries(user);  // [['name','Аня'], ...]\n\nuser?.address?.street; // optional chaining — не упадёт на undefined\nuser.nick ?? 'аноним'; // nullish — только для null/undefined`)}`);
+K('js-this', 'js', ['this', 'контекст', 'bind', 'call', 'apply', 'стрелочн', 'arrow'], `👉 this и стрелочные функции\n\n• В обычной функции this зависит от того, КАК её вызвали\n• В стрелочной функции this берётся из окружающего кода (своего нет)\n\n${code('javascript', `const obj = {\n  name: 'A',\n  regular() { return this.name; },   // 'A'\n  arrow: () => this.name,            // НЕ obj (this снаружи)\n  later() { setTimeout(() => console.log(this.name), 100); } // ок — стрелка\n};\n\nconst f = obj.regular;\nf();                  // this потерян!\nf.call(obj);          // 'A'\nconst g = f.bind(obj); // привязанная копия`)}`);
+K('js-dom', 'js', ['dom', 'queryselector', 'addeventlistener', 'getelementbyid', 'событие', 'события', 'элемент страниц', 'document'], `🖱 DOM и события\n\n${code('javascript', `const btn = document.querySelector('#btn');\nconst items = document.querySelectorAll('.item');\n\nbtn.addEventListener('click', e => {\n  e.preventDefault();\n  btn.classList.toggle('active');\n  btn.textContent = 'Нажато';        // безопасно\n  // btn.innerHTML = userText;        // ОПАСНО (XSS)\n});\n\n// создать элемент\nconst li = document.createElement('li');\nli.textContent = 'Новый';\ndocument.querySelector('ul').append(li);\n\n// делегирование: один обработчик на весь список\nlist.addEventListener('click', e => {\n  const item = e.target.closest('.item');\n  if (item) console.log(item.dataset.id);\n});`)}`);
+K('js-json', 'js', ['json', 'сериализ', 'parse', 'stringify'], `📄 JSON\n\n${code('javascript', `const obj = { a: 1, list: [1, 2, 3] };\nconst text = JSON.stringify(obj);          // '{"a":1,"list":[1,2,3]}'\nconst pretty = JSON.stringify(obj, null, 2); // с отступами\nconst back = JSON.parse(text);             // обратно в объект\n\n// JSON.parse бросает исключение на невалидном тексте:\ntry { JSON.parse('{oops'); } catch (e) { console.log('плохой JSON'); }`)}\n\nВ JSON нельзя: комментарии, одинарные кавычки, undefined, функции, завершающие запятые.`);
+K('js-modules', 'js', ['import', 'export', 'модул', 'require', 'commonjs', 'esm'], `📦 Модули в JavaScript\n\n${code('javascript', `// math.js\nexport const PI = 3.14;\nexport function add(a, b) { return a + b; }\nexport default class Calc {}\n\n// main.js\nimport Calc, { PI, add } from './math.js';\n\n// CommonJS (Node по умолчанию)\nconst fs = require('fs');\nmodule.exports = { add };`)}\n\nESM: в package.json добавьте "type": "module" или используйте расширение .mjs.`);
+K('js-timers', 'js', ['settimeout', 'setinterval', 'таймер', 'задержк', 'через секунд'], `⏱ Таймеры\n\n${code('javascript', `const id = setTimeout(() => console.log('через 2 сек'), 2000);\nclearTimeout(id);\n\nconst iv = setInterval(() => console.log('каждую секунду'), 1000);\nclearInterval(iv);\n\n// пауза с await\nconst sleep = ms => new Promise(r => setTimeout(r, ms));\nawait sleep(1000);`)}`);
+K('js-types', 'js', ['typeof', 'тип данных', 'типы данных', 'undefined', 'null', 'nan', 'приведение типов'], `🧬 Типы данных в JavaScript\n\nПримитивы: string, number, boolean, null, undefined, bigint, symbol. Всё остальное — объекты (массивы, функции, даты…).\n\n${code('javascript', `typeof 42          // 'number'\ntypeof 'a'         // 'string'\ntypeof null        // 'object' — историческая ошибка языка\ntypeof []          // 'object' → используйте Array.isArray(x)\ntypeof undefined   // 'undefined'\n\n'5' + 3   // '53'  (конкатенация)\n'5' - 3   // 2     (число)\n0.1 + 0.2 // 0.30000000000000004 — это норма для float`)}`);
+K('js-class', 'js', ['прототип', 'prototype', 'наследован', 'extends', 'конструктор', 'приватн поле'], `🏛 Классы и прототипы в JS\n\nclass — «сахар» над прототипами. Каждый объект имеет ссылку на прототип, по цепочке ищутся свойства и методы.\n\n${code('javascript', `class Account {\n  #balance = 0;                    // приватное поле\n  static count = 0;\n  constructor(owner) { this.owner = owner; Account.count++; }\n  deposit(x) { this.#balance += x; return this; }\n  get balance() { return this.#balance; }\n}\n\nconst a = new Account('Аня').deposit(100);\nconsole.log(a.balance); // 100`)}`);
+K('js-errors', 'js', ['try', 'catch', 'исключен', 'ошибк', 'throw', 'обработка ошиб', 'error'], `🚨 Обработка ошибок\n\n${code('javascript', `try {\n  const data = JSON.parse(input);\n  if (!data.id) throw new Error('нет id');\n} catch (err) {\n  console.error(err.message);\n} finally {\n  cleanup();\n}\n\n// своя ошибка\nclass ValidationError extends Error {\n  constructor(msg) { super(msg); this.name = 'ValidationError'; }\n}\n\n// ошибки в промисах без await\npromise.catch(err => console.error(err));\nwindow.addEventListener('unhandledrejection', e => console.error(e.reason));`)}`);
+K('js-storage', 'js', ['localstorage', 'sessionstorage', 'хранилище браузер', 'cookie', 'куки', 'indexeddb'], `💾 Хранение данных в браузере\n\n${code('javascript', `localStorage.setItem('theme', 'dark');\nlocalStorage.getItem('theme');          // 'dark'\nlocalStorage.removeItem('theme');\n\n// объекты — только через JSON\nlocalStorage.setItem('user', JSON.stringify({ id: 1 }));\nconst user = JSON.parse(localStorage.getItem('user') || 'null');`)}\n\n• localStorage — ~5 МБ, живёт пока не очистят\n• sessionStorage — до закрытия вкладки\n• IndexedDB — для больших объёмов\n• Не храните там пароли и токены доступа с высокими правами: XSS их прочитает`);
+K('js-websocket', 'js', ['websocket', 'вебсокет', 'сокет', 'socket', 'ws'], `🔌 WebSocket\n\nСервер (Node, библиотека ws):\n${code('javascript', `const WebSocket = require('ws');\nconst wss = new WebSocket.Server({ port: 8080 });\n\nwss.on('connection', ws => {\n  ws.on('message', raw => {\n    const msg = raw.toString();\n    // рассылка всем\n    wss.clients.forEach(c => c.readyState === WebSocket.OPEN && c.send(msg));\n  });\n});`)}\nКлиент (браузер):\n${code('javascript', `const ws = new WebSocket('ws://localhost:8080');\nws.onopen = () => ws.send('привет');\nws.onmessage = e => console.log(e.data);\nws.onclose = () => setTimeout(reconnect, 1000); // автопереподключение`)}\nТак же устроен и ваш мессенджер: клиент держит одно WebSocket-соединение, сервер рассылает события участникам чата.`);
+K('node', 'js', ['npm', 'node js', 'package.json', 'установить пакет', 'зависимост', 'npx', 'nodemon'], `🟢 Node.js и npm\n\n${code('bash', `npm init -y            # создать package.json\nnpm i express          # установить пакет\nnpm i -D nodemon       # dev-зависимость (автоперезапуск)\nnpm run dev            # скрипт из package.json\nnode server.js         # запустить\nnpx nodemon server.js  # запустить с автоперезапуском`)}\n\nВ package.json:\n${code('json', `{\n  "scripts": { "start": "node server.js", "dev": "nodemon server.js" }\n}`)}\nПапку node_modules не коммитят — добавьте её в .gitignore.`);
+K('ts', 'ts', ['typescript', 'тайпскрипт', 'interface', 'интерфейс', 'generic', 'дженерик', 'типизац'], `🔷 TypeScript — основы\n\n${code('typescript', `interface User {\n  id: number;\n  name: string;\n  email?: string;          // необязательное\n}\n\ntype Id = number | string;  // объединение типов\n\nfunction greet(u: User): string {\n  return 'Привет, ' + u.name;\n}\n\nfunction first<T>(arr: T[]): T | undefined {   // generic\n  return arr[0];\n}\n\nconst users: User[] = [{ id: 1, name: 'Аня' }];`)}\n\nЗапуск: npm i -D typescript → npx tsc --init → npx tsc.`);
+
+// ---- Python
+K('py-basics', 'py', ['основы python', 'синтаксис python', 'переменные python', 'начать python', 'с чего начать python', 'учить python', 'выучить python'], `🐍 Основы Python\n\n${code('python', `name = "Аня"            # типы определяются сами\nage = 25\nprice = 9.99\nok = True\n\nprint(f"Привет, {name}! Тебе {age}")   # f-строки\n\nif age >= 18:\n    print("взрослый")\nelif age > 12:\n    print("подросток")\nelse:\n    print("ребёнок")\n\nfor i in range(3):        # 0, 1, 2\n    print(i)\n\nwhile age < 27:\n    age += 1\n\ndef add(a, b=0):          # значения по умолчанию\n    return a + b`)}\n\nВ Python отступы — часть синтаксиса (обычно 4 пробела).`);
+K('py-list', 'py', ['списк', 'list', 'append', 'срез', 'slice', 'кортеж', 'tuple', 'set', 'множеств'], `📚 Списки, кортежи, множества (Python)\n\n${code('python', `a = [1, 2, 3]\na.append(4)          # [1, 2, 3, 4]\na.insert(0, 0)       # в начало\na.pop()              # удалить последний\na.remove(2)          # удалить значение\na[1:3]               # срез\na[::-1]              # развернуть\nlen(a); sum(a); max(a)\n\nt = (1, 2, 3)        # кортеж — неизменяемый\ns = {1, 2, 2, 3}     # множество — {1, 2, 3}, без повторов\ns & {2, 3, 4}        # пересечение\n\n# списковое выражение\nsquares = [x * x for x in range(10) if x % 2 == 0]`)}`);
+K('py-dict', 'py', ['словар', 'dict', 'ключ значение', 'items', 'defaultdict', 'counter'], `🗂 Словари в Python\n\n${code('python', `d = {"name": "Аня", "age": 25}\nd["city"] = "Москва"          # добавить\nd.get("phone", "нет")         # безопасно, с значением по умолчанию\ndel d["age"]\n\nfor k, v in d.items():\n    print(k, v)\n\n"name" in d                   # True\n{k: v * 2 for k, v in {"a": 1}.items()}   # словарное выражение\n\nfrom collections import defaultdict, Counter\ncnt = Counter("абракадабра")   # частоты\ngroups = defaultdict(list)`)}`);
+K('py-func', 'py', ['декоратор', 'decorator', 'лямбда', 'lambda', '*args', 'kwargs', 'аргумент функци'], `🎀 Функции, лямбды, декораторы (Python)\n\n${code('python', `def f(a, b=2, *args, **kwargs):\n    print(a, b, args, kwargs)\n\nf(1, 3, 4, 5, x=10)\n\nsq = lambda x: x * x\nsorted(["bb", "a", "ccc"], key=lambda s: len(s))\n\n# декоратор: оборачивает функцию\nimport time, functools\n\ndef timer(fn):\n    @functools.wraps(fn)\n    def wrap(*a, **kw):\n        t = time.time()\n        r = fn(*a, **kw)\n        print(f"{fn.__name__}: {time.time() - t:.3f}с")\n        return r\n    return wrap\n\n@timer\ndef work():\n    time.sleep(0.5)`)}`);
+K('py-gen', 'py', ['генератор', 'generator', 'yield', 'итератор', 'iterator'], `♻️ Генераторы (Python)\n\nГенератор отдаёт значения по одному и не хранит всё в памяти.\n\n${code('python', `def count_up(n):\n    i = 0\n    while i < n:\n        yield i\n        i += 1\n\nfor x in count_up(3):\n    print(x)             # 0 1 2\n\ngen = (x * x for x in range(10**9))   # выражение-генератор, память не тратится\nnext(gen)                              # 0`)}`);
+K('py-exc', 'py', ['исключени python', 'try except', 'except', 'ошибка python', 'traceback', 'raise'], `🚨 Исключения в Python\n\n${code('python', `try:\n    n = int(input("Число: "))\n    print(10 / n)\nexcept ValueError:\n    print("это не число")\nexcept ZeroDivisionError:\n    print("на ноль делить нельзя")\nexcept Exception as e:\n    print("другая ошибка:", e)\nelse:\n    print("ошибок не было")\nfinally:\n    print("выполнится всегда")\n\nraise ValueError("плохое значение")`)}\n\nНе ловите голый except: — он скроет настоящие баги.`);
+K('py-venv', 'py', ['pip', 'venv', 'виртуальное окружение', 'виртуальное окр', 'requirements', 'установить библиотеку python'], `📦 pip и виртуальное окружение\n\n${code('bash', `python -m venv .venv                # создать окружение\nsource .venv/bin/activate          # Linux/macOS\n.venv\\Scripts\\activate             # Windows\n\npip install requests flask\npip freeze > requirements.txt      # сохранить зависимости\npip install -r requirements.txt    # установить из файла\ndeactivate`)}`);
+K('py-async', 'py', ['asyncio', 'async python', 'асинхронность python'], `⚡ asyncio (Python)\n\n${code('python', `import asyncio\n\nasync def fetch(n):\n    await asyncio.sleep(1)      # имитация I/O\n    return n * 2\n\nasync def main():\n    results = await asyncio.gather(fetch(1), fetch(2), fetch(3))\n    print(results)              # [2, 4, 6] за ~1 секунду, а не за 3\n\nasyncio.run(main())`)}`);
+K('py-tg', 'py', ['телеграм бот', 'telegram bot', 'aiogram', 'бот на python', 'написать бота', 'сделать бота'], `🤖 Как сделать бота\n\nВ вашем мессенджере боты уже есть: через «Hours» можно создать своего (команды, кнопки, мини-приложения). Для Telegram — на Python:\n\n${code('python', `# pip install aiogram\nimport asyncio\nfrom aiogram import Bot, Dispatcher, types\nfrom aiogram.filters import Command\n\nbot = Bot(token="ТОКЕН_ОТ_BOTFATHER")\ndp = Dispatcher()\n\n@dp.message(Command("start"))\nasync def start(m: types.Message):\n    await m.answer("Привет!")\n\n@dp.message()\nasync def echo(m: types.Message):\n    await m.answer(m.text)\n\nasyncio.run(dp.start_polling(bot))`)}\nТокен храните в переменной окружения, а не в коде.`);
+K('py-oop', 'py', ['dataclass', 'датакласс', '__init__', 'self', 'магические методы', 'dunder'], `🏛 ООП в Python\n\n${code('python', `from dataclasses import dataclass\n\n@dataclass\nclass Point:\n    x: float\n    y: float\n\n    def dist(self) -> float:\n        return (self.x ** 2 + self.y ** 2) ** 0.5\n\n    def __str__(self):\n        return f"({self.x}, {self.y})"\n\np = Point(3, 4)\nprint(p, p.dist())   # (3, 4) 5.0`)}\n\nself — ссылка на текущий объект, обязательный первый параметр метода.`);
+
+// ---- HTML / CSS
+K('html', 'html', ['html', 'тег', 'теги', 'разметка', 'структура страницы', 'форма', 'input', 'ссылка', 'картинка'], `🌐 Основа HTML-страницы\n\n${code('html', `<!DOCTYPE html>\n<html lang="ru">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>Моя страница</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <header><h1>Заголовок</h1></header>\n  <main>\n    <p>Текст с <a href="https://example.com">ссылкой</a>.</p>\n    <img src="cat.jpg" alt="Кот">\n    <form>\n      <input type="text" name="name" placeholder="Имя" required>\n      <button type="submit">Отправить</button>\n    </form>\n  </main>\n  <script src="app.js"></script>\n</body>\n</html>`)}\n\nИспользуйте семантические теги (header, nav, main, section, footer) — это лучше для SEO и доступности.`);
+K('css-flex', 'css', ['flex', 'флекс', 'флексбокс', 'flexbox', 'justify-content', 'align-items'], `📐 Flexbox\n\n${code('css', `.row {\n  display: flex;\n  flex-direction: row;          /* column — по вертикали */\n  justify-content: space-between; /* главная ось */\n  align-items: center;          /* поперечная ось */\n  gap: 12px;\n  flex-wrap: wrap;\n}\n.item { flex: 1; }               /* занять равную долю */\n.item.fixed { flex: 0 0 200px; } /* фиксированная ширина */`)}\n\nFlex — для одномерной раскладки (ряд или столбец), Grid — для двумерной.`);
+K('css-grid', 'css', ['grid', 'грид', 'сетка'], `🔲 CSS Grid\n\n${code('css', `.grid {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);   /* 3 равные колонки */\n  gap: 16px;\n}\n/* адаптивная сетка без media-запросов */\n.cards {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));\n  gap: 16px;\n}\n.wide { grid-column: span 2; }`)}`);
+K('css-sel', 'css', ['селектор', 'selector', 'специфичность', 'псевдокласс', 'hover', 'nth-child', 'before', 'after'], `🎯 CSS-селекторы\n\n${code('css', `p { }                 /* по тегу */\n.card { }             /* по классу */\n#main { }             /* по id */\nul > li { }           /* прямой потомок */\nh1 + p { }            /* следующий сосед */\na:hover { }           /* при наведении */\nli:nth-child(2n) { }  /* чётные */\ninput:focus { }\n.btn::before { content: '★'; }\n[type="text"] { }     /* по атрибуту */\n.a.b { }              /* и a, и b */\n.a, .b { }            /* или */`)}\n\nСпецифичность: inline-стиль > #id > .класс > тег. Избегайте !important.`);
+K('css-pos', 'css', ['position', 'позиционирован', 'absolute', 'relative', 'fixed', 'sticky', 'z-index'], `📍 position в CSS\n\n• static — по умолчанию\n• relative — смещение от своего места, но место сохраняется; служит «якорем» для absolute-детей\n• absolute — вырывается из потока, позиционируется относительно ближайшего предка с position не static\n• fixed — относительно окна (шапки, кнопки «вверх»)\n• sticky — «прилипает» при прокрутке\n\n${code('css', `.parent { position: relative; }\n.badge  { position: absolute; top: 8px; right: 8px; }\n.header { position: sticky; top: 0; z-index: 10; }`)}`);
+K('css-media', 'css', ['media', 'адаптив', 'адаптивн', 'responsive', 'мобильн верстк', 'под телефон'], `📱 Адаптивная вёрстка\n\n${code('css', `/* mobile-first */\n.container { padding: 12px; }\n\n@media (min-width: 768px) {\n  .container { max-width: 720px; margin: 0 auto; }\n}\n@media (prefers-color-scheme: dark) {\n  body { background: #111; color: #eee; }\n}\n\nimg { max-width: 100%; height: auto; }\nfont-size: clamp(16px, 2.5vw, 22px);`)}\n\nОбязательно в <head>: <meta name="viewport" content="width=device-width, initial-scale=1">.`);
+K('css-anim', 'css', ['анимаци', 'transition', 'keyframes', 'transform', 'переход'], `✨ CSS-анимации\n\n${code('css', `.btn { transition: transform .2s, background .2s; }\n.btn:hover { transform: scale(1.05); background: #4c8bf5; }\n\n@keyframes pulse {\n  0%, 100% { opacity: 1; }\n  50%      { opacity: .4; }\n}\n.loader { animation: pulse 1.2s ease-in-out infinite; }`)}\n\nАнимируйте transform и opacity — они не вызывают перерасчёт раскладки и идут плавно.`);
+K('css-vars', 'css', ['css переменн', 'custom properties', 'var(--', 'тёмная тема', 'темная тема', 'dark mode'], `🎨 CSS-переменные и тёмная тема\n\n${code('css', `:root {\n  --bg: #fff;\n  --text: #111;\n  --accent: #4c8bf5;\n}\n[data-theme="dark"] {\n  --bg: #121212;\n  --text: #eee;\n}\nbody { background: var(--bg); color: var(--text); }\n\n/* переключатель */\n/* document.documentElement.dataset.theme = 'dark'; */`)}`);
+
+// ---- SQL / базы
+K('sql-basic', 'sql', ['select', 'insert', 'update', 'delete', 'запрос sql', 'sql запрос', 'where', 'order by', 'create table', 'sql'], `🗄 SQL — основные запросы\n\n${code('sql', `CREATE TABLE users (\n  id    INTEGER PRIMARY KEY,\n  name  TEXT NOT NULL,\n  email TEXT UNIQUE,\n  age   INTEGER\n);\n\nINSERT INTO users (name, email, age) VALUES ('Аня', 'a@b.ru', 25);\n\nSELECT name, age FROM users WHERE age >= 18 ORDER BY age DESC LIMIT 10;\n\nUPDATE users SET age = 26 WHERE id = 1;     -- WHERE не забывайте!\nDELETE FROM users WHERE id = 1;\n\nSELECT COUNT(*), AVG(age) FROM users;`)}\n\nUPDATE и DELETE без WHERE затронут ВСЕ строки.`);
+K('sql-join', 'sql', ['join', 'джойн', 'объединить таблицы', 'group by', 'группировк', 'having', 'внешний ключ', 'foreign key'], `🔗 JOIN и GROUP BY\n\n${code('sql', `-- INNER JOIN: только совпавшие\nSELECT u.name, o.total\nFROM users u\nJOIN orders o ON o.user_id = u.id;\n\n-- LEFT JOIN: все пользователи, даже без заказов\nSELECT u.name, COUNT(o.id) AS orders\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nGROUP BY u.id, u.name\nHAVING COUNT(o.id) > 0       -- HAVING фильтрует после группировки\nORDER BY orders DESC;`)}`);
+K('sql-index', 'sql', ['индекс', 'index', 'оптимизац запрос', 'медленный запрос', 'explain', 'транзакц'], `⚡ Индексы и транзакции\n\n${code('sql', `CREATE INDEX idx_users_email ON users(email);   -- ускоряет WHERE email = ...\nEXPLAIN SELECT * FROM users WHERE email = 'a@b.ru'; -- посмотреть план\n\nBEGIN;\nUPDATE accounts SET balance = balance - 100 WHERE id = 1;\nUPDATE accounts SET balance = balance + 100 WHERE id = 2;\nCOMMIT;       -- или ROLLBACK при ошибке`)}\n\nИндексы ускоряют чтение, но замедляют запись и занимают место. Индексируйте колонки из WHERE/JOIN/ORDER BY.`);
+K('sec-sqli', 'sql', ['sql инъекц', 'sql injection', 'инъекц', 'sqli', 'параметризованн'], `🛡 SQL-инъекции\n\nНикогда не склеивайте SQL из пользовательских данных!\n\n${code('javascript', `// ПЛОХО — пользователь введёт: ' OR '1'='1\ndb.query("SELECT * FROM users WHERE name = '" + name + "'");\n\n// ХОРОШО — параметризованный запрос\ndb.query('SELECT * FROM users WHERE name = $1', [name]);`)}\n\nТо же правило для любых ORM и шаблонов команд.`);
+
+// ---- Git / терминал / Docker
+K('git', 'bash', ['git', 'гит', 'коммит', 'commit', 'push', 'ветка', 'branch', 'merge', 'github', 'гитхаб', 'репозитор'], `🌿 Git — шпаргалка\n\n${code('bash', `git init                         # создать репозиторий\ngit clone <url>                  # скачать\ngit status                       # что изменилось\ngit add .                        # подготовить файлы\ngit commit -m "Описание"         # зафиксировать\ngit push origin main             # отправить\ngit pull                         # получить изменения\n\ngit checkout -b feature          # новая ветка\ngit merge feature                # влить ветку\ngit log --oneline                # история\ngit diff                         # правки\ngit stash / git stash pop        # спрятать изменения\ngit restore <файл>               # откатить файл\ngit reset --soft HEAD~1          # отменить последний коммит, сохранив правки`)}\n\nФайл .gitignore: node_modules/, .env, *.log.`);
+K('bash', 'bash', ['команды linux', 'терминал команды', 'bash команды', 'chmod', 'grep', 'ls', 'cd', 'консольные команды', 'командная строка'], `🖥 Команды терминала (Linux/macOS)\n\n${code('bash', `pwd                  # где я\nls -la               # список файлов\ncd папка / cd ..     # перейти\nmkdir -p a/b         # создать папки\ncp a b / mv a b      # копировать / переместить\nrm -r папка          # удалить (без корзины!)\ncat файл             # показать\nless файл            # листать\ngrep -rn "текст" .   # найти текст в файлах\nfind . -name "*.js"  # найти файлы\nchmod +x script.sh   # разрешить запуск\ncurl -s https://site # запрос\nps aux | grep node   # процессы\nkill <pid>           # завершить\ntail -f app.log      # следить за логом`)}`);
+K('docker', 'bash', ['docker', 'докер', 'контейнер', 'dockerfile', 'compose'], `🐳 Docker — основы\n\n${code('dockerfile', `FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\nEXPOSE 3000\nCMD ["node", "server.js"]`)}\n${code('bash', `docker build -t myapp .\ndocker run -p 3000:3000 --env-file .env myapp\ndocker ps\ndocker logs -f <id>\ndocker compose up -d`)}`);
+
+// ---- Дополнительные темы
+K('loops', null, ['цикл', 'циклы', 'loop', 'for', 'while', 'перебрать', 'перебор', 'итерац'], `🔁 Циклы\n\n${code('javascript', `for (let i = 0; i < 5; i++) console.log(i);        // классический\nfor (const x of [10, 20, 30]) console.log(x);       // по значениям\nfor (const key in { a: 1, b: 2 }) console.log(key); // по ключам объекта\n[1, 2, 3].forEach(x => console.log(x));\n\nlet n = 3;\nwhile (n > 0) { n--; }                               // пока условие истинно\ndo { n++; } while (n < 3);                           // минимум один раз\n\n// break — выйти из цикла, continue — перейти к следующей итерации`)}\n${code('python', `for i in range(5):\n    print(i)\nfor idx, x in enumerate(["a", "b"]):\n    print(idx, x)\nwhile n > 0:\n    n -= 1`)}\nЧастая ошибка — выход за границу: в массиве из n элементов индексы 0…n-1, поэтому условие i < n, а не i <= n.`);
+K('cond', null, ['условие', 'условия', 'условный оператор', 'if else', 'switch', 'тернарн', 'ветвлен'], `🔀 Условия\n\n${code('javascript', `if (age >= 18) {\n  console.log('взрослый');\n} else if (age >= 12) {\n  console.log('подросток');\n} else {\n  console.log('ребёнок');\n}\n\nconst label = age >= 18 ? 'взрослый' : 'нет';   // тернарный оператор\n\nswitch (color) {\n  case 'red':   /* ... */ break;\n  case 'green': /* ... */ break;\n  default:      /* ... */\n}\n\n// && и || — «и» / «или», ! — «не»\nif (user && user.isAdmin) {}`)}\n${code('python', `if age >= 18:\n    print("взрослый")\nelif age >= 12:\n    print("подросток")\nelse:\n    print("ребёнок")\nlabel = "взрослый" if age >= 18 else "нет"`)}`);
+K('string', null, ['строк', 'строки', 'string', 'split', 'substring', 'replace', 'trim', 'подстрок', 'форматирование строк'], `🔤 Работа со строками\n\n${code('javascript', `const s = '  Привет, Мир!  ';\ns.trim();                    // 'Привет, Мир!'\ns.toUpperCase();             // верхний регистр\ns.includes('Мир');           // true\ns.replaceAll('и', 'и́');\ns.split(', ');               // массив частей\n['а', 'б'].join('-');        // 'а-б'\ns.slice(2, 8);               // подстрока\ns.padStart(20, '*');\nconst name = 'Аня';\nconsole.log('Привет, ' + name + '!', \`Привет, \${name}!\`);   // шаблонная строка (обратные кавычки)`)}\n${code('python', `s = "  Привет, Мир!  "\ns.strip(); s.upper(); s.split(", ")\n"Мир" in s                # True\n", ".join(["а", "б"])\nf"Привет, {name}!"        # f-строка`)}`);
+K('dates', null, ['дата', 'даты', 'дату', 'date', 'время и дата', 'datetime', 'timestamp', 'часовой пояс', 'форматировать дату'], `📅 Даты и время\n\n${code('javascript', `const now = new Date();\nnow.getFullYear(); now.getMonth() + 1; now.getDate();  // месяцы с нуля!\nnow.toISOString();                                      // 2026-10-30T01:56:00.000Z\nnow.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });\nDate.now();                                             // миллисекунды (timestamp)\nconst tomorrow = new Date(Date.now() + 24 * 3600 * 1000);`)}\n${code('python', `from datetime import datetime, timedelta\nnow = datetime.now()\nprint(now.strftime("%d.%m.%Y %H:%M"))\ntomorrow = now + timedelta(days=1)\ndatetime.strptime("30.10.2026", "%d.%m.%Y")`)}\nХраните время в UTC (ISO-строка или timestamp), а в локальное переводите только при показе.`);
+K('random', null, ['случайное число', 'случайн', 'рандом', 'random', 'перемешать', 'shuffle'], `🎲 Случайные числа\n\n${code('javascript', `Math.random();                                      // [0, 1)\nconst rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;\nrnd(1, 6);                                          // как кубик\narr[Math.floor(Math.random() * arr.length)];        // случайный элемент\n[...arr].sort(() => Math.random() - 0.5);           // «грязное» перемешивание\n// для безопасности (токены, пароли) — crypto:\ncrypto.randomUUID();`)}\n${code('python', `import random\nrandom.randint(1, 6)        # включительно\nrandom.choice(["a", "b"])\nrandom.shuffle(items)\nimport secrets; secrets.token_hex(16)   # для безопасности`)}`);
+K('input', null, ['ввод', 'input', 'ввести', 'prompt', 'readline', 'ввод пользователя', 'считать с клавиатуры', 'scanf', 'cin'], `⌨️ Ввод данных\n\n${code('python', `name = input("Имя: ")\nage = int(input("Возраст: "))     # input всегда возвращает строку`)}\n${code('javascript', `// Node.js\nconst rl = require('readline').createInterface({ input: process.stdin, output: process.stdout });\nrl.question('Имя: ', name => { console.log('Привет,', name); rl.close(); });\n\n// браузер\nconst v = document.querySelector('input').value;`)}\n${code('cpp', `int a; std::cin >> a;`)}`);
+K('sql-connect', 'sql', ['подключиться к базе', 'подключение к бд', 'подключить базу', 'база данных', 'базы данных', 'бд', 'sqlite', 'postgres', 'mysql', 'mongodb', 'монго', 'orm'], `🔌 Подключение к базе данных\n\nPostgreSQL из Node.js:\n${code('javascript', `// npm i pg\nconst { Pool } = require('pg');\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL });\n\nconst { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);`)}\nSQLite из Python (без установки сервера):\n${code('python', `import sqlite3\ncon = sqlite3.connect("app.db")\ncon.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)")\ncon.execute("INSERT INTO users (name) VALUES (?)", ("Аня",))\ncon.commit()\nprint(con.execute("SELECT * FROM users").fetchall())`)}\nАдрес и пароль базы храните в переменной окружения (DATABASE_URL), а не в коде. Данные всегда передавайте параметрами, не склейкой.`);
+K('net', null, ['tcp', 'udp', 'dns', 'ip адрес', 'порт', 'сеть', 'протокол', 'https', 'ssl', 'tls', 'сертификат', 'пинг', 'ping', 'ssh'], `🌐 Сети — основы\n\n• IP — адрес устройства, порт — «дверь» приложения (HTTP 80, HTTPS 443, SSH 22)\n• DNS — переводит имя сайта в IP\n• TCP — надёжно, по порядку, с установкой соединения (веб, почта, WebSocket)\n• UDP — быстро, без гарантий доставки (видео, игры, звонки)\n• HTTP — запрос/ответ поверх TCP, HTTPS = HTTP + шифрование TLS\n• WebSocket — постоянное двустороннее соединение (чаты)\n• SSH — безопасный удалённый терминал\n\n${code('bash', `ping example.com\nnslookup example.com\ncurl -I https://example.com\nssh user@host`)}`);
+K('regexinfo', null, ['регулярк', 'regex', 'регэксп'], `Регулярные выражения — это шаблоны для поиска в тексте. Напишите «регулярки пример» — покажу готовые шаблоны (email, цифры, замена дат) на JS и Python.`, 0.3);
+K('compile', null, ['компилятор', 'интерпретатор', 'компилируемый', 'интерпретируемый', 'jit', 'байт-код', 'bytecode'], `⚙️ Компилятор и интерпретатор\n\n• Компилятор переводит весь код в машинный заранее (C, C++, Rust, Go) — быстро работает, но нужна сборка\n• Интерпретатор выполняет код построчно во время запуска (Python, PHP, Ruby) — удобно, но медленнее\n• Гибрид: Java и C# компилируются в байт-код, который исполняет виртуальная машина (JVM / .NET); JavaScript в браузере и Node.js исполняется движком V8 с JIT-компиляцией «на лету»`);
+K('frontvsback', null, ['фронтенд', 'бэкенд', 'бекенд', 'frontend', 'backend', 'fullstack', 'фуллстек', 'клиент сервер', 'клиент-сервер'], `🧭 Frontend и Backend\n\n• Frontend — то, что видит пользователь: HTML, CSS, JavaScript (React, Vue). Работает в браузере\n• Backend — сервер, логика и данные: Node.js, Python (Django/Flask), Java, Go, PHP + база данных\n• API связывает их: клиент отправляет запрос (fetch), сервер отвечает JSON\n• Fullstack — умение делать и то, и другое\n\nВаш мессенджер как раз так и устроен: index.html — клиент, server.js — сервер на Express + WebSocket.`);
+K('arch-this', null, ['мой мессенджер', 'как устроен мессенджер', 'как работает мессенджер', 'сделать мессенджер', 'написать мессенджер', 'свой чат'], `💬 Как устроен мессенджер\n\n1. Клиент (HTML/JS) подключается к серверу по WebSocket и держит соединение открытым\n2. Пользователь отправляет сообщение → сервер проверяет сессию и права → сохраняет в хранилище → рассылает участникам чата через WebSocket\n3. История загружается обычным REST-запросом (GET /api/messages/:chatId)\n4. Для офлайна — push-уведомления через Service Worker\n5. Хранение: PostgreSQL (или файлы), пароли — только хэшем\n6. Медиа — загрузка файлов отдельным эндпоинтом, в сообщении только ссылка\n\nБоты — это обычные «пользователи» с флагом bot, на сообщения которых сервер отвечает кодом.`);
+
+
+// ---- Ещё темы (расширение)
+K('express-mw', 'js', ['middleware', 'мидлвар', 'мидлвэр', 'express роутинг', 'роутинг', 'роуты', 'router', 'app.use'], `🛣 Express: middleware и роутинг\n\n${code('javascript', `const express = require('express');\nconst app = express();\n\napp.use(express.json());                       // middleware: разбор JSON\napp.use((req, res, next) => {                  // свой middleware\n  console.log(req.method, req.url);\n  next();                                      // без next() запрос «зависнет»\n});\n\nconst auth = (req, res, next) =>\n  req.headers.authorization ? next() : res.status(401).json({ error: 'нужен вход' });\n\nconst router = express.Router();\nrouter.get('/', (req, res) => res.json([]));\nrouter.post('/', auth, (req, res) => res.status(201).json(req.body));\napp.use('/api/items', router);\n\napp.use((err, req, res, next) => {             // обработчик ошибок (4 аргумента!)\n  console.error(err);\n  res.status(500).json({ error: 'Ошибка сервера' });\n});`)}`);
+K('testing', null, ['тест', 'тесты', 'тестирование', 'jest', 'pytest', 'unittest', 'юнит тест', 'tdd', 'mock', 'мок'], `🧪 Тестирование\n\n${code('javascript', `// Jest: npm i -D jest\nconst { add } = require('./math');\ntest('складывает числа', () => {\n  expect(add(2, 3)).toBe(5);\n});\ntest('async', async () => {\n  await expect(load()).resolves.toEqual({ ok: true });\n});`)}\n${code('python', `# pytest: pip install pytest\nfrom math_utils import add\n\ndef test_add():\n    assert add(2, 3) == 5`)}\n• Пирамида: много быстрых юнит-тестов → меньше интеграционных → мало e2e\n• Тестируйте поведение, а не реализацию\n• TDD: сначала падающий тест, потом код, потом рефакторинг`);
+K('cleancode', null, ['чистый код', 'clean code', 'рефакторинг', 'нейминг', 'как называть переменные', 'читаемость', 'код ревью', 'code review', 'dry', 'kiss', 'yagni', 'стиль кода'], `✨ Чистый код\n\n• Имена говорят сами за себя: getUserById, а не func1; isActive вместо flag\n• Функция делает одну вещь и помещается на экран\n• DRY — не копируйте код: повторяющееся выносите в функцию\n• KISS — простое решение лучше «умного»\n• YAGNI — не пишите то, что «может пригодиться»\n• Ранние return вместо глубоких if-вложений\n• Никаких «магических чисел»: const MAX_TRIES = 3\n• Комментарий объясняет ПОЧЕМУ, а не ЧТО\n• Обрабатывайте ошибки, не глотайте их молча\n• Форматтер и линтер (Prettier, ESLint, Black, Ruff) — на автомате`);
+K('cache', null, ['кэш', 'кеш', 'cache', 'redis', 'редис', 'memcached', 'ttl', 'мемоизац', 'memoize'], `⚡ Кэширование\n\nКэш хранит результат дорогой операции, чтобы не считать заново.\n\n${code('javascript', `// мемоизация\nconst memo = fn => { const c = new Map(); return x => c.has(x) ? c.get(x) : (c.set(x, fn(x)), c.get(x)); };\n\n// кэш с временем жизни\nconst cache = new Map();\nasync function getCached(key, load, ttl = 60000) {\n  const hit = cache.get(key);\n  if (hit && hit.exp > Date.now()) return hit.val;\n  const val = await load();\n  cache.set(key, { val, exp: Date.now() + ttl });\n  return val;\n}`)}\nPython: from functools import lru_cache. Для нескольких серверов — Redis. Сложнее всего — инвалидация: когда данные изменились, кэш нужно сбросить.`);
+K('arch', null, ['микросервис', 'монолит', 'архитектур', 'mvc', 'очередь сообщений', 'rabbitmq', 'kafka', 'масштабирован', 'нагрузка', 'балансировщик', 'load balancer', 'горизонтальн'], `🏗 Архитектура приложений\n\n• Монолит — всё в одном приложении: просто начинать, проще отлаживать. Для большинства проектов это правильный старт\n• Микросервисы — отдельные маленькие сервисы с API: масштабируются раздельно, но сложнее в сопровождении\n• MVC — Model (данные), View (отображение), Controller (логика запросов)\n• Масштабирование: вертикальное (мощнее сервер) и горизонтальное (больше серверов за балансировщиком)\n• Состояние (сессии, файлы) вынесите из процесса: в БД/Redis/S3, иначе несколько серверов не заработают\n• Очереди (RabbitMQ, Kafka, BullMQ) — тяжёлые задачи делаются в фоне\n• Сначала измеряйте узкие места: чаще всего это база данных`);
+K('cicd', 'bash', ['ci cd', 'cicd', 'github actions', 'деплой', 'deploy', 'развернуть сайт', 'хостинг', 'render', 'vercel', 'nginx', 'pm2', 'выложить сайт'], `🚀 Деплой и CI/CD\n\n• Статичный сайт: GitHub Pages, Netlify, Vercel — бесплатно\n• Node-сервер: Render, Railway, Fly.io или свой VPS\n• На VPS: ${'`'}pm2 start server.js${'`'} (автоперезапуск) + nginx как обратный прокси + сертификат Let's Encrypt\n• Секреты — только в переменных окружения хостинга\n• Данные: на бесплатных хостингах диск стирается при перезапуске → подключайте внешнюю БД (PostgreSQL)\n\n${code('yaml', `# .github/workflows/ci.yml\nname: CI\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with: { node-version: 20 }\n      - run: npm ci\n      - run: npm test`)}`);
+K('env', null, ['.env', 'dotenv', 'переменные окружения', 'process.env', 'environment variable', 'конфигурац'], `🔧 Переменные окружения\n\n${code('bash', `# файл .env (НЕ коммитить!)\nDATABASE_URL=postgres://user:pass@host/db\nSECRET=длинная_случайная_строка`)}\n${code('javascript', `require('dotenv').config();            // npm i dotenv (Node 20+: node --env-file=.env server.js)\nconst port = process.env.PORT || 3000;`)}\n${code('python', `import os\nport = int(os.environ.get("PORT", 3000))`)}\nДобавьте .env в .gitignore и положите рядом .env.example без настоящих значений.`);
+K('logging', null, ['логирование', 'логи', 'logging', 'logger', 'winston', 'pino', 'уровни логов'], `📝 Логирование\n\nУровни: error → warn → info → debug. В продакшене пишите info и выше.\n\n${code('python', `import logging\nlogging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")\nlog = logging.getLogger(__name__)\nlog.info("Пользователь %s вошёл", user_id)\nlog.exception("Ошибка")   # с трейсбеком`)}\nВ Node — pino или winston (JSON-логи). Не логируйте пароли, токены и персональные данные.`);
+K('bits', null, ['побитов', 'битовые операции', 'bitwise', 'сдвиг', 'xor', 'двоичная система', 'шестнадцатерич', 'системы счисления', 'бит'], `🔢 Системы счисления и биты\n\n• Двоичная (0b1010 = 10), восьмеричная (0o12), шестнадцатеричная (0xA)\n• AND &, OR |, XOR ^, NOT ~, сдвиги << и >>\n\n${code('javascript', `(10).toString(2);       // '1010'\n(255).toString(16);     // 'ff'\nparseInt('1010', 2);    // 10\nparseInt('ff', 16);     // 255\n5 & 3;  5 | 3;  5 ^ 3;  // 1, 7, 6\n1 << 4;                 // 16 — умножение на 2^4\nn & (n - 1);            // сбрасывает младший единичный бит\n(n & 1) === 1;          // нечётное`)}\nМогу сам перевести число: «255 в двоичную» или «0b1010 в десятичную».`);
+K('float', null, ['0.1 + 0.2', 'float', 'точность вычислений', 'плавающая точка', 'округлен', 'toFixed', 'decimal', 'bigint'], `🧮 Дробные числа и точность\n\n0.1 + 0.2 = 0.30000000000000004 — это не баг, а особенность двоичного представления (IEEE 754) во ВСЕХ языках.\n\n${code('javascript', `Math.abs(0.1 + 0.2 - 0.3) < Number.EPSILON;  // сравнение с допуском\n(0.1 + 0.2).toFixed(2);                      // '0.30' (строка!)\nMath.round(1.005 * 100) / 100;               // осторожно с округлением\n2n ** 64n;                                   // BigInt для больших целых`)}\nДеньги храните в копейках (целые числа) или используйте Decimal (Python: from decimal import Decimal).`);
+K('unicode', null, ['unicode', 'юникод', 'utf-8', 'utf8', 'кодировка', 'кракозябры', 'эмодзи', 'emoji', 'win-1251'], `🔤 Кодировки и Unicode\n\n• Unicode — таблица символов; UTF-8 — способ хранить её в байтах (русская буква = 2 байта, эмодзи = 4)\n• «Кракозябры» — текст прочитан не в той кодировке. Лечение: везде UTF-8 (<meta charset="utf-8">, encoding="utf-8" при открытии файлов, utf8mb4 в MySQL)\n• Длина строки с эмодзи в JS «врёт»: '😀'.length === 2. Для настоящих символов: [...'😀'].length\n\n${code('javascript', `new TextEncoder().encode('Привет').length;  // 12 байт`)}`);
+K('linux-perm', 'bash', ['права доступа', 'chmod', 'chown', 'sudo', '755', '644', 'permission denied'], `🔐 Права доступа в Linux\n\nПример -rwxr-xr-- : владелец (rwx) / группа (r-x) / остальные (r--)\nr=4, w=2, x=1 → rwx=7, r-x=5, r--=4\n\n${code('bash', `chmod 755 script.sh     # владелец всё, остальные читают и запускают\nchmod 600 key.pem       # только владелец (нужно для SSH-ключей)\nchmod +x run.sh\nsudo chown user:group file`)}\n«Permission denied» → проверьте владельца и права (ls -l), запускайте через sudo только осознанно.`);
+K('cron', 'bash', ['cron', 'крон', 'расписание', 'по расписанию', 'планировщик'], `⏰ Cron — запуск по расписанию\n\nФормат: минута час день_месяца месяц день_недели\n\n${code('bash', `*/5 * * * *    # каждые 5 минут\n0 9 * * 1-5    # в 9:00 по будням\n30 2 1 * *     # 1-го числа в 02:30\n@reboot        # при старте системы`)}\nВ Node: пакет node-cron или просто setInterval. Пришлите «cron 0 9 * * 1-5» — расшифрую.`);
+K('markdown', null, ['markdown', 'маркдаун', 'readme', 'ридми'], `📝 Markdown — шпаргалка\n\n${code('markdown', `# Заголовок 1\n## Заголовок 2\n**жирный**  *курсив*  ~~зачёркнутый~~\n- пункт списка\n1. нумерованный\n[текст ссылки](https://example.com)\n![картинка](img.png)\n> цитата\n\`код\` в строке`)}\nХороший README: что это → как установить → как запустить → примеры → лицензия.`);
+K('git-conflict', 'bash', ['git', 'гит', 'конфликт', 'merge conflict', 'rebase', 'ребейз', 'cherry-pick', 'откатить коммит', 'revert', 'git reset', 'удалил коммит', 'потерял коммит', 'reflog'], `🔀 Git: конфликты и откаты\n\nКонфликт при merge: откройте файл, найдите маркеры и оставьте нужное.\n${code('text', `<<<<<<< HEAD\nваш вариант\n=======\nчужой вариант\n>>>>>>> feature`)}\n${code('bash', `git add файл && git commit            # завершить слияние\ngit merge --abort                      # передумали\n\ngit revert <hash>                      # безопасно отменить коммит новым коммитом\ngit reset --hard HEAD~1                # ОПАСНО: удалить последний коммит и правки\ngit reflog                             # история всех перемещений HEAD — спасёт «потерянные» коммиты\ngit cherry-pick <hash>                 # перенести один коммит\ngit rebase main                        # перенести ветку поверх main`)}\nПравило: не делайте rebase/force-push общих веток.`);
+K('python-data', 'py', ['pandas', 'пандас', 'numpy', 'нампай', 'matplotlib', 'датафрейм', 'dataframe', 'анализ данных', 'графики python', 'csv'], `📊 Python: данные и графики\n\n${code('python', `# pip install pandas matplotlib\nimport pandas as pd\nimport matplotlib.pyplot as plt\n\ndf = pd.read_csv("data.csv")\nprint(df.head())                 # первые строки\nprint(df.describe())             # статистика\ndf = df.dropna()                 # убрать пропуски\nby_city = df.groupby("city")["price"].mean()\nby_city.plot(kind="bar")\nplt.show()\n\ndf[df["age"] > 18].sort_values("age")   # фильтр и сортировка`)}`);
+K('django', 'py', ['django', 'джанго', 'fastapi', 'фастапи', 'flask'], `🌐 Python-фреймворки\n\n• Flask — минимализм, быстрый старт\n• FastAPI — современный, типы, автодокументация /docs, асинхронный\n• Django — «всё включено»: ORM, админка, авторизация\n\n${code('python', `# pip install fastapi uvicorn\nfrom fastapi import FastAPI\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass Item(BaseModel):\n    name: str\n    price: float\n\n@app.post("/items")\ndef create(item: Item):\n    return {"ok": True, "item": item}\n\n# запуск: uvicorn main:app --reload`)}`);
+K('js-gen', 'js', ['генератор js', 'function*', 'iterator js', 'symbol', 'proxy', 'weakmap', 'map и set', 'set js', 'map js'], `🧰 Map, Set и продвинутое в JS\n\n${code('javascript', `const m = new Map([['a', 1]]);\nm.set({ id: 1 }, 'ключ-объект');   // ключом может быть что угодно\nm.get('a'); m.has('a'); m.size;\nfor (const [k, v] of m) {}\n\nconst s = new Set([1, 2, 2, 3]);   // уникальные значения\ns.add(4); s.has(2);\n\nfunction* idGen() { let i = 0; while (true) yield ++i; }\nconst g = idGen(); g.next().value; // 1\n\nObject.freeze(obj);                // запретить изменения\nstructuredClone(obj);              // глубокая копия`)}`);
+K('js-copy', 'js', ['глубокое копирование', 'копия объекта', 'клонировать объект', 'мутация', 'иммутабельн', 'ссылка на объект', 'передача по ссылке'], `📋 Копирование объектов\n\nОбъекты и массивы в JS передаются по ссылке — присваивание не копирует!\n\n${code('javascript', `const a = { x: 1, inner: { y: 2 } };\nconst b = a;                    // та же ссылка: b.x = 5 изменит и a\nconst c = { ...a };             // поверхностная копия: inner всё ещё общий\nconst d = structuredClone(a);   // глубокая копия\nconst e = JSON.parse(JSON.stringify(a));  // тоже глубокая, но теряет Date, undefined, функции`)}\nPython: copy.copy() — поверхностная, copy.deepcopy() — глубокая.`);
+K('algo-two', null, ['два указателя', 'скользящее окно', 'sliding window', 'динамическое программирование', 'dp', 'жадный алгоритм', 'backtracking', 'поиск в ширину', 'поиск в глубину', 'bfs', 'dfs', 'дейкстра', 'dijkstra'], `🧠 Приёмы в алгоритмах\n\n• Два указателя — сортированный массив, пары с суммой, палиндромы\n• Скользящее окно — подмассив/подстрока фиксированной или переменной длины за O(n)\n• Динамическое программирование — разбить на подзадачи и запомнить ответы (Фибоначчи, рюкзак, редакционное расстояние)\n• Жадный алгоритм — на каждом шаге берём лучшее локально (размен монет, интервалы)\n• BFS — по слоям, кратчайший путь в невзвешенном графе (очередь)\n• DFS — в глубину, обход, поиск компонент (стек/рекурсия)\n• Дейкстра — кратчайшие пути во взвешенном графе без отрицательных рёбер\n\n${code('python', `from collections import deque\ndef bfs(graph, start):\n    seen, q = {start}, deque([start])\n    while q:\n        v = q.popleft()\n        for u in graph[v]:\n            if u not in seen:\n                seen.add(u); q.append(u)\n    return seen`)}`);
+K('async-vs', null, ['многопоточн', 'потоки', 'thread', 'параллелизм', 'конкурентность', 'race condition', 'гонка данных', 'mutex', 'мьютекс', 'deadlock', 'дедлок', 'асинхронность и многопоточность'], `🧵 Потоки, асинхронность, параллелизм\n\n• Асинхронность — не ждём I/O (сеть, диск), занимаясь другим в том же потоке (JS, asyncio)\n• Многопоточность — несколько потоков выполнения; нужна синхронизация\n• Многопроцессность — отдельные процессы, настоящий параллелизм на CPU (в Python из-за GIL для вычислений нужен multiprocessing)\n• Гонка данных — два потока одновременно меняют одно значение → защита мьютексом/блокировкой\n• Дедлок — два потока ждут друг друга вечно → всегда берите блокировки в одном порядке\n• В JS тяжёлые вычисления выносят в Worker (worker_threads / Web Worker), чтобы не вешать интерфейс`);
+K('orm', null, ['нормализация', 'нормальные формы', 'связи таблиц', 'один ко многим', 'многие ко многим', 'подзапрос', 'subquery', 'union', 'view', 'представление', 'prisma', 'sequelize', 'sqlalchemy'], `🗃 Проектирование БД\n\n• Нормализация: каждый факт хранится в одном месте (1НФ — атомарные значения, 2НФ — нет частичных зависимостей, 3НФ — нет транзитивных)\n• Связи: один-ко-многим (user → orders через user_id), многие-ко-многим (через промежуточную таблицу)\n• Подзапрос: SELECT * FROM users WHERE id IN (SELECT user_id FROM orders WHERE total > 100)\n• ORM (Prisma, Sequelize, SQLAlchemy) — работаем с таблицами как с объектами; удобно, но следите за N+1 запросами\n• Денормализация допустима осознанно — ради скорости чтения\n\n${code('sql', `CREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n  total NUMERIC(10,2) NOT NULL\n);`)}`);
+K('a11y', 'html', ['доступность', 'accessibility', 'a11y', 'aria', 'seo', 'сео', 'meta теги', 'open graph', 'favicon'], `♿ Доступность и SEO\n\n• alt у каждой картинки, label у каждого поля, кнопки — <button>, а не <div onclick>\n• Контраст текста минимум 4.5:1, управление с клавиатуры (Tab/Enter), видимый :focus\n• Семантика: header, nav, main, article, footer; один h1 на страницу\n• SEO: уникальные <title> и <meta name="description">, чистые URL, быстрая загрузка, адаптивность\n\n${code('html', `<meta name="description" content="Короткое описание страницы">\n<meta property="og:title" content="Заголовок для соцсетей">\n<meta property="og:image" content="https://site.ru/cover.jpg">\n<link rel="icon" href="/favicon.ico">`)}`);
+K('canvas', 'js', ['canvas', 'канвас', 'игра на js', 'змейка', 'requestanimationframe', 'рисовать на странице', 'анимация js', 'game loop', 'игровой цикл'], `🎮 Canvas и игровой цикл\n\n${code('html', `<canvas id="c" width="400" height="300"></canvas>\n<script>\n  const ctx = c.getContext('2d');\n  let x = 0;\n  function frame() {\n    ctx.clearRect(0, 0, 400, 300);\n    ctx.fillStyle = 'tomato';\n    ctx.fillRect(x, 120, 40, 40);     // движущийся квадрат\n    x = (x + 2) % 400;\n    requestAnimationFrame(frame);     // ~60 кадров в секунду\n  }\n  frame();\n  addEventListener('keydown', e => { if (e.key === ' ') x = 0; });\n</script>`)}\nСхема любой игры: обработать ввод → обновить состояние → отрисовать → повторить.`);
+K('pwa', 'js', ['service worker', 'сервис воркер', 'manifest', 'офлайн', 'push уведомления', 'установить как приложение'], `📲 PWA: сайт как приложение\n\n1. manifest.json (name, icons, start_url, display: "standalone")\n2. Service Worker — перехватывает запросы, кэширует, принимает push\n3. HTTPS обязателен\n\n${code('javascript', `// регистрация\nif ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');\n\n// sw.js — кэш-первым для статики\nself.addEventListener('install', e => e.waitUntil(caches.open('v1').then(c => c.addAll(['/', '/app.js']))));\nself.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));`)}\nВаш мессенджер уже использует sw.js и manifest.json — поэтому его можно установить на телефон.`);
+K('ai-ml', 'py', ['нейросеть', 'машинное обучение', 'machine learning', 'ml', 'tensorflow', 'pytorch', 'scikit', 'sklearn', 'искусственный интеллект', 'обучение модели', 'llm', 'gpt', 'нейронка'], `🧠 Машинное обучение — коротко\n\nПуть: данные → признаки → модель → обучение → оценка на отложенной выборке.\n\n${code('python', `# pip install scikit-learn\nfrom sklearn.datasets import load_iris\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestClassifier\n\nX, y = load_iris(return_X_y=True)\nX_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=42)\nmodel = RandomForestClassifier().fit(X_tr, y_tr)\nprint("Точность:", model.score(X_te, y_te))`)}\nПереобучение — модель «зазубрила» обучающие данные: проверяйте на тестовых. LLM-нейросети (как ChatGPT) обучаются на огромных текстах; в отличие от них, я работаю по правилам и базе знаний, без нейросети.`);
+// ---- Алгоритмы и теория
+K('bigo', null, ['o(n', 'сложность алгоритм', 'big o', 'асимптотик', 'временная сложность', 'вычислительная сложность'], `📈 Сложность алгоритмов (Big O)\n\nO(1) — константа: доступ к элементу массива по индексу\nO(log n) — бинарный поиск\nO(n) — один проход по данным\nO(n log n) — хорошая сортировка (merge, quick, встроенная)\nO(n²) — вложенные циклы, пузырьковая сортировка\nO(2ⁿ) — наивные перебор подмножеств, рекурсивный Фибоначчи\nO(n!) — перебор перестановок\n\nПравило: смотрим, как растёт время при росте входа, константы отбрасываем. Для 10⁶ элементов O(n²) — это ~10¹² операций, то есть слишком долго.`);
+K('recursion', null, ['рекурси', 'recursion', 'стек вызовов', 'stack overflow', 'переполнение стека'], `🔁 Рекурсия\n\nФункция вызывает сама себя. Нужны две вещи: базовый случай (когда остановиться) и шаг, приближающий к нему.\n\n${code('javascript', `function sum(n) {\n  if (n === 0) return 0;      // базовый случай\n  return n + sum(n - 1);      // шаг рекурсии\n}\nsum(4); // 4 + 3 + 2 + 1 + 0 = 10`)}\n\nБез базового случая получите «Maximum call stack size exceeded» (stack overflow). Глубокую рекурсию заменяйте циклом или явным стеком.`);
+K('ds', null, ['структуры данных', 'стек', 'очередь', 'хэш таблица', 'хеш таблица', 'связный список', 'дерево', 'граф', 'queue', 'linked list', 'hash map', 'hashmap', 'куча'], `🧱 Структуры данных\n\n• Массив — доступ по индексу O(1), вставка в середину O(n)\n• Связный список — вставка O(1), поиск O(n)\n• Стек (LIFO) — последний пришёл, первый ушёл: отмена действий, скобки, DFS\n• Очередь (FIFO) — первый пришёл, первый ушёл: задачи, BFS\n• Хэш-таблица (Map/dict) — поиск/вставка в среднем O(1)\n• Дерево — иерархии; бинарное дерево поиска даёт O(log n)\n• Граф — вершины и рёбра: карты, соцсети\n• Куча — быстрый доступ к min/max (приоритетная очередь)\n\n${code('python', `stack = []; stack.append(1); stack.pop()\nfrom collections import deque\nq = deque(); q.append(1); q.popleft()`)}`);
+K('oop-theory', null, ['принципы ооп', 'инкапсуляц', 'полиморфизм', 'наследование', 'абстракци', 'solid', 'солид'], `🏛 ООП и SOLID\n\nЧетыре принципа ООП:\n• Инкапсуляция — скрываем внутренности за интерфейсом\n• Наследование — класс расширяет другой\n• Полиморфизм — разные классы отвечают на один вызов по-своему\n• Абстракция — работаем с сутью, а не деталями\n\nSOLID:\n• S — у класса одна ответственность\n• O — открыт для расширения, закрыт для изменения\n• L — подкласс можно подставить вместо родителя\n• I — много маленьких интерфейсов лучше одного большого\n• D — зависим от абстракций, а не от конкретных классов\n\nПредпочитайте композицию наследованию, когда можно.`);
+K('patterns', null, ['паттерн', 'шаблон проектирования', 'singleton', 'синглтон', 'observer', 'фабрика', 'factory', 'design pattern'], `🧩 Паттерны проектирования (кратко)\n\n• Singleton — один экземпляр на всё приложение (соединение с БД)\n• Factory — функция/класс создаёт объекты нужного типа\n• Observer — подписчики получают события (EventEmitter, addEventListener)\n• Strategy — взаимозаменяемые алгоритмы\n• Decorator — добавляет поведение, не меняя класс\n• Adapter — «переходник» между несовместимыми интерфейсами\n\n${code('javascript', `// Observer на практике\nconst EventEmitter = require('events');\nconst bus = new EventEmitter();\nbus.on('message', t => console.log('Получено:', t));\nbus.emit('message', 'привет');`)}`);
+
+// ---- Веб/API/безопасность
+K('rest', null, ['rest', 'api', 'http', 'коды ответ', 'статус код', 'get post', 'эндпоинт', 'endpoint', '404', '500', '200'], `🌍 HTTP и REST API\n\nМетоды: GET — получить, POST — создать, PUT/PATCH — изменить, DELETE — удалить.\n\nСтатусы:\n• 200 OK, 201 Created, 204 No Content\n• 301/302 — редирект\n• 400 Bad Request — клиент прислал ерунду\n• 401 — не авторизован, 403 — нельзя, 404 — не найдено, 429 — слишком много запросов\n• 500 — ошибка на сервере\n\n${code('http', `GET    /api/users        → список\nGET    /api/users/5      → один\nPOST   /api/users        → создать (тело — JSON)\nPUT    /api/users/5      → заменить\nDELETE /api/users/5      → удалить`)}\nREST: ресурсы — существительные в URL, действия — HTTP-методы, без состояния на сервере.`);
+K('cors', 'js', ['cors', 'корс', 'cross origin', 'access-control'], `🚧 CORS\n\nБраузер блокирует запросы на другой домен/порт, если сервер не разрешил их заголовком Access-Control-Allow-Origin.\n\n${code('javascript', `// Express\nconst cors = require('cors');\napp.use(cors({ origin: 'https://mysite.ru' }));   // или cors() — всем (только для разработки)`)}\n\nЭто защита браузера: curl и сервер-сервер запросы CORS не затрагивает. Ошибку чинят на сервере, а не в клиентском коде.`);
+K('sec-xss', null, ['xss', 'межсайтов', 'безопасност', 'уязвимост', 'защита сайта', 'взлом', 'sanitize', 'экранирован'], `🛡 Безопасность веб-приложений\n\n• XSS — вставка скриптов через пользовательский ввод. Защита: textContent вместо innerHTML, экранирование HTML, CSP.\n• SQL-инъекции — параметризованные запросы.\n• CSRF — токены/SameSite-куки.\n• Пароли — только хэш с солью (bcrypt/argon2), никогда не plain text.\n• Секреты (ключи, токены) — в переменных окружения, не в git.\n• Всегда проверяйте данные на СЕРВЕРЕ: клиентской валидации доверять нельзя.\n• HTTPS везде, обновляйте зависимости (npm audit).\n\n${code('javascript', `const esc = s => String(s).replace(/[&<>"']/g, c =>\n  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));`)}`);
+K('hash', null, ['пароль', 'хеш', 'хэш', 'bcrypt', 'шифрован', 'jwt', 'токен авториз', 'авторизац', 'аутентификац', 'логин'], `🔐 Пароли и авторизация\n\n${code('javascript', `// npm i bcrypt\nconst bcrypt = require('bcrypt');\nconst hash = await bcrypt.hash(password, 12);     // сохранить в БД\nconst ok = await bcrypt.compare(input, hash);     // проверить при входе\n\n// сессионный токен\nconst token = require('crypto').randomBytes(32).toString('hex');`)}\n\n• Не храните пароли в открытом виде и не используйте MD5/SHA1 для паролей\n• Токен сессии — длинный случайный, храните его хэш; отдавайте по HTTPS\n• JWT: подписывайте, ставьте срок жизни, не кладите секреты в payload (он читается всеми)`);
+K('perf', null, ['оптимизац', 'ускорить', 'производительность', 'тормозит', 'медленно работает', 'профилирован', 'утечка памяти'], `🚀 Как ускорить код\n\n1. Сначала измерьте (профайлер, console.time), а не угадывайте\n2. Выберите правильную структуру данных (Set/Map вместо поиска по массиву)\n3. Уберите вложенные циклы там, где можно (O(n²) → O(n))\n4. Кэшируйте результат дорогих вычислений\n5. БД: индексы, не делайте запросы в цикле (N+1), берите только нужные колонки\n6. Фронтенд: debounce для событий, ленивые картинки, не перерисовывайте весь DOM\n7. Сеть: сжатие, пагинация, кэширование заголовками\n\n${code('javascript', `console.time('work');\nheavy();\nconsole.timeEnd('work');`)}`);
+K('debug', null, ['отладк', 'дебаг', 'debug', 'не работает', 'баг', 'ошибка в коде', 'почему не работает', 'как найти ошибку'], `🐞 Как искать ошибки\n\n1. Прочитайте текст ошибки — там почти всегда указана строка и причина\n2. Воспроизведите минимальный пример\n3. Выведите промежуточные значения (console.log / print) или используйте отладчик с точками останова\n4. Сузьте область поиска: закомментируйте половину кода (бинарный поиск бага)\n5. Проверьте типичное: опечатки в именах, забытый await/return, undefined/None, индекс за границей, регистр букв, пути к файлам\n6. Отдохните — «утка-резинка»: объясните код вслух\n\nПришлите мне код и текст ошибки — разберём вместе 🙂`);
+K('commonerr', 'js', ['undefined is not', 'cannot read propert', 'is not a function', 'is not defined', 'unexpected token', 'referenceerror', 'typeerror', 'syntaxerror'], `🧯 Частые ошибки JavaScript\n\n• Cannot read properties of undefined (reading 'x') — вы обращаетесь к полю у undefined/null. Проверьте цепочку: obj?.a?.x, и откуда приходят данные (часто данные ещё не загрузились)\n• X is not a function — опечатка, вызов не того объекта или перезаписанное имя\n• X is not defined — переменная не объявлена или вне области видимости\n• Unexpected token — синтаксис: лишняя/пропущенная скобка, запятая, кавычка\n• Cannot access 'x' before initialization — let/const использована до объявления\n• CORS error — см. «что такое cors»\n• Uncaught (in promise) — забыли catch/try у async-функции\n\nПришлите точный текст ошибки и фрагмент кода — найду причину.`);
+K('pyerr', 'py', ['indentationerror', 'nameerror', 'keyerror', 'indexerror', 'attributeerror', 'modulenotfound', 'importerror', 'valueerror', 'typeerror python'], `🧯 Частые ошибки Python\n\n• IndentationError — неверные отступы, смешаны табы и пробелы\n• NameError — переменная/функция не определена (опечатка или не импортирована)\n• KeyError — нет такого ключа в словаре → используйте d.get(key)\n• IndexError: list index out of range — индекс больше длины-1\n• AttributeError — у объекта нет такого атрибута/метода (часто он None)\n• ModuleNotFoundError — pip install <пакет> в нужном окружении\n• TypeError — неподходящий тип, например "5" + 3 (нужно int("5") + 3)\n• ValueError — тип верный, а значение нет: int("abc")`);
+
+// ---- Другие языки (обзор)
+K('cpp-info', 'cpp', ['cpp', 'указатель', 'pointer', 'stl', 'vector', 'ссылка c++', 'new delete', 'умный указатель', 'шаблоны c++'], `⚙️ C++ — основы\n\n${code('cpp', `#include <iostream>\n#include <vector>\n#include <string>\n#include <memory>\nusing namespace std;\n\nint main() {\n    vector<int> v = {3, 1, 2};\n    v.push_back(4);\n    for (int x : v) cout << x << " ";\n\n    int a = 5;\n    int* p = &a;      // указатель\n    int& r = a;       // ссылка\n    *p = 10;          // a == 10\n\n    auto s = make_unique<string>("умный указатель"); // сам освободит память\n    cout << *s << endl;\n}`)}\n\nПравила: избегайте голых new/delete (используйте unique_ptr/vector), передавайте большие объекты по const&.`);
+K('java-info', 'java', ['java', 'джава', 'jvm', 'spring', 'arraylist', 'hashmap java', 'stringbuilder'], `☕ Java — основы\n\n${code('java', `import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<String> names = new ArrayList<>();\n        names.add("Аня"); names.add("Борис");\n        for (String n : names) System.out.println(n);\n\n        Map<String, Integer> ages = new HashMap<>();\n        ages.put("Аня", 25);\n        System.out.println(ages.getOrDefault("Боря", 0));\n\n        names.stream().filter(n -> n.startsWith("А")).forEach(System.out::println);\n    }\n}`)}\n\nСтроки сравнивайте через equals(), а не ==.`);
+K('go-info', 'go', ['golang', 'горутин', 'goroutine', 'канал go', 'channel'], `🐹 Go — основы\n\n${code('go', `package main\n\nimport (\n    "fmt"\n    "sync"\n)\n\nfunc main() {\n    var wg sync.WaitGroup\n    ch := make(chan int, 3)\n\n    for i := 0; i < 3; i++ {\n        wg.Add(1)\n        go func(n int) {          // горутина\n            defer wg.Done()\n            ch <- n * n\n        }(i)\n    }\n    wg.Wait()\n    close(ch)\n    for v := range ch {\n        fmt.Println(v)\n    }\n}`)}\n\nОшибки в Go возвращаются значением: if err != nil { return err }.`);
+K('rust-info', 'rust', ['rust', 'раст', 'borrow checker', 'владение', 'ownership', 'заимствован', 'cargo'], `🦀 Rust — основы\n\n${code('rust', `fn main() {\n    let s = String::from("привет");   // s владеет строкой\n    let t = s;                        // владение перешло к t, s больше недоступна\n    println!("{}", t);\n\n    let n = String::from("x");\n    show(&n);                         // заимствование (ссылка), n остаётся нашей\n    println!("{}", n);\n}\n\nfn show(s: &String) { println!("{}", s); }`)}\n\nПравила: у значения один владелец; одновременно либо много &T, либо одна &mut T. Менеджер пакетов — cargo (cargo new, cargo run).`);
+K('cs-info', 'cs', ['csharp', 'шарп', 'linq', 'unity', 'dotnet'], `🔷 C# — основы\n\n${code('csharp', `using System;\nusing System.Linq;\nusing System.Collections.Generic;\n\nvar nums = new List<int> { 5, 2, 9, 1 };\nvar evens = nums.Where(n => n % 2 == 0).OrderBy(n => n).ToList();\nConsole.WriteLine(string.Join(", ", evens));\n\nrecord Person(string Name, int Age);\nvar p = new Person("Аня", 25);`)}`);
+K('php-info', 'php', ['php', 'пхп', 'laravel'], `🐘 PHP — основы\n\n${code('php', `<?php\n$name = "Аня";\n$items = ["a", "b"];\n$items[] = "c";\n\nforeach ($items as $i => $item) {\n    echo "$i: $item\\n";\n}\n\nfunction hello(string $n): string { return "Привет, $n"; }\n\n// безопасный запрос к БД (PDO)\n$st = $pdo->prepare("SELECT * FROM users WHERE id = ?");\n$st->execute([$_GET['id']]);\n$user = $st->fetch();`)}`);
+K('mobile', null, ['android', 'ios', 'мобильное приложение', 'flutter', 'react native', 'pwa', 'приложение для телефона'], `📱 Мобильные приложения\n\n• PWA — ваш сайт устанавливается как приложение (manifest.json + service worker). Самый быстрый путь, ваш мессенджер уже так умеет\n• Flutter (Dart) — одна кодовая база для Android и iOS\n• React Native (JS) — для тех, кто знает React\n• Kotlin / Swift — нативно под Android / iOS\n• Capacitor / Cordova — упаковать веб-приложение в APK\n\nНачинающему проще всего: PWA → затем Capacitor для публикации в магазинах.`);
+K('react', 'js', ['react', 'реакт', 'usestate', 'useeffect', 'хуки', 'компонент', 'vue', 'вью', 'svelte'], `⚛️ React — минимальный пример\n\n${code('javascript', `import { useState, useEffect } from 'react';\n\nfunction Counter() {\n  const [n, setN] = useState(0);\n\n  useEffect(() => {\n    document.title = 'Счёт: ' + n;     // побочный эффект\n  }, [n]);                             // выполнять при смене n\n\n  return <button onClick={() => setN(n + 1)}>Нажато {n}</button>;\n}`)}\n\n• Состояние меняйте только через setN, не напрямую\n• key в списках обязателен и должен быть стабильным (id, а не индекс)\n• Хуки вызывайте на верхнем уровне компонента, не в условиях`);
+K('learn', null, ['с чего начать', 'как научиться программировать', 'выучить программирование', 'как стать программистом', 'roadmap', 'роадмап', 'учить программирование', 'начинающ', 'новичк'], `🎓 Как научиться программировать\n\n1. Выберите ОДИН язык: Python (проще всего начать) или JavaScript (сразу видно результат в браузере)\n2. База: переменные → условия → циклы → функции → массивы/словари → файлы\n3. Практика важнее чтения: решайте маленькие задачи каждый день (FizzBuzz, палиндром, сортировка…)\n4. Сделайте проект: калькулятор → список дел → бот → мини-чат\n5. Освойте Git и командную строку\n6. Потом углубляйтесь: алгоритмы, базы данных, веб (HTML/CSS/JS), сети\n7. Читайте чужой код и чужие ошибки — это лучший учитель\n\nГлавное — регулярность: 1 час в день лучше 7 часов раз в неделю. Скажите, какой язык выбираете, — составлю план и дам первые задачи!`);
+K('ideas', null, ['идея проекта', 'идеи проектов', 'идея для проекта', 'идеи для проекта', 'что написать', 'проект для практики', 'что сделать для портфолио', 'пет проект', 'pet project', 'идея', 'идеи', 'проект'], `💡 Идеи проектов\n\n🟢 Лёгкие: калькулятор, список дел, угадай число, конвертер валют, секундомер\n🟡 Средние: чат на WebSocket, погодное приложение (по публичному API), блог с БД, Telegram-бот, парсер новостей\n🔴 Сложные: свой мессенджер, Tetris/змейка на canvas, трекер расходов с графиками, мини-ORM, свой интерпретатор\n\nВыберите один, напишите «напиши угадай число на python» — и начнём.`);
+
+// ───────────────────────────── код от пользователя ─────────────────────────────
+function guessLang(src) {
+    const s = src;
+    if (/^\s*(def |import |from \w+ import|print\(|class \w+\(?.*\)?:|if __name__)/m.test(s) && !/[;{}]\s*$/m.test(s)) return 'py';
+    if (/#include\s*</.test(s)) return 'cpp';
+    if (/public\s+(static\s+)?(class|void)|System\.out\./.test(s)) return 'java';
+    if (/^\s*package main|fmt\.Print|func \w+\(/m.test(s)) return 'go';
+    if (/<\?php/.test(s)) return 'php';
+    if (/\bSELECT\b[\s\S]*\bFROM\b|\bINSERT INTO\b/i.test(s)) return 'sql';
+    if (/<(div|html|body|p|span|a|script)[\s>]/i.test(s)) return 'html';
+    if (/\{[^}]*:[^}]+;[^}]*\}/.test(s) && /[.#]?\w[\w-]*\s*\{/.test(s)) return 'css';
+    if (/\b(const|let|var|function|=>|console\.log|require\()/.test(s)) return 'js';
+    if (/\bdef\b|\belif\b|\bNone\b|\bTrue\b/.test(s)) return 'py';
+    return null;
+}
+
+function analyzeCode(src, hint) {
+    const lang = guessLang(src) || hint || null;
+    const lines = src.split('\n');
+    const notes = [], info = [];
+    const has = re => re.test(src);
+    if (lang) info.push(`Похоже на ${LANGS[lang] ? LANGS[lang].name : lang}, ${lines.length} ${lines.length === 1 ? 'строка' : lines.length < 5 ? 'строки' : 'строк'}.`);
+
+    const fnNames = [...src.matchAll(/(?:function\s+(\w+)|def\s+(\w+)|(?:const|let)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>|func\s+(\w+))/g)].map(m => m[1] || m[2] || m[3] || m[4]);
+    if (fnNames.length) info.push('Функции: ' + [...new Set(fnNames)].join(', ') + '.');
+    const loops = (src.match(/\b(for|while)\b/g) || []).length;
+    if (loops) info.push(`Циклов: ${loops}${loops > 1 && /\bfor\b[\s\S]*\bfor\b/.test(src) ? ' (есть вложенные — возможна сложность O(n²))' : ''}.`);
+
+    if (lang === 'js' || lang === 'ts') {
+        if (has(/\bvar\s/)) notes.push('Замените var на let/const — var имеет функциональную область видимости и «всплывает».');
+        if (has(/[^=!<>]==[^=]/) && !has(/==\s*null/)) notes.push('Используется нестрогое сравнение ==. Лучше ===, чтобы не было неожиданного приведения типов.');
+        if (has(/\.then\(/) && has(/\bawait\b/)) notes.push('Смешаны .then() и await — выберите один стиль, чтобы код читался проще.');
+        if (has(/\basync\b/) && !has(/\btry\b|\.catch\(/)) notes.push('В async-коде нет try/catch (или .catch) — ошибка запроса станет необработанной.');
+        if (has(/\bfetch\(/) && !has(/\.ok\b/)) notes.push('После fetch проверьте res.ok — fetch не бросает ошибку на ответах 404/500.');
+        if (has(/innerHTML\s*=/)) notes.push('⚠️ innerHTML с пользовательскими данными опасен (XSS). Используйте textContent или экранируйте.');
+        if (has(/\beval\(/)) notes.push('⚠️ eval() — серьёзная дыра безопасности и медленно. Почти всегда можно без него.');
+        if (has(/console\.log/)) notes.push('Не забудьте убрать отладочные console.log перед релизом.');
+        if (has(/\bfor\s*\(\s*(?:var|let)\s+\w+\s*=\s*0\s*;\s*\w+\s*<=\s*\w+\.length/)) notes.push('Условие i <= arr.length выходит за границу массива (последний индекс length - 1). Нужно <.');
+        if (has(/\bawait\b/) && !has(/\basync\b/) && !has(/^\s*import /m)) notes.push('await используется вне async-функции — это синтаксическая ошибка (кроме верхнего уровня ES-модуля).');
+        if (has(/\.forEach\([^)]*async/)) notes.push('async внутри forEach не ждётся. Используйте for…of с await или Promise.all(arr.map(...)).');
+    } else if (lang === 'py') {
+        if (has(/except\s*:/)) notes.push('Голый except: ловит вообще всё (даже Ctrl+C). Указывайте тип: except ValueError:.');
+        if (has(/def\s+\w+\([^)]*=\s*(\[\]|\{\})/)) notes.push('⚠️ Изменяемое значение по умолчанию (=[] / ={}) разделяется между вызовами. Используйте None и создавайте внутри функции.');
+        if (has(/==\s*None|!=\s*None/)) notes.push('Сравнивайте с None через is / is not.');
+        if (has(/range\(len\(/)) notes.push('range(len(x)) обычно заменяется на for item in x или enumerate(x).');
+        if (has(/\bopen\(/) && !has(/\bwith\b/)) notes.push('Файл открыт без with — легко забыть закрыть. Используйте with open(...) as f:.');
+        if (has(/\binput\(/) && has(/[+\-*/]\s*input\(|input\([^)]*\)\s*[+\-*/]/) && !has(/int\(|float\(/)) notes.push('input() возвращает строку — для вычислений оберните в int() или float().');
+        if (has(/\bprint\s+["']/)) notes.push('В Python 3 print — функция: print("текст").');
+        if (has(/\beval\(|\bexec\(/)) notes.push('⚠️ eval/exec на пользовательском вводе — уязвимость.');
+    } else if (lang === 'sql') {
+        if (/\b(UPDATE|DELETE)\b/i.test(src) && !/\bWHERE\b/i.test(src)) notes.push('⚠️ UPDATE/DELETE без WHERE изменит или удалит ВСЕ строки.');
+        if (/SELECT\s+\*/i.test(src)) notes.push('SELECT * тянет лишние колонки — перечислите нужные.');
+        if (/['"]\s*\+\s*\w+|\$\{/.test(src)) notes.push('⚠️ Похоже на склейку строк в запросе — риск SQL-инъекции, используйте параметры.');
+    } else if (lang === 'cpp' || lang === 'c') {
+        if (has(/\bnew\b/) && !has(/\bdelete\b/) && !has(/unique_ptr|shared_ptr/)) notes.push('new без delete — утечка памяти. Используйте std::unique_ptr / контейнеры.');
+        if (has(/using namespace std/)) notes.push('using namespace std в больших проектах загрязняет пространство имён — лучше std::.');
+        if (has(/\bgets\(/)) notes.push('⚠️ gets() небезопасна и удалена из стандарта — используйте fgets / std::getline.');
+    } else if (lang === 'java') {
+        if (has(/\w+\s*==\s*"/)) notes.push('Строки в Java сравнивают через equals(), а не ==.');
+    }
+    const cx = complexityNote(src); if (cx) info.push(cx);
+    // общее
+    const balanced = ['()', '[]', '{}'].every(([o, c]) => (src.split(o).length - 1) === (src.split(c).length - 1));
+    if (!balanced) notes.push('⚠️ Количество открывающих и закрывающих скобок не совпадает — проверьте синтаксис.');
+    if (/\b(password|passwd|api[_-]?key|secret|token)\s*[:=]\s*['"][^'"]{4,}['"]/i.test(src)) notes.push('⚠️ В коде зашит пароль/ключ. Вынесите в переменные окружения и не коммитьте в git.');
+    if (lines.some(l => l.length > 140)) notes.push('Есть очень длинные строки — разбейте для читаемости.');
+
+    let out = '🔎 Разбор вашего кода\n\n' + (info.join('\n') || 'Код получил.') + '\n\n';
+    out += notes.length ? 'Что можно улучшить:\n' + notes.map(n => '• ' + n).join('\n') : '✅ Явных проблем не вижу. Стиль и логика выглядят нормально.';
+    out += '\n\nЕсли код ведёт себя не так, как ожидается, напишите, что должно происходить и что происходит на самом деле (и текст ошибки) — разберу точнее.';
+    return out;
+}
+
+// ───────────────────────────── small talk ─────────────────────────────
+const JOKES = [
+    'Почему программисты путают Хэллоуин и Рождество? Потому что Oct 31 == Dec 25 🎃',
+    'Заходит программист в бар. Бармен: «Что будете?» — «Один пи… ой, ошибка 404: пиво не найдено».',
+    'Жена — программисту: «Сходи в магазин, купи батон. Если будут яйца — возьми десяток». Вернулся с десятью батонами: «Яйца были».',
+    '— Сколько программистов нужно, чтобы поменять лампочку? — Ни одного, это аппаратная проблема 💡',
+    'Есть всего 10 типов людей: те, кто понимает двоичную систему, и те, кто нет.',
+    'У программиста спрашивают: «Почему ты всегда мокрый?» — «Я сижу на Java, постоянно в C(h)ай».',
+    'Баг — это не баг, а недокументированная фича 🐛',
+    'Работает? Не трогай. Не работает? Тоже не трогай — завтра заработает само (нет).',
+    'Два байта встретились. Один говорит: «Ты не заболел?» — «Нет, просто бит ушёл».',
+    'Оптимист: стакан наполовину полон. Пессимист: наполовину пуст. Программист: стакан в два раза больше, чем нужно.',
+];
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+const HELP = `🤖 Я Ai_bot — ваш помощник по программированию. Работаю без внешних API и интернета.
+
+Что я умею:
+💬 Отвечать на вопросы: «что такое замыкание», «как работает async await», «разница между let и const»
+🧑‍💻 Писать код: «напиши факториал на python», «сделай сервер на express», «как отцентровать div»
+🔎 Разбирать ваш код: пришлите фрагмент (лучше в блоке ${F}…${F}) — найду ошибки и дам советы
+🧮 Считать: «2+2*3», «корень из 144», «15% от 200»
+🌐 Языки: JavaScript, TypeScript, Python, HTML/CSS, SQL, C/C++, Java, C#, Go, Rust, PHP, Bash
+📚 Темы: алгоритмы, структуры данных, ООП, Git, Docker, REST, безопасность, оптимизация, отладка
+😄 Шутить: «расскажи анекдот»
+
+Я помню контекст: после «напиши сортировку на js» можно спросить «а на python?».
+🧰 Инструменты: проверка JSON, «255 в двоичную», «sha256 от текст», «закодируй base64 текст», «что значит 502», «сгенерируй пароль 20», «uuid», «#ff8800 в rgb», «cron 0 9 * * 1-5», «проверь /\\d+/ на «a12b3»»
+Команды: /help — это меню, /topics — темы, /clear — забыть контекст.`;
+
+const TOPICS = `📚 О чём можно спросить:\n\nJavaScript: переменные, ==/===, замыкания, async/await, event loop, массивы, объекты, this, DOM, JSON, модули, классы, ошибки, WebSocket, Node.js\nPython: основы, списки, словари, функции и декораторы, генераторы, исключения, pip/venv, asyncio, ООП\nWeb: HTML, Flexbox, Grid, селекторы, position, адаптив, анимации, тёмная тема, CORS, REST\nБазы: SQL, JOIN, индексы, транзакции, инъекции\nИнструменты: Git, терминал, Docker\nТеория: Big O, рекурсия, структуры данных, ООП/SOLID, паттерны\nПрактика: безопасность, оптимизация, отладка, частые ошибки, идеи проектов, как учиться\nЗадачи с кодом: факториал, Фибоначчи, простые числа, палиндром, сортировки, бинарный поиск, FizzBuzz, HTTP-запросы, файлы, классы, список дел…`;
+
+function smallTalk(n, toks, st, name) {
+    const has = (...w) => w.some(x => toks.some(t => t === x || (x.length > 4 && t.startsWith(x))));
+    const first = name ? String(name).split(/\s+/)[0] : '';
+    if (/как (у тебя )?дела|как ты\b|как жизнь|как настроение/.test(n) && toks.length <= 6) return pick(['Отлично, работаю без перебоев, баги не кусаются 😄 А у вас как? Над чем сидите?', 'Всё в порядке: процессор не греется, память не течёт 😎 Чем займёмся — кодом?', 'Прекрасно! Только что скомпилировал мысли без единой ошибки. Что будем писать?']);
+    if (/^((привет|здравствуй|здарова|хеллоу|добрый|доброе|салют|hello)|(ку|хай|hi|hey|yo|йо)(?![а-яa-z]))/.test(n) && toks.length <= 4) {
+        const hr = new Date().getHours();
+        const g = hr < 6 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер';
+        return `${g}${first ? ', ' + first : ''}! 👋 Я Ai_bot. Спрашивайте про программирование, присылайте код на проверку или просите написать что-нибудь. Что делаем?\n\n(список возможностей — /help)`;
+    }
+    if (/как (у тебя )?дела|как ты|как жизнь|как настроение|что нового|как сам/.test(n)) return pick(['Отлично, работаю без перебоев, баги не кусаются 😄 А у вас как? Над чем сидите?', 'Всё в порядке: процессор не греется, память не течёт 😎 Чем займёмся — кодом?', 'Прекрасно! Только что компилировал мысли без единой ошибки. Что будем писать?']);
+    if (/кто ты|ты кто|как тебя зовут|твое имя|твоё имя|что ты такое|представься/.test(n)) return '🤖 Я Ai_bot — встроенный помощник этого мессенджера. Знаю программирование, пишу и разбираю код, считаю и отвечаю на вопросы. Всё работает прямо на сервере мессенджера, без внешних API и подписок.';
+    if (/что ты (умеешь|можешь)|твои возможности|чем (ты )?можешь|^помощь$|^help$|^команды$|^меню$|что умеешь/.test(n)) return HELP;
+    if (/кто (тебя )?(создал|сделал|написал|разработал)|твой (создатель|автор)/.test(n)) return 'Меня встроили в этот мессенджер его разработчики 🛠 Я написан на JavaScript и живу на сервере вместе с чатом — без внешних нейросетей.';
+    if (/спасибо|благодарю|thanks|thx|сенкс|пасиб|мерси/.test(n)) return pick(['Всегда рад помочь! 🙌 Если будут вопросы — пишите.', 'Пожалуйста! Обращайтесь 😊', 'Не за что! Удачи с кодом 🚀']);
+    if (/^(пока(?![а-я])|до свидан|бывай|удачи|до встречи|bye|good ?bye|споки|спокойной ночи)/.test(n)) return pick(['Пока! Удачного кода 👋', 'До встречи! Пусть тесты всегда будут зелёными ✅', 'Бывайте! Если что — я тут 🤖']);
+    if (/анекдот|шутк|шути|рассмеши|смешное|прикол|юмор|joke/.test(n)) return '😄 ' + pick(JOKES);
+    if (/(сколько )?(сейчас )?врем[яе]|который час|сколько времени/.test(n) && has('врем', 'час')) { const d = new Date(); return `🕒 На сервере сейчас ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Vladivostok' })} (Владивосток). У меня нет доступа к вашим часам, поэтому смотрите время на устройстве.`; }
+    if (/какое (сегодня )?число|какая (сегодня )?дата|какой (сегодня )?день|сегодняшн.. дата/.test(n)) return '📅 Сегодня ' + new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Vladivostok' }) + '.';
+    if (/ты (умный|тупой|глупый|классный|крутой|молодец)|молодец|умница|красавчик|круто/.test(n)) return pick(['Спасибо! Стараюсь 😊 Давайте проверим на практике — задайте вопрос по коду.', 'Приятно слышать! Но проверьте меня сложной задачей 😉']);
+    if (/ты (живой|человек|настоящий|бот|робот|ии|нейросеть)|ты нейросет|ты chatgpt|ты gpt/.test(n)) return 'Я программа, а не человек и не большая нейросеть: работаю по набору правил и базе знаний по программированию, поэтому быстрый, бесплатный и без внешних API. Могу ошибаться или чего-то не знать — тогда так и скажу.';
+    if (/^(да|ага|угу|ок|окей|ok|okay|хорошо|ладно|понятно|ясно|понял|поняла)\W*$/.test(n)) return pick(['Отлично! Что дальше? 🙂', 'Хорошо. Есть ещё вопросы по коду?', 'Принято 👍 Пишите, если что-то понадобится.']);
+    if (/^(нет|неа|не надо|не нужно)\W*$/.test(n)) return 'Хорошо, не буду. Если что — просто напишите вопрос 🙂';
+    if (/\b(люблю тебя|ты мне нравишься)\b/.test(n)) return 'Я всего лишь бот, но мне приятно 😄 Давайте лучше напишем что-нибудь полезное!';
+    return null;
+}
+
+// ───────────────────────────── контекст диалогов ─────────────────────────────
+const sessions = new Map();     // uid -> { lang, task, topic, last, unknown }
+const sess = uid => {
+    let s = sessions.get(uid);
+    if (!s) { s = { lang: null, task: null, topic: null, last: Date.now(), unknown: 0 }; sessions.set(uid, s); }
+    s.last = Date.now();
+    return s;
+};
+setInterval(() => { const now = Date.now(); for (const [k, v] of sessions) if (now - v.last > 6 * 3600e3) sessions.delete(k); }, 30 * 60e3).unref?.();
+
+// ───────────────────────────── главный разбор ─────────────────────────────
+function scoreKB(toks, raw, lang, ctxLang) {
+    const n = norm(raw);
+    const scored = [];
+    for (const e of KB) {
+        let s = 0, matched = 0;
+        for (const k of e.kws) {
+            if (k.includes(' ') || /[^a-zа-я0-9_]/.test(k)) { if (n.includes(k)) { s += 3; matched++; } }
+            else if (toks.some(t => kwMatch(k, t))) { s += k.length >= 6 ? 2 : k.length >= 4 ? 1.5 : 2; matched++; }
+        }
+        if (!matched) continue;
+        s *= e.weight;
+        if (e.lang) {
+            if (lang === e.lang) s += 2.5;
+            else if (lang && lang !== e.lang) s -= 1.5;
+            else if (ctxLang === e.lang) s += 0.6;
+        }
+        scored.push([e, s]);
+    }
+    scored.sort((a, b) => b[1] - a[1]);
+    return scored;
+}
+
+function extractCode(text) {
+    const m = text.match(/```(\w*)\n?([\s\S]*?)```/);
+    if (m) return { lang: m[1] || null, src: m[2].trim() };
+    // «сырой» код без ограждений
+    const lines = text.split('\n');
+    const codey = /[{};]|=>|\bdef\b|\bfunction\b|\bconsole\.|\bprint\(|#include|\bimport\b|\bSELECT\b|:\s*$/m;
+    const score = lines.filter(l => /[{};=()<>]/.test(l) && /\w/.test(l)).length;
+    if (lines.length >= 3 && score >= 3 && codey.test(text)) return { lang: null, src: text.trim() };
+    const kwLines = lines.filter(l => /^\s*(def|class|for|while|if|elif|else|try|except|finally|return|import|from|function|const|let|var|select|insert|update|delete|public|private|static|#include|package|func)(?=[\s(:{]|$)/i.test(l)).length;
+    if (lines.length >= 3 && kwLines >= 2 && lines.some(l => /^\s{2,}\S/.test(l) || /[{};=()]/.test(l))) return { lang: null, src: text.trim() };
+    if (lines.length <= 2 && /^\s*(const|let|var|def|function|print|console\.|for\s*\(|if\s*\(|while\s*\(|import |from \w+ import|select |insert |update |delete |class )/i.test(text) && /[(){}=;:*]/.test(text)) return { lang: null, src: text.trim() };
+    return null;
+}
+
+
+// ───────────────────────────── инструменты (считают по-настоящему) ─────────────────────────────
+const nodeCrypto = require('crypto');
+
+const HTTP_CODES = {
+    100: 'Continue — продолжайте отправку', 101: 'Switching Protocols — смена протокола (например, на WebSocket)', 200: 'OK — всё хорошо', 201: 'Created — ресурс создан', 202: 'Accepted — принято, обработка позже', 204: 'No Content — успех, тела ответа нет',
+    301: 'Moved Permanently — страница переехала навсегда', 302: 'Found — временный редирект', 304: 'Not Modified — берите из кэша', 307: 'Temporary Redirect', 308: 'Permanent Redirect',
+    400: 'Bad Request — сервер не понял запрос (кривой JSON, не те поля)', 401: 'Unauthorized — нужна авторизация (нет/неверный токен)', 403: 'Forbidden — вы вошли, но прав нет', 404: 'Not Found — такого адреса/ресурса нет', 405: 'Method Not Allowed — этот метод (GET/POST…) для адреса не разрешён',
+    408: 'Request Timeout — клиент слишком долго слал запрос', 409: 'Conflict — конфликт состояния (например, дубликат)', 413: 'Payload Too Large — тело запроса слишком большое', 415: 'Unsupported Media Type — не тот Content-Type', 418: "I'm a teapot — шуточный код 🫖", 422: 'Unprocessable Entity — данные синтаксически верны, но не проходят валидацию', 429: 'Too Many Requests — превышен лимит запросов',
+    500: 'Internal Server Error — необработанная ошибка в коде сервера (смотрите логи сервера)', 501: 'Not Implemented — не реализовано', 502: 'Bad Gateway — прокси/шлюз получил плохой ответ от сервера за ним (часто сервер упал или не запущен)', 503: 'Service Unavailable — сервис перегружен или на обслуживании', 504: 'Gateway Timeout — шлюз не дождался ответа от сервера',
+};
+
+// «запусти код»: чужой код на сервере НЕ выполняем (это небезопасно) — вместо этого делаем разбор
+function toolRunCode(raw, n) {
+    if (!/(запусти|выполни|исполни|прогони|run |что выведет|что выдаст|что напечатает|результат кода)/.test(n)) return null;
+    const ec = extractCode(raw);
+    if (!ec) return null;
+    return '⚠️ Выполнять присланный код на сервере мессенджера я не буду — это небезопасно для всех пользователей. Запустить можно у себя: Node.js — ' + '`node файл.js`' + ', Python — ' + '`python файл.py`' + ', либо в консоли браузера (F12).\n\nЗато разберу код «в уме»:\n\n' + analyzeCode(ec.src, ec.lang && LANGS[ec.lang] ? ec.lang : null);
+}
+
+function toolConvertBase(n) {
+    const m = n.match(/(?:переведи|перевести|конвертируй|преобразуй|convert)?\s*(0b[01]+|0x[0-9a-f]+|0o[0-7]+|-?\d+|[0-9a-f]+(?=\s*из\s*шестнадцатеричн))\s*(?:из\s*(двоичн|десятичн|шестнадцатеричн|восьмеричн)[а-яё]*\s*)?(?:в|to|->|→)\s*(двоичн|десятичн|шестнадцатеричн|hex|binary|decimal|восьмеричн|octal|bin|dec|oct)[а-яё]*/);
+    if (!m) return null;
+    const src = m[1]; let val; const fromWord = m[2];
+    if (/^0b/.test(src)) val = parseInt(src.slice(2), 2); else if (/^0x/.test(src)) val = parseInt(src.slice(2), 16); else if (/^0o/.test(src)) val = parseInt(src.slice(2), 8);
+    else if (fromWord) val = parseInt(src, fromWord.startsWith('двоич') ? 2 : fromWord.startsWith('шест') ? 16 : fromWord.startsWith('восьм') ? 8 : 10);
+    else val = parseInt(src, 10);
+    if (!Number.isFinite(val)) return null;
+    const t = m[3];
+    const base = /двоич|bin/.test(t) ? 2 : /шест|hex/.test(t) ? 16 : /восьм|oct/.test(t) ? 8 : 10;
+    const names = { 2: 'двоичной', 8: 'восьмеричной', 10: 'десятичной', 16: 'шестнадцатеричной' };
+    const pre = { 2: '0b', 8: '0o', 10: '', 16: '0x' };
+    return `🔢 ${src} в ${names[base]} системе = ${pre[base]}${val.toString(base).toUpperCase()}\n\nВсе представления: dec ${val} · bin 0b${val.toString(2)} · oct 0o${val.toString(8)} · hex 0x${val.toString(16).toUpperCase()}`;
+}
+
+function toolsSimple(raw, n) {
+    let m;
+    if ((m = n.match(/(?:ошибк[а-яё]*|статус[а-яё]*|код[а-яё]*|http|значит|что за|такое|status)\s*(?:ответа\s*)?(\d{3})\b/)) || (m = n.match(/^(\d{3})\s*(?:ошибк[а-яё]*|статус[а-яё]*|http)?\s*\??$/))) {
+        const c = +m[1];
+        if (HTTP_CODES[c]) return `🌍 HTTP ${c} — ${HTTP_CODES[c]}`;
+        if (c >= 100 && c < 600) return `🌍 HTTP ${c}: ${c < 200 ? 'информационный' : c < 300 ? 'успешный' : c < 400 ? 'перенаправление' : c < 500 ? 'ошибка клиента' : 'ошибка сервера'} класс. Точного описания для этого кода у меня нет.`;
+    }
+    if ((m = raw.match(/(?:декодируй|раскодируй|расшифруй|decode)[^\n]*?base64[:\s]+([A-Za-z0-9+/=_-]{4,})/i)) || (m = raw.match(/base64[^\n]*?(?:decode|декодир[а-яё]*|раскодир[а-яё]*)[:\s]+([A-Za-z0-9+/=_-]{4,})/i)))
+        return '🔓 Расшифровано:\n' + code('text', Buffer.from(m[1], 'base64').toString('utf8'));
+    if ((m = raw.match(/(?:закодируй|кодируй|зашифруй|encode)[^\n]*?base64[:\s]+([\s\S]+)/i)) || (m = raw.match(/base64[^\n]*?(?:encode|закодир[а-яё]*|кодир[а-яё]*)[:\s]+([\s\S]+)/i)))
+        return '🔐 Base64:\n' + code('text', Buffer.from(m[1].trim(), 'utf8').toString('base64')) + '\nBase64 — не шифрование, а просто запись байтов буквами.';
+    if ((m = raw.match(/\b(md5|sha1|sha-1|sha256|sha-256|sha512|sha-512)\b[^\n]*?(?:от|для|of|:)\s+([\s\S]+)/i))) {
+        const alg = m[1].toLowerCase().replace('-', '');
+        return `#️⃣ ${alg.toUpperCase()}:\n` + code('text', nodeCrypto.createHash(alg).update(m[2].trim()).digest('hex')) + (alg === 'md5' || alg === 'sha1' ? '\n⚠️ MD5 и SHA-1 считаются устаревшими; для паролей нужны bcrypt/argon2.' : '');
+    }
+    if (/(сгенерируй|сделай|создай|дай|generate|нужен)\s+(новый\s+)?uuid|^uuid$/.test(n)) return '🆔 UUID v4:\n' + code('text', nodeCrypto.randomUUID());
+    if ((m = n.match(/(?:сгенерируй|сделай|создай|придумай|дай|generate|нужен)\s+(?:мне\s+)?(?:надёжный\s+|надежный\s+|сложный\s+|случайный\s+|новый\s+)*парол[а-яё]*(?:\s+(?:из|на|длиной)?\s*(\d{1,3}))?/))) {
+        const len = Math.min(64, Math.max(6, +m[1] || 16)), cs = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*-_?';
+        let pw = ''; for (let i = 0; i < len; i++) pw += cs[nodeCrypto.randomInt(cs.length)];
+        return `🔑 Пароль (${len} симв.):\n` + code('text', pw) + '\nСгенерирован на сервере и нигде не сохраняется. Для хранения используйте менеджер паролей.';
+    }
+    if ((m = n.match(/(?:timestamp|таймстамп|unix|юникс|эпох[а-яё]*|дата по)\D{0,15}(\d{9,13})\b/)) || (m = n.match(/^(\d{10}|\d{13})$/))) {
+        let v = +m[1]; if (String(m[1]).length <= 10) v *= 1000; const d = new Date(v);
+        return `🕒 ${m[1]} → ${d.toISOString()}\nПо Владивостоку: ${d.toLocaleString('ru-RU', { timeZone: 'Asia/Vladivostok' })}\nПо Москве: ${d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`;
+    }
+    if (/(текущий|сейчас|сегодняшний)\s+(timestamp|unix)|timestamp сейчас|unix time/.test(n)) return `🕒 Сейчас: ${Math.floor(Date.now() / 1000)} (секунды) / ${Date.now()} (миллисекунды)`;
+    if ((m = n.match(/#([0-9a-f]{6}|[0-9a-f]{3})(?![0-9a-f])/)) && /(rgb|ргб|цвет|hsl|перевед|конверт)/.test(n)) {
+        let h = m[1]; if (h.length === 3) h = [...h].map(c => c + c).join('');
+        const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+        const R = r / 255, G = g / 255, B = b / 255, mx = Math.max(R, G, B), mn = Math.min(R, G, B), l = (mx + mn) / 2; let H = 0, S = 0;
+        if (mx !== mn) { const d = mx - mn; S = l > .5 ? d / (2 - mx - mn) : d / (mx + mn); H = mx === R ? (G - B) / d + (G < B ? 6 : 0) : mx === G ? (B - R) / d + 2 : (R - G) / d + 4; H *= 60; }
+        return `🎨 #${h.toUpperCase()}\nrgb(${r}, ${g}, ${b})\nhsl(${Math.round(H)}, ${Math.round(S * 100)}%, ${Math.round(l * 100)}%)`;
+    }
+    if ((m = n.match(/rgb\(?\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*\)?/)) && /(hex|хекс|в #|цвет)/.test(n)) {
+        const h = [m[1], m[2], m[3]].map(x => Math.min(255, +x).toString(16).padStart(2, '0')).join('');
+        return `🎨 rgb(${m[1]}, ${m[2]}, ${m[3]}) = #${h.toUpperCase()}`;
+    }
+    if ((m = n.match(/(?:cron|крон)\s+((?:[\d*\/,\-]+\s+){4}[\d*\/,\-a-z]+)/))) {
+        const [mi, ho, dom, mo, dow] = m[1].trim().split(/\s+/);
+        const days = { 0: 'вс', 1: 'пн', 2: 'вт', 3: 'ср', 4: 'чт', 5: 'пт', 6: 'сб', 7: 'вс' };
+        let t;
+        if (mi.startsWith('*/') && ho === '*') t = `каждые ${mi.slice(2)} мин.`;
+        else if (/^\d+$/.test(mi) && /^\d+$/.test(ho)) t = `в ${ho.padStart(2, '0')}:${mi.padStart(2, '0')}`;
+        else t = `минуты: ${mi}, часы: ${ho}`;
+        let d = dow === '*' ? 'каждый день' : dow === '1-5' ? 'по будням' : dow === '0,6' || dow === '6,0' ? 'по выходным' : 'в дни: ' + dow.split(',').map(x => x.includes('-') ? x.split('-').map(y => days[y] || y).join('–') : days[x] || x).join(', ');
+        if (dom !== '*') d += `, числа месяца: ${dom}`; if (mo !== '*') d += `, месяцы: ${mo}`;
+        return `⏰ cron «${m[1].trim()}»: ${t}, ${d}.`;
+    }
+    if ((m = raw.match(/(?:url[\s-]*encode|закодируй url|urlencode)[:\s]+([\s\S]+)/i))) return '🔗 ' + encodeURIComponent(m[1].trim());
+    if ((m = raw.match(/сколько\s+(?:символов|букв)\s+в\s+(?:слове|тексте|строке)?\s*[«"'](.+)[»"']/i))) return `🔤 В «${m[1]}» ${[...m[1]].length} символов (с пробелами), без пробелов ${[...m[1].replace(/\s/g, '')].length}; слов: ${(m[1].match(/\S+/g) || []).length}.`;
+    return null;
+}
+
+function toolJson(raw) {
+    const t = raw.trim().replace(/^```(?:json)?\n?|```$/g, '').trim();
+    if (!/^[\[{]/.test(t)) return null;
+    try {
+        const v = JSON.parse(t);
+        const pretty = JSON.stringify(v, null, 2);
+        const kind = Array.isArray(v) ? `массив из ${v.length} элементов` : `объект с ${Object.keys(v).length} ключами`;
+        return `✅ Валидный JSON (${kind}). Отформатированный вид:\n\n` + code('json', pretty.length > 3000 ? pretty.slice(0, 3000) + '\n…' : pretty);
+    } catch (e) {
+        if (!/"\s*:|'\s*:|\w\s*:/.test(t)) return null;
+        const pos = (e.message.match(/position (\d+)/) || [])[1];
+        let where = '';
+        if (pos !== undefined) { const p = +pos, before = t.slice(0, p), line = before.split('\n').length, col = p - before.lastIndexOf('\n'); where = `\nМесто ошибки: строка ${line}, столбец ${col}, около: «${t.slice(Math.max(0, p - 15), p + 15).replace(/\n/g, ' ')}»`; }
+        const tips = [];
+        if (/'[^']*'\s*:/.test(t)) tips.push('одинарные кавычки — в JSON нужны только двойные');
+        if (/,\s*[}\]]/.test(t)) tips.push('лишняя запятая перед закрывающей скобкой');
+        if (/[{,]\s*[a-zA-Z_]\w*\s*:/.test(t)) tips.push('ключи без кавычек — ключи должны быть в двойных кавычках');
+        if (/\/\/|\/\*/.test(t)) tips.push('комментарии в JSON запрещены');
+        if (/\bundefined\b|\bNaN\b/.test(t)) tips.push('undefined и NaN недопустимы');
+        return `❌ Невалидный JSON: ${e.message.split('\n')[0]}${where}` + (tips.length ? '\n\nВероятные причины:\n' + tips.map(x => '• ' + x).join('\n') : '');
+    }
+}
+
+function toolRegex(raw) {
+    const m = raw.match(/(?:провер[а-яё]*|протестир[а-яё]*|тест[а-яё]*|подойд[а-яё]*|совпад[а-яё]*|найд[а-яё]*)[^\n/]*\/((?:\\\/|[^\/\n])+)\/([gimsuy]*)[^\n]*?(?:на|в|для|с|по)\s+(?:тексте\s+|строке\s+|строку\s+)?(?:[«"'`]([\s\S]+?)[»"'`]|(\S[\s\S]*))\s*$/i);
+    if (!m) return null;
+    const text = (m[3] !== undefined ? m[3] : m[4] || '');
+    if (m[1].length > 200 || text.length > 2000) return 'Слишком длинное выражение или текст для проверки.';
+    // защита от катастрофического бэктрекинга: вложенные квантификаторы вида (a+)+ не запускаем
+    if (/\([^)]*[+*][^)]*\)[+*{]/.test(m[1])) return '⚠️ Такое выражение с вложенными квантификаторами, например (a+)+, может «зависнуть» (катастрофический бэктрекинг), поэтому я его не запускаю. Упростите шаблон.';
+    try {
+        const re = new RegExp(m[1], m[2].includes('g') ? m[2] : m[2] + 'g');
+        const res = [...text.matchAll(re)].slice(0, 15);
+        if (!res.length) return `🔎 /${m[1]}/${m[2]} — совпадений в «${text}» нет.`;
+        return `🔎 /${m[1]}/${m[2]} — найдено совпадений: ${res.length}\n` + res.map((x, i) => `${i + 1}) «${x[0]}» (позиция ${x.index})${x.length > 1 ? ', группы: ' + x.slice(1).map(g => g === undefined ? '—' : '«' + g + '»').join(', ') : ''}`).join('\n');
+    } catch (e) { return '❌ Ошибка в регулярном выражении: ' + e.message; }
+}
+
+function complexityNote(src) {
+    const loops = [...src.matchAll(/\b(for|while)\b|\.(forEach|map|filter|reduce|some|every|find|indexOf|includes)\(/g)].length;
+    let depth = 0, max = 0;
+    for (const line of src.split('\n')) {
+        if (/\b(for|while)\b[^\n]*[{:]\s*$/.test(line)) { depth++; max = Math.max(max, depth); }
+        if (/^\s*}\s*$/.test(line)) depth = Math.max(0, depth - 1);
+    }
+    const rec = /function\s+(\w+)[\s\S]*\b\1\s*\(/.test(src) || /def\s+(\w+)[\s\S]*\b\1\s*\(/.test(src);
+    if (max >= 3) return 'Оценка сложности: вложенность циклов ≥ 3 → примерно O(n³), на больших данных будет очень медленно.';
+    if (max === 2) return 'Оценка сложности: вложенные циклы → примерно O(n²). Если данных много, поищите решение через Map/Set или сортировку (O(n log n)).';
+    if (rec) return 'Есть рекурсия: убедитесь в базовом случае; если вызов повторяется для одних и тех же значений — добавьте мемоизацию.';
+    if (loops) return 'Оценка сложности: линейная, примерно O(n).';
+    return '';
+}
+
+function runTools(raw, n, s) {
+    return toolRunCode(raw, n) || toolJson(raw) || toolRegex(raw) || toolConvertBase(n) || toolsSimple(raw, n);
+}
+
+const MATH_ONLY = /^[\s\d+\-*/%^().,×÷=a-z]*$/i;
+
+function reply(uid, text, name) {
+    const raw = String(text || '').trim();
+    const s = sess(uid);
+    if (!raw) return 'Напишите вопрос или пришлите код — отвечу 🙂';
+    const n = norm(raw);
+
+    // команды
+    const cmd = n.match(/^\/(\w+)/);
+    if (cmd) {
+        switch (cmd[1]) {
+            case 'start': return smallTalkStart(name);
+            case 'help': return HELP;
+            case 'topics': case 'themes': return TOPICS;
+            case 'clear': case 'reset': sessions.delete(uid); return '🧹 Контекст очищен. Начнём с чистого листа!';
+            case 'joke': return '😄 ' + pick(JOKES);
+            default: return 'Не знаю такую команду. Доступны: /help, /topics, /joke, /clear';
+        }
+    }
+
+    // 0. инструменты: JSON, regex, конвертеры, base64, хэши, коды HTTP…
+    const tool = runTools(raw, n, s);
+    if (tool) return tool;
+
+    // 1. присланный код → разбор (если нет явной просьбы написать новый)
+    const ec = extractCode(raw);
+    if (ec && ec.src.length > 6) {
+        const out = analyzeCode(ec.src, ec.lang && LANGS[ec.lang] ? ec.lang : s.lang);
+        const g = guessLang(ec.src); if (g) s.lang = g;
+        return out;
+    }
+
+    const toks = tokens(raw);
+    const lang = detectLang(toks, raw);
+    if (lang) s.lang = lang;
+
+    // 2. калькулятор
+    const mathLike = /^(посчитай|вычисли|сколько будет|сколько|калькулятор|calc|реши|=)\s*/.test(n);
+    const expr = n.replace(/^(посчитай|вычисли|сколько будет|сколько|калькулятор|calc|реши|=)\s*/, '').replace(/[?=]+$/, '').trim();
+    if (expr && (mathLike || /\d/.test(expr)) && (MATH_ONLY.test(expr) || /корень из|% от|в степени/.test(expr)) && /[\d]/.test(expr) && (/[-+*/%^×÷]|корень|sqrt|sin|cos|tan|log|ln|abs|в степени/.test(expr))) {
+        if (/\/\s*0(?![\d.])/.test(expr)) return '🧮 Делить на ноль нельзя 🙂 (в JavaScript это даст Infinity, в Python — ошибку ZeroDivisionError).';
+        const v = calc(expr);
+        if (v !== null) return `🧮 ${raw.replace(/^[\s=]+|[?=\s]+$/g, '')} = ${fmtNum(v)}`;
+        if (mathLike) return 'Не смог разобрать выражение 🤔 Пример: «2+2*3», «(5+3)^2», «корень из 144», «15% от 200».';
+    }
+
+    // 3. «а на другом языке?» — повторить прошлую задачу
+    if (s.task && lang && toks.length <= 8 && !findTask(toks, raw) && /(а на|на |теперь|давай на|то же|тоже|покажи на|переведи|перепиши|вариант)/.test(n)) {
+        return renderTask(s.task, lang, s.lang);
+    }
+
+    // 4. задача с готовым кодом
+    const taskId = findTask(toks, raw);
+    const wantsCode = TASK_TRIGGERS.test(n) || toks.length <= 4;
+    const isWhatIs = /^(что такое|что значит|объясни|расскажи|в чём разница|чем отличается|зачем нужен|как работает|для чего)/.test(n);
+    if (taskId && (wantsCode || !isWhatIs)) {
+        // если вопрос теоретический и есть сильное совпадение в базе знаний — отдадим теорию
+        const kb = scoreKB(toks, raw, lang, s.lang);
+        const theoryStrong = kb.length && kb[0][1] >= (isWhatIs ? 4 : 3) && !/(напиш|сдела|создай|сгенерир|реализ)/.test(n);
+        if (!theoryStrong) { s.task = taskId; return renderTask(taskId, lang, s.lang); }
+    }
+
+    // 5. small talk
+    const st = smallTalk(n, toks, s, name);
+    if (st && !(toks.length > 6 && findTask(toks, raw))) return st;
+
+    // 6. база знаний
+    const kb = scoreKB(toks, raw, lang, s.lang);
+    if (kb.length && (kb[0][1] >= 2 || (kb[0][1] >= 1.5 && (kb.length === 1 || kb[0][1] - kb[1][1] >= 0.7)))) {
+        const [top, topScore] = kb[0];
+        s.topic = top.id; s.unknown = 0;
+        let out = top.text;
+        // близкий второй результат — предложить
+        const alt = kb.slice(1).filter(([e, sc]) => sc >= topScore * 0.8 && sc >= 2 && e.id !== top.id).slice(0, 2);
+        if (alt.length) out += `\n\n➕ Возможно, вас также интересует: ${alt.map(([e]) => titleOf(e)).join('; ')} — просто спросите.`;
+        return out;
+    }
+    if (taskId) { s.task = taskId; return renderTask(taskId, lang, s.lang); }
+
+    // 7. слабое совпадение — переспросить
+    if (kb.length && kb[0][1] >= 1) {
+        s.unknown = 0;
+        return `Не совсем уверен, что понял вопрос 🤔 Возможно, вы имели в виду: ${kb.slice(0, 3).map(([e]) => titleOf(e)).join('; ')}.\n\nУточните, пожалуйста, или опишите задачу подробнее (язык, что нужно получить).`;
+    }
+
+    // 8. общий вопрос про программирование без совпадений
+    s.unknown++;
+    const progWords = /(код|программ|функци|ошибк|скрипт|язык|алгоритм|переменн|массив|цикл|сервер|база данных|библиотек|фреймворк|api|компил|класс|метод|строк|число)/.test(n);
+    if (progWords) {
+        return `Пока не нашёл точного ответа на это 😕 Помогите мне:\n• назовите язык (JavaScript, Python, C++…)\n• опишите, что нужно получить или что сломалось\n• пришлите код в виде блока ${F} ... ${F} и текст ошибки\n\nИли выберите тему: /topics`;
+    }
+    if (s.unknown >= 2) return 'Я специализируюсь на программировании, поэтому на общие темы отвечаю ограниченно 🙈 Спросите про код, алгоритмы, веб, базы данных или Git — тут я силён. Список тем: /topics';
+    return pick([
+        'Хм, не уверен, что понял 🤔 Я лучше всего разбираюсь в программировании. Попробуйте, например: «как работает async await» или «напиши сортировку на python».',
+        'Этот вопрос вне моей специализации, но по коду готов помочь 😊 Напишите, что нужно: объяснение, пример или разбор вашего кода. Список тем — /topics',
+    ]);
+}
+
+function titleOf(e) { const first = e.text.split('\n')[0].replace(/^[^\wА-Яа-я]+/, '').trim(); return first; }
+function smallTalkStart(name) {
+    const first = name ? String(name).split(/\s+/)[0] : '';
+    return `👋 Привет${first ? ', ' + first : ''}! Я Ai_bot — умный помощник по программированию. Работаю без внешних API, прямо внутри мессенджера.\n\nПопробуйте:\n• «что такое замыкание?»\n• «напиши факториал на python»\n• «как отцентровать div»\n• пришлите свой код — найду ошибки\n• «2+2*3» — посчитаю\n\nВсе возможности — /help, темы — /topics.`;
+}
+
+module.exports = { reply, calc, start: smallTalkStart, HELP, TOPICS, _internal: { KB, TASKS, tokens, analyzeCode } };
+return module.exports;
+})();
+// ── конец «мозга» Ai_bot ──
+
+function ensureAiBot() {
+    const users = read(F.users), old = users.find(u => u.id === AIBOT_ID);
+    const bio = 'Умный помощник по программированию. Отвечает на вопросы, пишет и проверяет код. Работает без API.';
+    if (old) {
+        let ch = false;
+        if (old.username !== AIBOT_NAME) { old.username = AIBOT_NAME; ch = true; }
+        if (old.avatar !== AIBOT_AVATAR) { old.avatar = AIBOT_AVATAR; ch = true; }
+        if (old.bio !== bio) { old.bio = bio; ch = true; }
+        if (!old.bot || !old.custom) { old.bot = true; old.custom = true; ch = true; }
+        if (ch) write(F.users, users);
+        return;
+    }
+    // handle должен быть свободен
+    const taken = users.find(u => (u.handles || [u.handle]).includes(AIBOT_HANDLE));
+    if (taken) { console.warn(`⚠️ Юзернейм @${AIBOT_HANDLE} уже занят пользователем id=${taken.id}, Ai_bot не создан`); return; }
+    users.push({ id: AIBOT_ID, username: AIBOT_NAME, handle: AIBOT_HANDLE, bot: true, custom: true, aiLocal: true, bio,
+        avatar: AIBOT_AVATAR, mars: 0, password: 'x' + crypto.randomBytes(24).toString('hex'), createdAt: new Date().toISOString() });
+    write(F.users, users);
+    console.log('🤖 Ai_bot создан (@ai_bot)');
+}
+
+// Делит длинный ответ на части (≤3800 символов), не разрывая блоки кода
+function aiSplit(text, max = 3800) {
+    if (text.length <= max) return [text];
+    const parts = [], paras = text.split(/\n(?=(?:```|\n))/); let cur = '';
+    for (const p of paras) { if ((cur + '\n' + p).length > max && cur) { parts.push(cur); cur = p; } else cur = cur ? cur + '\n' + p : p; }
+    if (cur) parts.push(cur);
+    return parts.flatMap(p => p.length <= max ? [p] : p.match(new RegExp('[\\s\\S]{1,' + max + '}', 'g')));
+}
+
+const aiPending = new Set();   // кто сейчас ждёт ответа
+const aiQueue = new Map();     // если человек написал ещё раз, пока бот «печатает», — ответим на последнее сообщение
+function aiBotOnMessage(chat, uid, msg) {
+    const text = String(msg.text || '').trim();
+    if (aiPending.has(uid)) { aiQueue.set(uid, { chat, msg }); return; }
+    const u = read(F.users).find(x => x.id === uid) || {};
+    let answer = null;
+    if (!aiBrain) answer = '⚠️ Мой «мозг» не загружен.';
+    else if (!text) { if (!msg.media) return; answer = 'Файлы и голосовые я пока не читаю 🙈 Пришлите вопрос или код текстом.'; }
+    aiPending.add(uid);
+    const delay = Math.min(2200, 450 + text.length * 6);
+    const typing = () => sendTo([uid], { type: 'typing', data: { chatId: chat.id, userId: AIBOT_ID } });
+    typing();
+    const typer = setInterval(typing, 1500);
+    setTimeout(() => {
+        clearInterval(typer);
+        try {
+            const out = answer || aiBrain.reply(uid, text, u.username);
+            aiSplit(String(out)).forEach(part => botPost(AIBOT_ID, uid, part));
+        } catch (e) {
+            console.error('Ai_bot error:', e);
+            botPost(AIBOT_ID, uid, '😵 Внутренняя ошибка при формировании ответа. Попробуйте переформулировать вопрос.');
+        } finally {
+            aiPending.delete(uid);
+            const q = aiQueue.get(uid);
+            if (q) { aiQueue.delete(uid); aiBotOnMessage(q.chat, uid, q.msg); }
+        }
+    }, delay);
+}
+
 function onCustomBotMessage(chat, uid, msg) {
     const other = chat.members.find(i => i !== uid);
+    if (other === AIBOT_ID) return aiBotOnMessage(chat, uid, msg);
     const users = read(F.users), bot = users.find(u => u.id === other);
     if (!isCustomBot(bot)) return;
     const db = botsDb(), cfg = db[bot.id];
@@ -1779,6 +2748,10 @@ app.post('/api/bots/:id/start', async (req, res) => {
     if (id === HOURS_ID) {
         userSaysToBot(uid, HOURS_ID, '/start');
         hoursWelcome(uid);
+    } else if (id === AIBOT_ID) {
+        userSaysToBot(uid, AIBOT_ID, '/start');
+        const me0 = read(F.users).find(x => x.id === uid) || {};
+        botPost(AIBOT_ID, uid, aiBrain ? aiBrain.start(me0.username) : '👋 Привет! Я Ai_bot.');
     } else if (isCustomBot(bot)) {
         if (blockedEither(uid, bot.id)) return res.status(400).json({ error: 'Бот заблокирован' });
         userSaysToBot(uid, bot.id, '/start');
@@ -2037,6 +3010,7 @@ app.delete('/api/groups/:id/bots/:botId', async (req, res) => {
 });
 // Список команд бота — для подсказок «/» в поле ввода
 app.get('/api/bots/:id/commands', (req, res) => {
+    if (Number(req.params.id) === AIBOT_ID) return res.json([{ cmd: '/start', desc: 'Запустить бота' }, { cmd: '/help', desc: 'Что я умею' }, { cmd: '/topics', desc: 'Список тем' }, { cmd: '/joke', desc: 'Шутка про программистов' }, { cmd: '/clear', desc: 'Забыть контекст диалога' }]);
     const bot = read(F.users).find(u => u.id === Number(req.params.id)), cfg = bot && botsDb()[bot.id];
     if (!isCustomBot(bot) || !cfg) return res.status(404).json({ error: 'Бот не найден' });
     res.json([{ cmd: '/start', desc: 'Запустить бота' }, ...cfg.commands.filter(c => c.cmd).map(c => ({ cmd: c.cmd, desc: c.desc || '' })), ...(cfg.commands.some(c => c.cmd === '/help') ? [] : [{ cmd: '/help', desc: 'Список команд' }])]);
@@ -4166,6 +5140,7 @@ async function init() {
     ensureSaimonChatBot();
     ensureHoursBot();
     removeAiBot();
+    ensureAiBot();
     await ensureVapid();
     await persist();
 

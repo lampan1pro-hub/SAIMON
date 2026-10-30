@@ -2865,7 +2865,7 @@ const HNDL_RE = /(^|[^a-zA-Z0-9_])@([a-z0-9_]{3,20})/g;
 const linkHandles = t => esc(t).replace(HNDL_RE, (m, p, h) => `${p}<a class="hndl" data-h="${h}">@${h}</a>`);
 // Ссылки http(s):// и www. — синие, открываются по нажатию (только безопасные http/https)
 const URL_RE = /(^|[^@\w.\/])((?:https?:\/\/|www\.)[^\s<>"'«»]+[^\s<>"'«».,;:!?)\]]|(?:[a-z0-9а-яё-]+\.)+(?:ru|com|org|net|io|me|dev|app|su|ua|by|kz|uz|info|xyz|tv|gg|co|site|online|store|shop|pro|рф|ai|tech|art|link|live|top|club|blog|news|edu|gov|eu|de|uk|us)(?![a-zа-яё0-9-])(?:\/[^\s<>"'«»]*[^\s<>"'«».,;:!?)\]])?)/gi;
-const linkify = t => {
+const linkifyBase = t => {
   const s = String(t || ''); let out = '', last = 0;
   for (const m of s.matchAll(URL_RE)) {
     const raw = m[2], at = m.index + m[1].length, href = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
@@ -2875,6 +2875,32 @@ const linkify = t => {
   }
   return out + linkHandles(s.slice(last));
 };
+// Блоки кода ```lang ... ``` и `встроенный код` (в основном для ответов Ai_bot)
+const CODE_FENCE_RE = /```([\w+#.-]*)[ \t]*\n?([\s\S]*?)```/g;
+const linkify = t => {
+  const s = String(t || '');
+  if (s.indexOf('`') < 0) return linkifyBase(s);
+  const inl = h => h.replace(/`([^`\n]+)`/g, (m, c) => `<code class="aic">${c}</code>`);
+  let out = '', last = 0;
+  for (const m of s.matchAll(CODE_FENCE_RE)) {
+    out += inl(linkifyBase(s.slice(last, m.index).replace(/\n$/, '')));
+    const lang = (m[1] || '').toLowerCase();
+    out += `<span class="aicb"><span class="aich"><i>${esc(lang || 'код')}</i><button type="button" class="aicp">Копировать</button></span><pre class="aicode"><code>${esc(m[2].replace(/\n+$/, ''))}</code></pre></span>`;
+    last = m.index + m[0].length;
+    if (s[last] === '\n') last++;
+  }
+  return out + inl(linkifyBase(s.slice(last)));
+};
+// «Копировать» в блоке кода
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('.aicp');
+  if (!b) return;
+  e.stopPropagation();
+  const code = b.closest('.aicb').querySelector('code').textContent;
+  try { await navigator.clipboard.writeText(code); b.textContent = 'Скопировано ✓'; }
+  catch { try { const ta = document.createElement('textarea'); ta.value = code; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); b.textContent = 'Скопировано ✓'; } catch { b.textContent = 'Не вышло'; } }
+  setTimeout(() => { b.textContent = 'Копировать'; }, 1500);
+}, true);
 // Карточка превью под сообщением
 const lpCard = p => {
   if (!p || !p.url || !/^https?:\/\//i.test(p.url)) return '';
@@ -8032,6 +8058,17 @@ html[data-theme="dark"] #hbPay .hp-card{background:#16212d}
 
 
 /* ===== Ссылки и превью ===== */
+/* Блоки кода в сообщениях (Ai_bot) */
+.m:has(.aicb){max-width:min(94%,640px)}
+.aicb{display:block;margin:6px 0;border-radius:10px;overflow:hidden;background:#0f1722;color:#e6edf3;text-align:left;white-space:normal}
+.m.me .aicb{background:rgba(0,0,0,.28)}
+.aich{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 10px;background:rgba(255,255,255,.08);font-size:11px;color:#9fb0c3}
+.aich i{font-style:normal;text-transform:lowercase;letter-spacing:.3px}
+.aicp{background:none;border:0;color:#8ab4ff;font:inherit;font-size:11px;cursor:pointer;padding:2px 4px;border-radius:6px}
+.aicp:hover{background:rgba(255,255,255,.12)}
+pre.aicode{margin:0;padding:9px 11px;overflow-x:auto;white-space:pre;tab-size:2;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;-webkit-overflow-scrolling:touch}
+pre.aicode code{font:inherit;color:inherit;background:none;padding:0}
+code.aic{font:.92em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:rgba(127,127,127,.2);padding:1px 5px;border-radius:5px}
 #msgs .tx a.lnk-url{color:#3d8bff;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;word-break:break-all;font-weight:500}
 html[data-theme="dark"] #msgs .tx a.lnk-url{color:#6ab0ff}
 #msgs .m.me .tx a.lnk-url{color:#cfe6ff;text-decoration-color:rgba(255,255,255,.6)}
