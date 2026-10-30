@@ -53,7 +53,8 @@ const F = {
     sessions: path.join(DIR, 'sessions.json'),
     blocks: path.join(DIR, 'blocks.json'),
     stickerPacks: path.join(DIR, 'sticker_packs.json'),
-    bots: path.join(DIR, 'bots.json')
+    bots: path.join(DIR, 'bots.json'),
+    aibrain: path.join(DIR, 'aibrain.json')   // чему научился Ai_bot
 };
 
 // ---- Хранение ----
@@ -1744,8 +1745,8 @@ const AIBOT_AVATAR = 'data:image/svg+xml;base64,' + Buffer.from(`<svg xmlns="htt
 VERIFIED.add(AIBOT_HANDLE);
 // ── «Мозг» Ai_bot: встроен прямо сюда, отдельные файлы не нужны ──
 const aiBrain = (() => {
-'use strict';
-const module = { exports: {} };
+'use strict'; const module={exports:{}};
+
 /**
  * Ai_bot — локальный «умный» помощник по программированию.
  * Работает полностью офлайн, без каких-либо внешних API.
@@ -2046,6 +2047,88 @@ const TASKS = {
     },
 };
 
+
+TASKS.linkedlist = { kw: ['связный список', 'связного списка', 'linked list', 'односвязный', 'односвязного'], title: 'Односвязный список',
+    js: `class Node {\n  constructor(value) { this.value = value; this.next = null; }\n}\n\nclass LinkedList {\n  constructor() { this.head = null; this.size = 0; }\n\n  push(value) {                    // добавить в конец\n    const node = new Node(value);\n    if (!this.head) this.head = node;\n    else { let cur = this.head; while (cur.next) cur = cur.next; cur.next = node; }\n    this.size++;\n  }\n  remove(value) {                  // удалить первое совпадение\n    if (!this.head) return false;\n    if (this.head.value === value) { this.head = this.head.next; this.size--; return true; }\n    let cur = this.head;\n    while (cur.next && cur.next.value !== value) cur = cur.next;\n    if (!cur.next) return false;\n    cur.next = cur.next.next; this.size--; return true;\n  }\n  reverse() {\n    let prev = null, cur = this.head;\n    while (cur) { [cur.next, prev, cur] = [prev, cur, cur.next]; }\n    this.head = prev;\n  }\n  toArray() { const r = []; for (let c = this.head; c; c = c.next) r.push(c.value); return r; }\n}\n\nconst list = new LinkedList();\nlist.push(1); list.push(2); list.push(3);\nlist.reverse();\nconsole.log(list.toArray()); // [3, 2, 1]`,
+    py: `class Node:\n    def __init__(self, value):\n        self.value = value\n        self.next = None\n\nclass LinkedList:\n    def __init__(self):\n        self.head = None\n\n    def push(self, value):\n        node = Node(value)\n        if not self.head:\n            self.head = node\n            return\n        cur = self.head\n        while cur.next:\n            cur = cur.next\n        cur.next = node\n\n    def reverse(self):\n        prev, cur = None, self.head\n        while cur:\n            cur.next, prev, cur = prev, cur, cur.next\n        self.head = prev\n\n    def to_list(self):\n        out, cur = [], self.head\n        while cur:\n            out.append(cur.value)\n            cur = cur.next\n        return out\n\nl = LinkedList()\nfor x in (1, 2, 3):\n    l.push(x)\nl.reverse()\nprint(l.to_list())  # [3, 2, 1]`,
+    note: 'Вставка в начало — O(1), поиск и вставка в конец — O(n). Хранить указатель tail сделает push за O(1).' };
+TASKS.stackq = { kw: ['реализовать стек', 'реализуй стек', 'класс стек', 'реализовать очередь', 'реализуй очередь', 'класс очередь', 'stack class', 'свой стек', 'свою очередь', 'написать стек', 'написать очередь'], title: 'Стек и очередь',
+    js: `class Stack {                     // LIFO\n  #items = [];\n  push(x) { this.#items.push(x); }\n  pop() { return this.#items.pop(); }\n  peek() { return this.#items[this.#items.length - 1]; }\n  get size() { return this.#items.length; }\n  isEmpty() { return this.#items.length === 0; }\n}\n\nclass Queue {                     // FIFO\n  #items = {}; #head = 0; #tail = 0;\n  enqueue(x) { this.#items[this.#tail++] = x; }\n  dequeue() {\n    if (this.#head === this.#tail) return undefined;\n    const x = this.#items[this.#head];\n    delete this.#items[this.#head++];\n    return x;\n  }\n  get size() { return this.#tail - this.#head; }\n}\n\nconst s = new Stack(); s.push(1); s.push(2);\nconsole.log(s.pop()); // 2`,
+    py: `from collections import deque\n\nclass Stack:\n    def __init__(self):\n        self._items = []\n    def push(self, x): self._items.append(x)\n    def pop(self): return self._items.pop()\n    def peek(self): return self._items[-1]\n    def __len__(self): return len(self._items)\n\nclass Queue:\n    def __init__(self):\n        self._items = deque()\n    def enqueue(self, x): self._items.append(x)\n    def dequeue(self): return self._items.popleft()   # O(1), у list.pop(0) было бы O(n)\n    def __len__(self): return len(self._items)\n\ns = Stack(); s.push(1); s.push(2)\nprint(s.pop())  # 2`,
+    note: 'Применение стека: отмена действий, проверка скобок, DFS. Очереди: задачи, BFS, буфер сообщений.' };
+TASKS.mergesort = { kw: ['сортировка слиянием', 'сортировку слиянием', 'merge sort', 'mergesort'], title: 'Сортировка слиянием',
+    js: `function mergeSort(a) {\n  if (a.length < 2) return a;\n  const mid = a.length >> 1;\n  const L = mergeSort(a.slice(0, mid)), R = mergeSort(a.slice(mid));\n  const out = [];\n  let i = 0, j = 0;\n  while (i < L.length && j < R.length) out.push(L[i] <= R[j] ? L[i++] : R[j++]);\n  return out.concat(L.slice(i), R.slice(j));\n}\nconsole.log(mergeSort([5, 2, 9, 1, 7])); // [1, 2, 5, 7, 9]`,
+    py: `def merge_sort(a):\n    if len(a) < 2:\n        return a\n    mid = len(a) // 2\n    L, R = merge_sort(a[:mid]), merge_sort(a[mid:])\n    out, i, j = [], 0, 0\n    while i < len(L) and j < len(R):\n        if L[i] <= R[j]:\n            out.append(L[i]); i += 1\n        else:\n            out.append(R[j]); j += 1\n    return out + L[i:] + R[j:]\n\nprint(merge_sort([5, 2, 9, 1, 7]))`,
+    note: 'O(n log n) всегда, устойчивая (равные элементы сохраняют порядок), но требует O(n) дополнительной памяти.' };
+TASKS.flatten = { kw: ['выровнять массив', 'flatten', 'плоский массив', 'вложенный массив', 'вложенные массивы', 'развернуть массив'], title: 'Выпрямление вложенного массива',
+    js: `const nested = [1, [2, [3, [4]], 5]];\nconsole.log(nested.flat(Infinity)); // [1, 2, 3, 4, 5]\n\n// вручную (рекурсия)\nconst flatten = arr => arr.reduce((acc, x) => acc.concat(Array.isArray(x) ? flatten(x) : x), []);`,
+    py: `def flatten(a):\n    for x in a:\n        if isinstance(x, list):\n            yield from flatten(x)\n        else:\n            yield x\n\nprint(list(flatten([1, [2, [3, [4]], 5]])))  # [1, 2, 3, 4, 5]` };
+TASKS.groupby = { kw: ['сгруппировать', 'группировка массива', 'group by', 'groupby', 'сгруппируй', 'группировать объекты'], title: 'Группировка элементов по ключу',
+    js: `const users = [\n  { name: 'Аня', city: 'Москва' },\n  { name: 'Боря', city: 'Омск' },\n  { name: 'Вика', city: 'Москва' },\n];\n\nconst groupBy = (arr, key) =>\n  arr.reduce((acc, x) => ((acc[x[key]] ||= []).push(x), acc), {});\n\nconsole.log(groupBy(users, 'city'));\n// Object.groupBy(users, u => u.city) — в новых версиях Node/браузеров`,
+    py: `from collections import defaultdict\n\nusers = [{"name": "Аня", "city": "Москва"}, {"name": "Боря", "city": "Омск"}, {"name": "Вика", "city": "Москва"}]\ngroups = defaultdict(list)\nfor u in users:\n    groups[u["city"]].append(u)\nprint(dict(groups))` };
+TASKS.emitter = { kw: ['eventemitter', 'event emitter', 'эмиттер', 'pub sub', 'pubsub', 'паб саб', 'система событий', 'своя система событий', 'наблюдатель'], title: 'Свой EventEmitter (паттерн «наблюдатель»)',
+    js: `class Emitter {\n  #handlers = new Map();\n  on(event, fn) {\n    if (!this.#handlers.has(event)) this.#handlers.set(event, new Set());\n    this.#handlers.get(event).add(fn);\n    return () => this.off(event, fn);          // функция для отписки\n  }\n  off(event, fn) { this.#handlers.get(event)?.delete(fn); }\n  once(event, fn) { const off = this.on(event, (...a) => { off(); fn(...a); }); }\n  emit(event, ...args) { this.#handlers.get(event)?.forEach(fn => fn(...args)); }\n}\n\nconst bus = new Emitter();\nconst off = bus.on('msg', t => console.log('Получено:', t));\nbus.emit('msg', 'привет'); // Получено: привет\noff();`,
+    py: `from collections import defaultdict\n\nclass Emitter:\n    def __init__(self):\n        self._h = defaultdict(list)\n    def on(self, event, fn):\n        self._h[event].append(fn)\n    def emit(self, event, *args):\n        for fn in list(self._h[event]):\n            fn(*args)\n\nbus = Emitter()\nbus.on("msg", lambda t: print("Получено:", t))\nbus.emit("msg", "привет")` };
+TASKS.lru = { kw: ['lru', 'lru cache', 'lru кэш', 'lru кеш'], title: 'LRU-кэш',
+    js: `class LRU {\n  constructor(limit = 100) { this.limit = limit; this.map = new Map(); }\n  get(key) {\n    if (!this.map.has(key)) return undefined;\n    const v = this.map.get(key);\n    this.map.delete(key); this.map.set(key, v);        // «освежаем» ключ\n    return v;\n  }\n  set(key, value) {\n    this.map.delete(key);\n    this.map.set(key, value);\n    if (this.map.size > this.limit) this.map.delete(this.map.keys().next().value);  // самый старый\n  }\n}\nconst c = new LRU(2); c.set('a', 1); c.set('b', 2); c.get('a'); c.set('c', 3);\nconsole.log(c.get('b')); // undefined — вытеснен`,
+    py: `from collections import OrderedDict\n\nclass LRU:\n    def __init__(self, limit=100):\n        self.limit, self.d = limit, OrderedDict()\n    def get(self, k):\n        if k not in self.d: return None\n        self.d.move_to_end(k)\n        return self.d[k]\n    def set(self, k, v):\n        self.d[k] = v\n        self.d.move_to_end(k)\n        if len(self.d) > self.limit:\n            self.d.popitem(last=False)`,
+    note: 'Идея: Map/OrderedDict помнят порядок вставки — самый «старый» элемент всегда первый. get и set работают за O(1).' };
+TASKS.retry = { kw: ['retry', 'повторить запрос', 'повторные попытки', 'backoff', 'бэкофф', 'повторять при ошибке', 'ретрай'], title: 'Повтор запроса с экспоненциальной задержкой (retry + backoff)',
+    js: `const sleep = ms => new Promise(r => setTimeout(r, ms));\n\nasync function retry(fn, { tries = 4, base = 300 } = {}) {\n  for (let i = 0; ; i++) {\n    try {\n      return await fn();\n    } catch (err) {\n      if (i >= tries - 1) throw err;\n      const delay = base * 2 ** i + Math.random() * 100;   // 300, 600, 1200… + «дрожание»\n      await sleep(delay);\n    }\n  }\n}\n\nconst data = await retry(() => fetch('/api/data').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }));`,
+    py: `import time, random\n\ndef retry(fn, tries=4, base=0.3):\n    for i in range(tries):\n        try:\n            return fn()\n        except Exception:\n            if i == tries - 1:\n                raise\n            time.sleep(base * 2 ** i + random.random() * 0.1)` };
+TASKS.sleep = { kw: ['sleep', 'сон в коде', 'пауза в коде', 'задержка в коде', 'подождать секунду', 'подождать несколько секунд', 'delay', 'пауза'], title: 'Пауза / задержка в коде',
+    js: `const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));\n\nasync function main() {\n  console.log('начало');\n  await sleep(1500);          // ждём 1.5 секунды, не блокируя программу\n  console.log('через 1.5 с');\n}\nmain();`,
+    py: `import time\n\nprint("начало")\ntime.sleep(1.5)   # блокирует поток\nprint("через 1.5 с")\n\n# асинхронно\nimport asyncio\nasync def main():\n    await asyncio.sleep(1.5)\nasyncio.run(main())` };
+TASKS.guess = { kw: ['угадай число', 'угадать число', 'игра угадай', 'guess the number'], title: 'Игра «Угадай число»',
+    js: `// Node.js: node game.js\nconst rl = require('readline').createInterface({ input: process.stdin, output: process.stdout });\nconst secret = Math.floor(Math.random() * 100) + 1;\nlet tries = 0;\n\nconsole.log('Я загадал число от 1 до 100');\nrl.on('line', line => {\n  const n = Number(line);\n  tries++;\n  if (n === secret) { console.log('Верно! Попыток: ' + tries); rl.close(); }\n  else console.log(n < secret ? 'Больше' : 'Меньше');\n});`,
+    py: `import random\n\nsecret = random.randint(1, 100)\ntries = 0\nprint("Я загадал число от 1 до 100")\nwhile True:\n    try:\n        n = int(input("Ваш вариант: "))\n    except ValueError:\n        print("Введите число!")\n        continue\n    tries += 1\n    if n == secret:\n        print(f"Верно! Попыток: {tries}")\n        break\n    print("Больше" if n < secret else "Меньше")` };
+TASKS.tictactoe = { kw: ['крестики', 'нолики', 'tic tac toe', 'tictactoe', 'крестики нолики'], title: 'Крестики-нолики (логика и проверка победы)',
+    py: `WIN = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),(1,4,7),(2,5,8),(0,4,8),(2,4,6)]\n\ndef winner(b):\n    for a, c, d in WIN:\n        if b[a] != " " and b[a] == b[c] == b[d]:\n            return b[a]\n    return None\n\ndef show(b):\n    for i in (0, 3, 6):\n        print(" | ".join(b[i:i+3]))\n        if i < 6: print("--+---+--")\n\nboard, turn = [" "] * 9, "X"\nfor _ in range(9):\n    show(board)\n    move = int(input(f"Ход {turn} (0-8): "))\n    if board[move] != " ":\n        print("Занято!"); continue\n    board[move] = turn\n    if winner(board):\n        show(board); print("Победил", turn); break\n    turn = "O" if turn == "X" else "X"\nelse:\n    print("Ничья")`,
+    js: `const WIN = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];\nconst winner = b => {\n  for (const [a, c, d] of WIN) if (b[a] && b[a] === b[c] && b[a] === b[d]) return b[a];\n  return null;\n};\nconst board = Array(9).fill('');\nboard[0] = board[4] = board[8] = 'X';\nconsole.log(winner(board)); // 'X'` };
+TASKS.passgen = { kw: ['генератор паролей', 'генератор пароля', 'password generator', 'написать генератор паролей', 'программа генерации паролей'], title: 'Генератор паролей',
+    js: `const crypto = require('crypto');\n\nfunction genPassword(len = 16) {\n  const chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*';\n  let out = '';\n  for (let i = 0; i < len; i++) out += chars[crypto.randomInt(chars.length)];   // crypto, а не Math.random!\n  return out;\n}\nconsole.log(genPassword(20));`,
+    py: `import secrets, string\n\ndef gen_password(n=16):\n    chars = string.ascii_letters + string.digits + "!@#$%^&*"\n    return "".join(secrets.choice(chars) for _ in range(n))\n\nprint(gen_password(20))`,
+    note: 'Для паролей и токенов всегда используйте криптографический генератор (crypto / secrets), а не random.' };
+TASKS.vowels = { kw: ['гласные', 'гласных', 'посчитать гласные', 'vowels', 'считать буквы', 'частота букв'], title: 'Подсчёт гласных и частоты букв',
+    js: `const countVowels = s => (s.match(/[аеёиоуыэюяaeiou]/gi) || []).length;\nconsole.log(countVowels('Привет, мир')); // 3\n\nconst freq = s => [...s.toLowerCase()].filter(c => /\\p{L}/u.test(c))\n  .reduce((m, c) => (m[c] = (m[c] || 0) + 1, m), {});`,
+    py: `from collections import Counter\n\ndef count_vowels(s):\n    return sum(ch in "аеёиоуыэюяaeiou" for ch in s.lower())\n\nprint(count_vowels("Привет, мир"))  # 3\nprint(Counter(ch for ch in "привет".lower() if ch.isalpha()))` };
+TASKS.capitalize = { kw: ['с большой буквы', 'capitalize', 'каждое слово с большой', 'заглавная буква', 'title case', 'первая буква заглавная'], title: 'Каждое слово с большой буквы',
+    js: `const titleCase = s => s.toLowerCase().replace(/(^|\\s)\\S/g, c => c.toUpperCase());\nconsole.log(titleCase('привет мир и все')); // Привет Мир И Все`,
+    py: `print("привет мир и все".title())   # Привет Мир И Все\n\n# только первая буква строки\nprint("привет".capitalize())` };
+TASKS.digitsum = { kw: ['сумма цифр', 'сумму цифр', 'digit sum', 'цифры числа'], title: 'Сумма цифр числа',
+    js: `const digitSum = n => [...String(Math.abs(n))].reduce((a, d) => a + Number(d), 0);\nconsole.log(digitSum(12345)); // 15`,
+    py: `def digit_sum(n: int) -> int:\n    return sum(int(d) for d in str(abs(n)))\n\nprint(digit_sum(12345))  # 15` };
+TASKS.csv = { kw: ['csv', 'прочитать csv', 'парсить csv', 'csv файл', 'разобрать csv'], title: 'Чтение CSV',
+    py: `import csv\n\nwith open("data.csv", encoding="utf-8", newline="") as f:\n    for row in csv.DictReader(f):\n        print(row["name"], row["age"])\n\n# запись\nwith open("out.csv", "w", encoding="utf-8", newline="") as f:\n    w = csv.writer(f)\n    w.writerow(["name", "age"])\n    w.writerow(["Аня", 25])`,
+    js: `const fs = require('fs');\nconst [head, ...lines] = fs.readFileSync('data.csv', 'utf8').trim().split('\\n');\nconst keys = head.split(',');\nconst rows = lines.map(l => Object.fromEntries(l.split(',').map((v, i) => [keys[i], v])));\nconsole.log(rows);\n// для кавычек и запятых внутри полей используйте библиотеку papaparse или csv-parse`,
+    note: 'Простое split(",") ломается на полях вида "Москва, ул. Ленина". Для реальных файлов берите готовый парсер.' };
+TASKS.countdown = { kw: ['обратный отсчёт', 'обратный отсчет', 'countdown', 'таймер обратного', 'секундомер', 'stopwatch'], title: 'Таймер обратного отсчёта',
+    js: `function countdown(sec, onTick, onDone) {\n  onTick(sec);\n  const id = setInterval(() => {\n    sec--;\n    onTick(sec);\n    if (sec <= 0) { clearInterval(id); onDone?.(); }\n  }, 1000);\n  return () => clearInterval(id);       // функция остановки\n}\n\ncountdown(5, s => console.log(s), () => console.log('Старт!'));`,
+    py: `import time\n\ndef countdown(sec):\n    while sec > 0:\n        print(sec)\n        time.sleep(1)\n        sec -= 1\n    print("Старт!")\n\ncountdown(5)` };
+TASKS.calculator = { kw: ['написать калькулятор', 'программа калькулятор', 'калькулятор на python', 'калькулятор на js', 'сделай калькулятор', 'консольный калькулятор'], title: 'Консольный калькулятор',
+    py: `def calc(a, op, b):\n    ops = {"+": lambda: a + b, "-": lambda: a - b, "*": lambda: a * b,\n           "/": lambda: a / b if b else "делить на 0 нельзя"}\n    return ops.get(op, lambda: "неизвестная операция")()\n\nwhile True:\n    line = input("Введите: число оператор число (или q): ").split()\n    if line and line[0] == "q":\n        break\n    try:\n        a, op, b = float(line[0]), line[1], float(line[2])\n        print("=", calc(a, op, b))\n    except (ValueError, IndexError):\n        print("Формат: 2 + 3")`,
+    js: `const calc = (a, op, b) => ({\n  '+': () => a + b, '-': () => a - b, '*': () => a * b,\n  '/': () => (b === 0 ? 'делить на 0 нельзя' : a / b),\n}[op] || (() => 'неизвестная операция'))();\n\nconsole.log(calc(6, '*', 7)); // 42\n// Никогда не используйте eval() для разбора выражений пользователя!` };
+TASKS.matrix = { kw: ['матрица', 'матрицу', 'матрицы', 'транспонировать', 'умножение матриц', 'двумерный массив'], title: 'Матрицы: транспонирование и умножение',
+    js: `const transpose = m => m[0].map((_, j) => m.map(row => row[j]));\nconst multiply = (A, B) => A.map(row => transpose(B).map(col => row.reduce((s, x, i) => s + x * col[i], 0)));\n\nconsole.log(transpose([[1, 2, 3], [4, 5, 6]]));   // [[1,4],[2,5],[3,6]]\nconsole.log(multiply([[1, 2], [3, 4]], [[5, 6], [7, 8]])); // [[19,22],[43,50]]`,
+    py: `def transpose(m):\n    return [list(r) for r in zip(*m)]\n\ndef multiply(A, B):\n    Bt = transpose(B)\n    return [[sum(x * y for x, y in zip(row, col)) for col in Bt] for row in A]\n\nprint(transpose([[1, 2, 3], [4, 5, 6]]))\nprint(multiply([[1, 2], [3, 4]], [[5, 6], [7, 8]]))` };
+TASKS.bst = { kw: ['бинарное дерево', 'бинарного дерева', 'binary tree', 'bst', 'дерево поиска', 'двоичное дерево'], title: 'Бинарное дерево поиска',
+    js: `class Node { constructor(v) { this.v = v; this.l = this.r = null; } }\n\nclass BST {\n  root = null;\n  insert(v) {\n    const n = new Node(v);\n    if (!this.root) return void (this.root = n);\n    let c = this.root;\n    for (;;) {\n      if (v < c.v) { if (!c.l) return void (c.l = n); c = c.l; }\n      else         { if (!c.r) return void (c.r = n); c = c.r; }\n    }\n  }\n  has(v) { let c = this.root; while (c) { if (v === c.v) return true; c = v < c.v ? c.l : c.r; } return false; }\n  *inorder(n = this.root) { if (n) { yield* this.inorder(n.l); yield n.v; yield* this.inorder(n.r); } }\n}\n\nconst t = new BST(); [5, 3, 8, 1, 4].forEach(x => t.insert(x));\nconsole.log([...t.inorder()]); // [1, 3, 4, 5, 8] — отсортировано`,
+    py: `class Node:\n    def __init__(self, v):\n        self.v, self.l, self.r = v, None, None\n\nclass BST:\n    def __init__(self):\n        self.root = None\n    def insert(self, v):\n        if not self.root:\n            self.root = Node(v); return\n        c = self.root\n        while True:\n            side = "l" if v < c.v else "r"\n            nxt = getattr(c, side)\n            if nxt is None:\n                setattr(c, side, Node(v)); return\n            c = nxt\n    def inorder(self, n="root"):\n        n = self.root if n == "root" else n\n        if n:\n            yield from self.inorder(n.l)\n            yield n.v\n            yield from self.inorder(n.r)\n\nt = BST()\nfor x in (5, 3, 8, 1, 4):\n    t.insert(x)\nprint(list(t.inorder()))  # [1, 3, 4, 5, 8]`,
+    note: 'Поиск и вставка — O(log n) в сбалансированном дереве, O(n) в худшем случае (вырожденное). Для гарантий используют AVL или красно-чёрные деревья.' };
+TASKS.twosum = { kw: ['two sum', 'twosum', 'пара с суммой', 'два числа сумма', 'два числа дающие сумму', 'найти два числа'], title: 'Two Sum: найти два числа с заданной суммой',
+    js: `function twoSum(nums, target) {\n  const seen = new Map();                 // значение -> индекс\n  for (let i = 0; i < nums.length; i++) {\n    const need = target - nums[i];\n    if (seen.has(need)) return [seen.get(need), i];\n    seen.set(nums[i], i);\n  }\n  return null;\n}\nconsole.log(twoSum([2, 7, 11, 15], 9)); // [0, 1]`,
+    py: `def two_sum(nums, target):\n    seen = {}\n    for i, x in enumerate(nums):\n        if target - x in seen:\n            return [seen[target - x], i]\n        seen[x] = i\n\nprint(two_sum([2, 7, 11, 15], 9))  # [0, 1]`,
+    note: 'Один проход и словарь — O(n). Наивный перебор пар — O(n²).' };
+TASKS.brackets = { kw: ['скобки', 'скобок', 'скобочная', 'валидные скобки', 'правильная скобочная последовательность', 'valid parentheses', 'баланс скобок'], title: 'Проверка правильности скобок (стек)',
+    js: `function validBrackets(s) {\n  const pairs = { ')': '(', ']': '[', '}': '{' };\n  const stack = [];\n  for (const ch of s) {\n    if ('([{'.includes(ch)) stack.push(ch);\n    else if (pairs[ch]) { if (stack.pop() !== pairs[ch]) return false; }\n  }\n  return stack.length === 0;\n}\nconsole.log(validBrackets('{[()]}'), validBrackets('([)]')); // true false`,
+    py: `def valid_brackets(s):\n    pairs = {")": "(", "]": "[", "}": "{"}\n    stack = []\n    for ch in s:\n        if ch in "([{":\n            stack.append(ch)\n        elif ch in pairs:\n            if not stack or stack.pop() != pairs[ch]:\n                return False\n    return not stack\n\nprint(valid_brackets("{[()]}"), valid_brackets("([)]"))` };
+TASKS.roman = { kw: ['римские цифры', 'римские числа', 'roman numerals', 'в римские', 'римскую запись'], title: 'Римские цифры',
+    js: `function toRoman(n) {\n  const map = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];\n  let out = '';\n  for (const [v, r] of map) while (n >= v) { out += r; n -= v; }\n  return out;\n}\nconsole.log(toRoman(1994)); // MCMXCIV`,
+    py: `def to_roman(n):\n    table = [(1000,"M"),(900,"CM"),(500,"D"),(400,"CD"),(100,"C"),(90,"XC"),(50,"L"),(40,"XL"),(10,"X"),(9,"IX"),(5,"V"),(4,"IV"),(1,"I")]\n    out = ""\n    for v, r in table:\n        while n >= v:\n            out += r; n -= v\n    return out\n\nprint(to_roman(1994))  # MCMXCIV` };
+TASKS.memoize = { kw: ['мемоизация', 'мемоизацию', 'memoize', 'функцию мемоизации', 'мемоизатор'], title: 'Мемоизация функции',
+    js: `const memoize = fn => {\n  const cache = new Map();\n  return (...args) => {\n    const key = JSON.stringify(args);\n    if (!cache.has(key)) cache.set(key, fn(...args));\n    return cache.get(key);\n  };\n};\n\nconst fib = memoize(n => (n < 2 ? n : fib(n - 1) + fib(n - 2)));\nconsole.log(fib(80)); // мгновенно (без мемоизации — вечность)`,
+    py: `from functools import lru_cache\n\n@lru_cache(maxsize=None)\ndef fib(n):\n    return n if n < 2 else fib(n - 1) + fib(n - 2)\n\nprint(fib(80))` };
+
 const TASK_TRIGGERS = /(напиш|сделай|создай|покажи|дай|нужн|код|пример|реализ|сгенерир|как (?:сделать|написать|найти|получить|проверить|посчитать|вывести|прочитать|создать|отправить|подсчитать|отсортировать|перевернуть|убрать|удалить|отцентровать)|write|make|create|implement|example)/;
 
 function findTask(toks, raw) {
@@ -2101,7 +2184,7 @@ K('js-timers', 'js', ['settimeout', 'setinterval', 'таймер', 'задерж
 K('js-types', 'js', ['typeof', 'тип данных', 'типы данных', 'undefined', 'null', 'nan', 'приведение типов'], `🧬 Типы данных в JavaScript\n\nПримитивы: string, number, boolean, null, undefined, bigint, symbol. Всё остальное — объекты (массивы, функции, даты…).\n\n${code('javascript', `typeof 42          // 'number'\ntypeof 'a'         // 'string'\ntypeof null        // 'object' — историческая ошибка языка\ntypeof []          // 'object' → используйте Array.isArray(x)\ntypeof undefined   // 'undefined'\n\n'5' + 3   // '53'  (конкатенация)\n'5' - 3   // 2     (число)\n0.1 + 0.2 // 0.30000000000000004 — это норма для float`)}`);
 K('js-class', 'js', ['прототип', 'prototype', 'наследован', 'extends', 'конструктор', 'приватн поле'], `🏛 Классы и прототипы в JS\n\nclass — «сахар» над прототипами. Каждый объект имеет ссылку на прототип, по цепочке ищутся свойства и методы.\n\n${code('javascript', `class Account {\n  #balance = 0;                    // приватное поле\n  static count = 0;\n  constructor(owner) { this.owner = owner; Account.count++; }\n  deposit(x) { this.#balance += x; return this; }\n  get balance() { return this.#balance; }\n}\n\nconst a = new Account('Аня').deposit(100);\nconsole.log(a.balance); // 100`)}`);
 K('js-errors', 'js', ['try', 'catch', 'исключен', 'ошибк', 'throw', 'обработка ошиб', 'error'], `🚨 Обработка ошибок\n\n${code('javascript', `try {\n  const data = JSON.parse(input);\n  if (!data.id) throw new Error('нет id');\n} catch (err) {\n  console.error(err.message);\n} finally {\n  cleanup();\n}\n\n// своя ошибка\nclass ValidationError extends Error {\n  constructor(msg) { super(msg); this.name = 'ValidationError'; }\n}\n\n// ошибки в промисах без await\npromise.catch(err => console.error(err));\nwindow.addEventListener('unhandledrejection', e => console.error(e.reason));`)}`);
-K('js-storage', 'js', ['localstorage', 'sessionstorage', 'хранилище браузер', 'cookie', 'куки', 'indexeddb'], `💾 Хранение данных в браузере\n\n${code('javascript', `localStorage.setItem('theme', 'dark');\nlocalStorage.getItem('theme');          // 'dark'\nlocalStorage.removeItem('theme');\n\n// объекты — только через JSON\nlocalStorage.setItem('user', JSON.stringify({ id: 1 }));\nconst user = JSON.parse(localStorage.getItem('user') || 'null');`)}\n\n• localStorage — ~5 МБ, живёт пока не очистят\n• sessionStorage — до закрытия вкладки\n• IndexedDB — для больших объёмов\n• Не храните там пароли и токены доступа с высокими правами: XSS их прочитает`);
+K('js-storage', 'js', ['сохранить в браузере', 'сохранить данные в браузере', 'хранить данные', 'запомнить данные', 'сохранить данные', 'localstorage', 'sessionstorage', 'хранилище браузер', 'cookie', 'куки', 'indexeddb'], `💾 Хранение данных в браузере\n\n${code('javascript', `localStorage.setItem('theme', 'dark');\nlocalStorage.getItem('theme');          // 'dark'\nlocalStorage.removeItem('theme');\n\n// объекты — только через JSON\nlocalStorage.setItem('user', JSON.stringify({ id: 1 }));\nconst user = JSON.parse(localStorage.getItem('user') || 'null');`)}\n\n• localStorage — ~5 МБ, живёт пока не очистят\n• sessionStorage — до закрытия вкладки\n• IndexedDB — для больших объёмов\n• Не храните там пароли и токены доступа с высокими правами: XSS их прочитает`);
 K('js-websocket', 'js', ['websocket', 'вебсокет', 'сокет', 'socket', 'ws'], `🔌 WebSocket\n\nСервер (Node, библиотека ws):\n${code('javascript', `const WebSocket = require('ws');\nconst wss = new WebSocket.Server({ port: 8080 });\n\nwss.on('connection', ws => {\n  ws.on('message', raw => {\n    const msg = raw.toString();\n    // рассылка всем\n    wss.clients.forEach(c => c.readyState === WebSocket.OPEN && c.send(msg));\n  });\n});`)}\nКлиент (браузер):\n${code('javascript', `const ws = new WebSocket('ws://localhost:8080');\nws.onopen = () => ws.send('привет');\nws.onmessage = e => console.log(e.data);\nws.onclose = () => setTimeout(reconnect, 1000); // автопереподключение`)}\nТак же устроен и ваш мессенджер: клиент держит одно WebSocket-соединение, сервер рассылает события участникам чата.`);
 K('node', 'js', ['npm', 'node js', 'package.json', 'установить пакет', 'зависимост', 'npx', 'nodemon'], `🟢 Node.js и npm\n\n${code('bash', `npm init -y            # создать package.json\nnpm i express          # установить пакет\nnpm i -D nodemon       # dev-зависимость (автоперезапуск)\nnpm run dev            # скрипт из package.json\nnode server.js         # запустить\nnpx nodemon server.js  # запустить с автоперезапуском`)}\n\nВ package.json:\n${code('json', `{\n  "scripts": { "start": "node server.js", "dev": "nodemon server.js" }\n}`)}\nПапку node_modules не коммитят — добавьте её в .gitignore.`);
 K('ts', 'ts', ['typescript', 'тайпскрипт', 'interface', 'интерфейс', 'generic', 'дженерик', 'типизац'], `🔷 TypeScript — основы\n\n${code('typescript', `interface User {\n  id: number;\n  name: string;\n  email?: string;          // необязательное\n}\n\ntype Id = number | string;  // объединение типов\n\nfunction greet(u: User): string {\n  return 'Привет, ' + u.name;\n}\n\nfunction first<T>(arr: T[]): T | undefined {   // generic\n  return arr[0];\n}\n\nconst users: User[] = [{ id: 1, name: 'Аня' }];`)}\n\nЗапуск: npm i -D typescript → npx tsc --init → npx tsc.`);
@@ -2181,6 +2264,22 @@ K('a11y', 'html', ['доступность', 'accessibility', 'a11y', 'aria', 's
 K('canvas', 'js', ['canvas', 'канвас', 'игра на js', 'змейка', 'requestanimationframe', 'рисовать на странице', 'анимация js', 'game loop', 'игровой цикл'], `🎮 Canvas и игровой цикл\n\n${code('html', `<canvas id="c" width="400" height="300"></canvas>\n<script>\n  const ctx = c.getContext('2d');\n  let x = 0;\n  function frame() {\n    ctx.clearRect(0, 0, 400, 300);\n    ctx.fillStyle = 'tomato';\n    ctx.fillRect(x, 120, 40, 40);     // движущийся квадрат\n    x = (x + 2) % 400;\n    requestAnimationFrame(frame);     // ~60 кадров в секунду\n  }\n  frame();\n  addEventListener('keydown', e => { if (e.key === ' ') x = 0; });\n</script>`)}\nСхема любой игры: обработать ввод → обновить состояние → отрисовать → повторить.`);
 K('pwa', 'js', ['service worker', 'сервис воркер', 'manifest', 'офлайн', 'push уведомления', 'установить как приложение'], `📲 PWA: сайт как приложение\n\n1. manifest.json (name, icons, start_url, display: "standalone")\n2. Service Worker — перехватывает запросы, кэширует, принимает push\n3. HTTPS обязателен\n\n${code('javascript', `// регистрация\nif ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');\n\n// sw.js — кэш-первым для статики\nself.addEventListener('install', e => e.waitUntil(caches.open('v1').then(c => c.addAll(['/', '/app.js']))));\nself.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));`)}\nВаш мессенджер уже использует sw.js и manifest.json — поэтому его можно установить на телефон.`);
 K('ai-ml', 'py', ['нейросеть', 'машинное обучение', 'machine learning', 'ml', 'tensorflow', 'pytorch', 'scikit', 'sklearn', 'искусственный интеллект', 'обучение модели', 'llm', 'gpt', 'нейронка'], `🧠 Машинное обучение — коротко\n\nПуть: данные → признаки → модель → обучение → оценка на отложенной выборке.\n\n${code('python', `# pip install scikit-learn\nfrom sklearn.datasets import load_iris\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestClassifier\n\nX, y = load_iris(return_X_y=True)\nX_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=42)\nmodel = RandomForestClassifier().fit(X_tr, y_tr)\nprint("Точность:", model.score(X_te, y_te))`)}\nПереобучение — модель «зазубрила» обучающие данные: проверяйте на тестовых. LLM-нейросети (как ChatGPT) обучаются на огромных текстах; в отличие от них, я работаю по правилам и базе знаний, без нейросети.`);
+
+K('forms', 'html', ['форма', 'формы', 'форму', 'отправить форму', 'submit', 'валидация', 'валидация формы', 'formdata', 'отправка формы'], `📨 Формы и отправка данных\n\n${code('html', `<form id="f">\n  <input name="email" type="email" required>\n  <input name="age" type="number" min="1" max="120">\n  <button>Отправить</button>\n</form>`)}\n${code('javascript', `f.addEventListener('submit', async e => {\n  e.preventDefault();                          // не перезагружать страницу\n  const data = Object.fromEntries(new FormData(f));\n  const res = await fetch('/api/signup', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(data),\n  });\n  if (!res.ok) return alert('Ошибка ' + res.status);\n});`)}\nВалидацию делайте и в браузере (required, pattern), и обязательно на сервере.`);
+K('ui-style', 'css', ['красивая кнопка', 'красивую кнопку', 'кнопка', 'кнопку', 'стилизовать', 'скругление', 'тень', 'градиент', 'border-radius', 'box-shadow', 'оформить', 'красиво'], `🎨 Красивая кнопка и базовый стиль\n\n${code('css', `.btn {\n  padding: 10px 18px;\n  border: 0;\n  border-radius: 12px;\n  background: linear-gradient(135deg, #6a5cff, #00c2ff);\n  color: #fff;\n  font: 600 15px system-ui, sans-serif;\n  box-shadow: 0 6px 16px rgba(106, 92, 255, .35);\n  cursor: pointer;\n  transition: transform .15s, box-shadow .15s;\n}\n.btn:hover  { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(106, 92, 255, .45); }\n.btn:active { transform: translateY(1px); }\n.btn:disabled { opacity: .5; cursor: not-allowed; }`)}\nПравила хорошего вида: единый отступ (8/16/24px), 2–3 цвета, достаточный контраст, скругления одного размера.`);
+
+K('auth-flow', null, ['oauth', 'ооаут', 'вход через google', 'вход через гугл', 'авторизация через', 'sso', 'access token', 'refresh token', 'refresh', 'сессия или jwt', 'jwt или сессии', 'cookie сессии', 'httponly'], `🔑 Сессии, JWT и OAuth\n\n• Сессия: сервер хранит данные, браузеру отдаёт случайный id в cookie (HttpOnly, Secure, SameSite). Легко отозвать\n• JWT: токен сам несёт данные и подпись. Не нужно хранить на сервере, но отозвать до истечения сложно → делают короткий срок жизни (access, 15 мин) + refresh-токен\n• OAuth 2.0: «войти через Google» — вы не отдаёте приложению пароль, а оно получает токен с ограниченными правами\n• Токены не кладите в localStorage, если можно использовать HttpOnly-cookie (защита от кражи через XSS)\n\n${code('javascript', `res.cookie('sid', token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7 * 864e5 });`)}`);
+K('graphql', null, ['graphql', 'грэфкюэл', 'гарфкуэль', 'apollo', 'query и mutation'], `🔷 GraphQL\n\nКлиент сам описывает, какие поля нужны, и получает ровно их — одним запросом.\n\n${code('graphql', `query {\n  user(id: 5) {\n    name\n    posts(limit: 3) { title }\n  }\n}\n\nmutation {\n  addPost(title: "Привет") { id }\n}`)}\nПлюсы: нет лишних данных и множества запросов. Минусы: сложнее кэшировать, нужно защищаться от слишком тяжёлых запросов. Для простых проектов обычно хватает REST.`);
+K('mongo', null, ['mongodb', 'монго', 'монгодб', 'mongoose', 'документная база', 'nosql база'], `🍃 MongoDB\n\nХранит документы (JSON-подобные) в коллекциях, схема гибкая.\n\n${code('javascript', `// npm i mongoose\nconst mongoose = require('mongoose');\nawait mongoose.connect(process.env.MONGO_URL);\n\nconst User = mongoose.model('User', new mongoose.Schema({\n  name: { type: String, required: true },\n  age: Number,\n}));\n\nawait User.create({ name: 'Аня', age: 25 });\nconst adults = await User.find({ age: { $gte: 18 } }).sort({ age: -1 }).limit(10);`)}\nХорош для данных без жёстких связей. Если много связей и транзакций — берите PostgreSQL.`);
+K('bundler', 'js', ['vite', 'webpack', 'сборка js', 'бандлер', 'bundler', 'rollup', 'esbuild', 'babel', 'транспиляц', 'npm run build'], `📦 Сборщики (Vite, Webpack)\n\nСборщик склеивает модули и ресурсы в оптимизированные файлы для браузера: минификация, tree-shaking (выкидывает неиспользуемое), TypeScript/JSX → JS.\n\n${code('bash', `npm create vite@latest myapp   # быстрый старт (React/Vue/Svelte/vanilla)\ncd myapp && npm i\nnpm run dev      # сервер разработки с мгновенным обновлением\nnpm run build    # продакшн-сборка в папку dist`)}\nСегодня для новых проектов чаще берут Vite: он быстрее и проще в настройке, чем Webpack.`);
+K('lint', null, ['eslint', 'prettier', 'линтер', 'линтинг', 'форматирование кода', 'black python', 'ruff', 'flake8', 'pre-commit', 'husky'], `🧹 Линтеры и форматтеры\n\n• Линтер находит ошибки и плохие приёмы (ESLint, Ruff/Flake8)\n• Форматтер приводит стиль к единому виду (Prettier, Black)\n\n${code('bash', `npm i -D eslint prettier\nnpx eslint .          # проверить\nnpx prettier -w .     # отформатировать\n\npip install ruff black\nruff check . && black .`)}\nПодключите их в редакторе (форматирование при сохранении) и в pre-commit — стиль перестанет быть темой споров.`);
+K('linux-ops', 'bash', ['journalctl', 'systemctl', 'systemd', 'top', 'htop', 'df', 'du', 'свободное место', 'память сервера', 'нагрузка на сервер', 'процессы linux', 'порт занят', 'lsof', 'netstat', 'логи сервера', 'tail', 'администрирование'], `🛠 Linux: диагностика сервера\n\n${code('bash', `top / htop              # процессы, CPU и память\ndf -h                   # свободное место на дисках\ndu -sh * | sort -h      # какие папки тяжёлые\nfree -h                 # память\nss -tulpn               # кто слушает порты (замена netstat)\nlsof -i :3000           # что занимает порт 3000\nkill -9 <pid>           # убить процесс\n\nsystemctl status nginx  # состояние службы\nsystemctl restart nginx\njournalctl -u myapp -f  # логи службы в реальном времени\ntail -f /var/log/app.log`)}\n«Порт занят» (EADDRINUSE): найдите процесс через lsof и завершите его, либо смените порт.`);
+K('nginx', 'bash', ['nginx', 'нжинкс', 'обратный прокси', 'reverse proxy', 'proxy_pass', 'ssl сертификат', "let's encrypt", 'certbot', 'https для сайта', 'домен для сервера'], `🌐 Nginx как обратный прокси + HTTPS\n\n${code('nginx', `server {\n    listen 80;\n    server_name example.com;\n\n    location / {\n        proxy_pass http://127.0.0.1:3000;        # ваше приложение\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_http_version 1.1;                  # для WebSocket:\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";\n    }\n}`)}\n${code('bash', `sudo certbot --nginx -d example.com   # бесплатный HTTPS (Let's Encrypt)`)}\nДомен направьте A-записью на IP сервера.`);
+K('k8s', 'bash', ['kubernetes', 'k8s', 'кубернетес', 'кубер', 'pod', 'deployment', 'helm'], `☸️ Kubernetes — основы\n\nОркестратор контейнеров: запускает, масштабирует и перезапускает ваши Docker-контейнеры на кластере.\n\n• Pod — минимальная единица (1+ контейнер)\n• Deployment — «хочу 3 копии приложения», сам следит за этим\n• Service — постоянный адрес для набора подов\n• Ingress — входящий HTTP-трафик снаружи\n\n${code('bash', `kubectl get pods\nkubectl apply -f deployment.yaml\nkubectl logs -f <pod>\nkubectl scale deployment app --replicas=5`)}\nДля одного небольшого сервиса это избыточно: хватит Docker Compose или простого хостинга.`);
+K('py-typing', 'py', ['аннотации типов', 'type hints', 'typing', 'mypy', 'optional python', 'тип аргумента python', 'pydantic'], `🏷 Аннотации типов в Python\n\n${code('python', `from typing import Optional\n\ndef greet(name: str, age: Optional[int] = None) -> str:\n    return f"Привет, {name}" + (f" ({age})" if age else "")\n\nitems: list[int] = [1, 2, 3]\nuser: dict[str, str | int] = {"name": "Аня", "age": 25}`)}\nИнтерпретатор типы не проверяет — это подсказки для редактора и инструмента mypy (pip install mypy; mypy file.py). Для проверки данных на входе используйте pydantic.`);
+K('sort-theory', null, ['какая сортировка', 'какую сортировку', 'виды сортировок', 'сравнение сортировок', 'сортировка быстрая или', 'устойчивая сортировка', 'heap sort', 'пирамидальная', 'timsort', 'сортировка выбором', 'сортировка вставками'], `📊 Сортировки: что выбрать\n\n• Пузырьком / выбором / вставками — O(n²). Только для обучения и очень маленьких массивов (вставками хороша на почти отсортированных)\n• Быстрая (quick) — в среднем O(n log n), на практике самая быстрая, но худший случай O(n²), неустойчивая\n• Слиянием (merge) — всегда O(n log n), устойчивая, нужна доп. память\n• Пирамидальная (heap) — O(n log n), без доп. памяти, неустойчивая\n• Timsort (в Python и JS) — гибрид слияния и вставок, устойчивая, очень быстрая на реальных данных\n\nУстойчивая — равные элементы сохраняют исходный порядок. В 99% случаев используйте встроенную sort().`);
+K('pagination', null, ['пагинация', 'постраничный вывод', 'limit offset', 'cursor pagination', 'бесконечная прокрутка', 'infinite scroll', 'ленивая подгрузка', 'rate limit', 'ограничение запросов', 'лимит запросов'], `📄 Пагинация и ограничение запросов\n\n${code('sql', `-- постранично\nSELECT * FROM posts ORDER BY id DESC LIMIT 20 OFFSET 40;     -- 3-я страница\n-- курсором (быстрее на больших таблицах)\nSELECT * FROM posts WHERE id < 12345 ORDER BY id DESC LIMIT 20;`)}\nOFFSET на больших таблицах медленный (БД всё равно перебирает пропущенные строки) — для бесконечной ленты используйте курсор (id/время последней записи).\n\nRate limit (защита от флуда):\n${code('javascript', `const hits = new Map();\napp.use((req, res, next) => {\n  const now = Date.now(), list = (hits.get(req.ip) || []).filter(t => now - t < 60000);\n  if (list.length >= 100) return res.status(429).json({ error: 'Слишком много запросов' });\n  list.push(now); hits.set(req.ip, list); next();\n});`)}`);
+K('web-perf', 'html', ['lighthouse', 'web vitals', 'core web vitals', 'lcp', 'ленивая загрузка картинок', 'lazy loading', 'оптимизация картинок', 'webp', 'сжатие gzip', 'brotli', 'скорость загрузки сайта'], `⚡ Скорость загрузки сайта\n\n• Картинки: WebP/AVIF, нужный размер, loading="lazy", width/height (чтобы не «прыгала» вёрстка)\n• Сжатие ответов: gzip/brotli на сервере\n• Кэш статики: Cache-Control: public, max-age=31536000, immutable (с хэшем в имени файла)\n• JS: не грузить лишнее, defer/async у скриптов, разбивать на чанки\n• Шрифты: font-display: swap, один-два начертания\n• Измеряйте: Lighthouse в DevTools (Core Web Vitals: LCP, CLS, INP)\n\n${code('html', `<img src="cat.webp" alt="Кот" width="400" height="300" loading="lazy">\n<script src="app.js" defer></script>`)}`);
 // ---- Алгоритмы и теория
 K('bigo', null, ['o(n', 'сложность алгоритм', 'big o', 'асимптотик', 'временная сложность', 'вычислительная сложность'], `📈 Сложность алгоритмов (Big O)\n\nO(1) — константа: доступ к элементу массива по индексу\nO(log n) — бинарный поиск\nO(n) — один проход по данным\nO(n log n) — хорошая сортировка (merge, quick, встроенная)\nO(n²) — вложенные циклы, пузырьковая сортировка\nO(2ⁿ) — наивные перебор подмножеств, рекурсивный Фибоначчи\nO(n!) — перебор перестановок\n\nПравило: смотрим, как растёт время при росте входа, константы отбрасываем. Для 10⁶ элементов O(n²) — это ~10¹² операций, то есть слишком долго.`);
 K('recursion', null, ['рекурси', 'recursion', 'стек вызовов', 'stack overflow', 'переполнение стека'], `🔁 Рекурсия\n\nФункция вызывает сама себя. Нужны две вещи: базовый случай (когда остановиться) и шаг, приближающий к нему.\n\n${code('javascript', `function sum(n) {\n  if (n === 0) return 0;      // базовый случай\n  return n + sum(n - 1);      // шаг рекурсии\n}\nsum(4); // 4 + 3 + 2 + 1 + 0 = 10`)}\n\nБез базового случая получите «Maximum call stack size exceeded» (stack overflow). Глубокую рекурсию заменяйте циклом или явным стеком.`);
@@ -2192,8 +2291,8 @@ K('patterns', null, ['паттерн', 'шаблон проектировани�
 K('rest', null, ['rest', 'api', 'http', 'коды ответ', 'статус код', 'get post', 'эндпоинт', 'endpoint', '404', '500', '200'], `🌍 HTTP и REST API\n\nМетоды: GET — получить, POST — создать, PUT/PATCH — изменить, DELETE — удалить.\n\nСтатусы:\n• 200 OK, 201 Created, 204 No Content\n• 301/302 — редирект\n• 400 Bad Request — клиент прислал ерунду\n• 401 — не авторизован, 403 — нельзя, 404 — не найдено, 429 — слишком много запросов\n• 500 — ошибка на сервере\n\n${code('http', `GET    /api/users        → список\nGET    /api/users/5      → один\nPOST   /api/users        → создать (тело — JSON)\nPUT    /api/users/5      → заменить\nDELETE /api/users/5      → удалить`)}\nREST: ресурсы — существительные в URL, действия — HTTP-методы, без состояния на сервере.`);
 K('cors', 'js', ['cors', 'корс', 'cross origin', 'access-control'], `🚧 CORS\n\nБраузер блокирует запросы на другой домен/порт, если сервер не разрешил их заголовком Access-Control-Allow-Origin.\n\n${code('javascript', `// Express\nconst cors = require('cors');\napp.use(cors({ origin: 'https://mysite.ru' }));   // или cors() — всем (только для разработки)`)}\n\nЭто защита браузера: curl и сервер-сервер запросы CORS не затрагивает. Ошибку чинят на сервере, а не в клиентском коде.`);
 K('sec-xss', null, ['xss', 'межсайтов', 'безопасност', 'уязвимост', 'защита сайта', 'взлом', 'sanitize', 'экранирован'], `🛡 Безопасность веб-приложений\n\n• XSS — вставка скриптов через пользовательский ввод. Защита: textContent вместо innerHTML, экранирование HTML, CSP.\n• SQL-инъекции — параметризованные запросы.\n• CSRF — токены/SameSite-куки.\n• Пароли — только хэш с солью (bcrypt/argon2), никогда не plain text.\n• Секреты (ключи, токены) — в переменных окружения, не в git.\n• Всегда проверяйте данные на СЕРВЕРЕ: клиентской валидации доверять нельзя.\n• HTTPS везде, обновляйте зависимости (npm audit).\n\n${code('javascript', `const esc = s => String(s).replace(/[&<>"']/g, c =>\n  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));`)}`);
-K('hash', null, ['пароль', 'хеш', 'хэш', 'bcrypt', 'шифрован', 'jwt', 'токен авториз', 'авторизац', 'аутентификац', 'логин'], `🔐 Пароли и авторизация\n\n${code('javascript', `// npm i bcrypt\nconst bcrypt = require('bcrypt');\nconst hash = await bcrypt.hash(password, 12);     // сохранить в БД\nconst ok = await bcrypt.compare(input, hash);     // проверить при входе\n\n// сессионный токен\nconst token = require('crypto').randomBytes(32).toString('hex');`)}\n\n• Не храните пароли в открытом виде и не используйте MD5/SHA1 для паролей\n• Токен сессии — длинный случайный, храните его хэш; отдавайте по HTTPS\n• JWT: подписывайте, ставьте срок жизни, не кладите секреты в payload (он читается всеми)`);
-K('perf', null, ['оптимизац', 'ускорить', 'производительность', 'тормозит', 'медленно работает', 'профилирован', 'утечка памяти'], `🚀 Как ускорить код\n\n1. Сначала измерьте (профайлер, console.time), а не угадывайте\n2. Выберите правильную структуру данных (Set/Map вместо поиска по массиву)\n3. Уберите вложенные циклы там, где можно (O(n²) → O(n))\n4. Кэшируйте результат дорогих вычислений\n5. БД: индексы, не делайте запросы в цикле (N+1), берите только нужные колонки\n6. Фронтенд: debounce для событий, ленивые картинки, не перерисовывайте весь DOM\n7. Сеть: сжатие, пагинация, кэширование заголовками\n\n${code('javascript', `console.time('work');\nheavy();\nconsole.timeEnd('work');`)}`);
+K('hash', null, ['хранить сессии', 'сессии', 'сессия', 'хранить пароли', 'вход на сайт', 'пароль', 'хеш', 'хэш', 'bcrypt', 'шифрован', 'jwt', 'токен авториз', 'авторизац', 'аутентификац', 'логин'], `🔐 Пароли и авторизация\n\n${code('javascript', `// npm i bcrypt\nconst bcrypt = require('bcrypt');\nconst hash = await bcrypt.hash(password, 12);     // сохранить в БД\nconst ok = await bcrypt.compare(input, hash);     // проверить при входе\n\n// сессионный токен\nconst token = require('crypto').randomBytes(32).toString('hex');`)}\n\n• Не храните пароли в открытом виде и не используйте MD5/SHA1 для паролей\n• Токен сессии — длинный случайный, храните его хэш; отдавайте по HTTPS\n• JWT: подписывайте, ставьте срок жизни, не кладите секреты в payload (он читается всеми)`);
+K('perf', null, ['медленно', 'долго грузится', 'грузится', 'тормоз', 'скорость сайта', 'быстродействие', 'лагает', 'оптимизац', 'ускорить', 'производительность', 'тормозит', 'медленно работает', 'профилирован', 'утечка памяти'], `🚀 Как ускорить код\n\n1. Сначала измерьте (профайлер, console.time), а не угадывайте\n2. Выберите правильную структуру данных (Set/Map вместо поиска по массиву)\n3. Уберите вложенные циклы там, где можно (O(n²) → O(n))\n4. Кэшируйте результат дорогих вычислений\n5. БД: индексы, не делайте запросы в цикле (N+1), берите только нужные колонки\n6. Фронтенд: debounce для событий, ленивые картинки, не перерисовывайте весь DOM\n7. Сеть: сжатие, пагинация, кэширование заголовками\n\n${code('javascript', `console.time('work');\nheavy();\nconsole.timeEnd('work');`)}`);
 K('debug', null, ['отладк', 'дебаг', 'debug', 'не работает', 'баг', 'ошибка в коде', 'почему не работает', 'как найти ошибку'], `🐞 Как искать ошибки\n\n1. Прочитайте текст ошибки — там почти всегда указана строка и причина\n2. Воспроизведите минимальный пример\n3. Выведите промежуточные значения (console.log / print) или используйте отладчик с точками останова\n4. Сузьте область поиска: закомментируйте половину кода (бинарный поиск бага)\n5. Проверьте типичное: опечатки в именах, забытый await/return, undefined/None, индекс за границей, регистр букв, пути к файлам\n6. Отдохните — «утка-резинка»: объясните код вслух\n\nПришлите мне код и текст ошибки — разберём вместе 🙂`);
 K('commonerr', 'js', ['undefined is not', 'cannot read propert', 'is not a function', 'is not defined', 'unexpected token', 'referenceerror', 'typeerror', 'syntaxerror'], `🧯 Частые ошибки JavaScript\n\n• Cannot read properties of undefined (reading 'x') — вы обращаетесь к полю у undefined/null. Проверьте цепочку: obj?.a?.x, и откуда приходят данные (часто данные ещё не загрузились)\n• X is not a function — опечатка, вызов не того объекта или перезаписанное имя\n• X is not defined — переменная не объявлена или вне области видимости\n• Unexpected token — синтаксис: лишняя/пропущенная скобка, запятая, кавычка\n• Cannot access 'x' before initialization — let/const использована до объявления\n• CORS error — см. «что такое cors»\n• Uncaught (in promise) — забыли catch/try у async-функции\n\nПришлите точный текст ошибки и фрагмент кода — найду причину.`);
 K('pyerr', 'py', ['indentationerror', 'nameerror', 'keyerror', 'indexerror', 'attributeerror', 'modulenotfound', 'importerror', 'valueerror', 'typeerror python'], `🧯 Частые ошибки Python\n\n• IndentationError — неверные отступы, смешаны табы и пробелы\n• NameError — переменная/функция не определена (опечатка или не импортирована)\n• KeyError — нет такого ключа в словаре → используйте d.get(key)\n• IndexError: list index out of range — индекс больше длины-1\n• AttributeError — у объекта нет такого атрибута/метода (часто он None)\n• ModuleNotFoundError — pip install <пакет> в нужном окружении\n• TypeError — неподходящий тип, например "5" + 3 (нужно int("5") + 3)\n• ValueError — тип верный, а значение нет: int("abc")`);
@@ -2279,7 +2378,7 @@ function analyzeCode(src, hint) {
 
     let out = '🔎 Разбор вашего кода\n\n' + (info.join('\n') || 'Код получил.') + '\n\n';
     out += notes.length ? 'Что можно улучшить:\n' + notes.map(n => '• ' + n).join('\n') : '✅ Явных проблем не вижу. Стиль и логика выглядят нормально.';
-    out += '\n\nЕсли код ведёт себя не так, как ожидается, напишите, что должно происходить и что происходит на самом деле (и текст ошибки) — разберу точнее.';
+    out += '\n\nМогу показать разбор по строкам — ответьте «да». Если код ведёт себя не так, как ожидается, напишите, что должно происходить и какая ошибка — разберу точнее.';
     return out;
 }
 
@@ -2310,6 +2409,9 @@ const HELP = `🤖 Я Ai_bot — ваш помощник по программи
 😄 Шутить: «расскажи анекдот»
 
 Я помню контекст: после «напиши сортировку на js» можно спросить «а на python?».
+🙋 Профиль: «я учу python», «я новичок», «делаю бота» — подстроюсь; «а в питоне?» — покажу то же на другом языке; «объясни проще» — на пальцах; «что мы обсуждали»
+🧠 Обучение: «запомни: вопрос = ответ», «что ты запомнил», «забудь …»; если ответ не тот — напишите «не то» и поясните
+📏 Единицы: «5 км в мили», «100 f в c», «2 гб в мб»
 🧰 Инструменты: проверка JSON, «255 в двоичную», «sha256 от текст», «закодируй base64 текст», «что значит 502», «сгенерируй пароль 20», «uuid», «#ff8800 в rgb», «cron 0 9 * * 1-5», «проверь /\\d+/ на «a12b3»»
 Команды: /help — это меню, /topics — темы, /clear — забыть контекст.`;
 
@@ -2335,6 +2437,12 @@ function smallTalk(n, toks, st, name) {
     if (/какое (сегодня )?число|какая (сегодня )?дата|какой (сегодня )?день|сегодняшн.. дата/.test(n)) return '📅 Сегодня ' + new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Vladivostok' }) + '.';
     if (/ты (умный|тупой|глупый|классный|крутой|молодец)|молодец|умница|красавчик|круто/.test(n)) return pick(['Спасибо! Стараюсь 😊 Давайте проверим на практике — задайте вопрос по коду.', 'Приятно слышать! Но проверьте меня сложной задачей 😉']);
     if (/ты (живой|человек|настоящий|бот|робот|ии|нейросеть)|ты нейросет|ты chatgpt|ты gpt/.test(n)) return 'Я программа, а не человек и не большая нейросеть: работаю по набору правил и базе знаний по программированию, поэтому быстрый, бесплатный и без внешних API. Могу ошибаться или чего-то не знать — тогда так и скажу.';
+    if (/(мне скучно|скучно)/.test(n) && toks.length <= 5) return 'Тогда давайте займёмся делом 😄 Могу дать задачку из викторины (напишите «квиз»), предложить идею проекта («идея для проекта») или рассказать анекдот.';
+    if (/(я устал|устала|выгорел|нет сил|надоело программировать)/.test(n)) return 'Это нормально — программирование выматывает 🫶 Сделайте паузу: прогулка, вода, 10 минут без экрана. Часто ошибка находится сама, когда возвращаешься со свежей головой. Когда будете готовы — я рядом.';
+    if (/(не получается|ничего не выходит|не могу разобраться|у меня не выходит|запутался|запуталась|не понимаю программирование)/.test(n)) return 'Спокойно, это бывает у всех 🙂 Давайте по шагам: напишите, что именно хотите получить, и пришлите свой код (в блоке ```) с текстом ошибки — разберём вместе. Можно и «объясни» + код — расскажу построчно.';
+    if (/(какой язык (лучше|выбрать|учить)|посоветуй язык|с какого языка)/.test(n)) return '🧭 Выбор языка зависит от цели:\n• Сайты и боты — JavaScript\n• Данные, автоматизация, старт «с нуля» — Python\n• Игры — C#/C++\n• Android — Kotlin, iOS — Swift\n• Сервера под нагрузкой — Go/Java\nНе знаете цели — берите Python или JavaScript. Напишите «python или javascript» — сравню.';
+    if (/(сколько тебе лет|когда ты (родился|появился)|где ты живешь|где ты живёшь)/.test(n)) return 'Я программа: живу на сервере этого мессенджера, а «возраст» — со дня последнего перезапуска 😄';
+    if (/(ты (любишь|нравится)|твой любимый язык|любимый язык)/.test(n)) return 'Любимчиков нет, но JavaScript и Python мне ближе всего — на них я могу показать больше всего примеров 🙂';
     if (/^(да|ага|угу|ок|окей|ok|okay|хорошо|ладно|понятно|ясно|понял|поняла)\W*$/.test(n)) return pick(['Отлично! Что дальше? 🙂', 'Хорошо. Есть ещё вопросы по коду?', 'Принято 👍 Пишите, если что-то понадобится.']);
     if (/^(нет|неа|не надо|не нужно)\W*$/.test(n)) return 'Хорошо, не буду. Если что — просто напишите вопрос 🙂';
     if (/\b(люблю тебя|ты мне нравишься)\b/.test(n)) return 'Я всего лишь бот, но мне приятно 😄 Давайте лучше напишем что-нибудь полезное!';
@@ -2355,12 +2463,15 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of sessions) if (n
 function scoreKB(toks, raw, lang, ctxLang) {
     const n = norm(raw);
     const scored = [];
+    const badList = CUR != null ? ((userMem(CUR).bad || {})[pkey(toks)] || []) : [];
     for (const e of KB) {
+        if (badList.includes(e.id)) continue;
         let s = 0, matched = 0;
         for (const k of e.kws) {
             if (k.includes(' ') || /[^a-zа-я0-9_]/.test(k)) { if (n.includes(k)) { s += 3; matched++; } }
             else if (toks.some(t => kwMatch(k, t))) { s += k.length >= 6 ? 2 : k.length >= 4 ? 1.5 : 2; matched++; }
         }
+        const lh = learnedHits(e.id, toks); if (lh) { s += 1.2 * lh; matched++; }
         if (!matched) continue;
         s *= e.weight;
         if (e.lang) {
@@ -2529,8 +2640,59 @@ function complexityNote(src) {
     return '';
 }
 
+
+const bigFact = n => { let r = 1n; for (let i = 2n; i <= BigInt(n); i++) r *= i; return r; };
+const bigFib = n => { let a = 0n, b = 1n; for (let i = 0; i < n; i++) [a, b] = [b, a + b]; return a; };
+const gcdN = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; };
+function factorize(n) { const f = []; for (let d = 2; d * d <= n; d++) while (n % d === 0) { f.push(d); n /= d; } if (n > 1) f.push(n); return f; }
+const groupPow = f => Object.entries(f.reduce((m, x) => (m[x] = (m[x] || 0) + 1, m), {})).map(([p, k]) => (k > 1 ? `${p}^${k}` : p)).join(' × ');
+const numList = str => (str.match(/-?\d+(?:[.,]\d+)?/g) || []).map(x => parseFloat(x.replace(',', '.')));
+function toRomanN(n) { const m = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]; let o = ''; for (const [v, r] of m) while (n >= v) { o += r; n -= v; } return o; }
+function fromRoman(s) { const v = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 }; let t = 0; for (let i = 0; i < s.length; i++) { const c = v[s[i]], nx = v[s[i + 1]]; t += nx > c ? -c : c; } return t; }
+function toolCompute(n, raw) {
+    let m;
+    if ((m = n.match(/факториал\S*\s*(?:числа\s*)?(\d{1,3})(?![\d])/)) || (m = n.match(/(?:^|\s)(\d{1,3})\s*!(?!=)/))) {
+        const k = +m[1]; if (k > 500) return 'Слишком большое число для вывода 🙂 Попробуйте до 500.';
+        const r = bigFact(k).toString(); return `🧮 ${k}! = ${r.length > 120 ? r.slice(0, 60) + '…' + r.slice(-30) + ` (всего ${r.length} цифр)` : r}`;
+    }
+    if ((m = n.match(/(\d{1,4})[-\s]*(?:е|ое|ый|ой|й|ое)?\s+число\s+фибоначчи/)) || (m = n.match(/(?:^|\s)(\d{1,4})\s+(?:число\s+)?фибоначчи/)) || (m = n.match(/фибоначчи\s*(?:от\s*|для\s*|числа\s*|номер\s*)?(\d{1,4})(?![\d])/)) || (m = n.match(/fib(?:onacci)?\s*\(?(\d{1,4})\)?/))) {
+        const k = +m[1], r = bigFib(k).toString(); return `🧮 F(${k}) = ${r.length > 100 ? r.slice(0, 50) + '…' + ` (${r.length} цифр)` : r}  (нумерация с F(0)=0, F(1)=1)`;
+    }
+    if ((m = n.match(/(?:разлож\S*|факторизу\S*|раскла\S*)\s*(?:на\s*(?:простые\s*)?множител\S*\s*)?(?:число\s*)?(\d{2,15})/)) || (m = n.match(/(\d{2,15})\s*на\s*(?:простые\s*)?множител/))) {
+        const v = +m[1], f = factorize(v); return f.length === 1 ? `🔢 ${v} — простое число (разложить нельзя).` : `🔢 ${v} = ${groupPow(f)}`;
+    }
+    if ((m = n.match(/(?:^|\s)(\d{1,15})\s+(?:это\s+)?(?:простое|прост\S*)(?:\s+число)?(?:\s+ли)?(?![а-я])/)) || (m = n.match(/прост\S*\s+(?:ли\s+)?(?:число\s+)?(\d{1,15})/)) || (m = n.match(/(?:является\s+ли|является ли)\s+(\d{1,15})\s+прост/)) || (m = n.match(/(?:^|\s)(\d{1,15})\s+простое\s+ли/))) {
+        const v = +m[1]; if (v < 2) return `🔢 ${v} — не простое число (простые начинаются с 2).`;
+        const f = factorize(v); return f.length === 1 ? `🔢 ${v} — простое число ✅` : `🔢 ${v} — составное число ❌, ${groupPow(f)}`;
+    }
+    if ((m = n.match(/делител\S*\s*(?:числа\s*)?(\d{1,9})/))) { const v = +m[1], d = []; for (let i = 1; i * i <= v; i++) if (v % i === 0) { d.push(i); if (i !== v / i) d.push(v / i); } d.sort((a, b) => a - b); return `🔢 Делители ${v} (${d.length}): ${d.join(', ')}`; }
+    if ((m = n.match(/(?:нод|наибольш\S*\s+общ\S*\s+делител\S*|gcd)\D{0,12}?(-?\d+)\D+?(-?\d+)/))) return `🔢 НОД(${m[1]}, ${m[2]}) = ${gcdN(+m[1], +m[2])}`;
+    if ((m = n.match(/(?:нок|наименьш\S*\s+общ\S*\s+кратн\S*|lcm)\D{0,12}?(\d+)\D+?(\d+)/))) { const a = +m[1], b = +m[2]; return `🔢 НОК(${a}, ${b}) = ${a / gcdN(a, b) * b}`; }
+    if ((m = n.match(/високосн\S*\s*(?:ли\s*)?(?:год\s*)?(\d{3,4})/)) || (m = n.match(/(\d{3,4})\s*(?:год\s*)?високосн/))) { const y = +m[1]; const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; return `📅 ${y} год ${leap ? 'високосный (366 дней)' : 'не високосный (365 дней)'}. Правило: делится на 4, но не на 100 — кроме делящихся на 400.`; }
+    if ((m = n.match(/(\d{1,4})\s*(?:в|->|→)\s*римск/))) { const v = +m[1]; if (v < 1 || v > 3999) return 'Римскими цифрами можно записать числа от 1 до 3999.'; return `🏛 ${v} = ${toRomanN(v)}`; }
+    if ((m = raw.match(/(?:римск\S*|roman)[^A-Za-z]*\b([IVXLCDM]{1,15})\b/i)) || (m = raw.match(/\b([IVXLCDM]{2,15})\b\s*(?:в|->|→)\s*(?:арабск|числ|цифр)/))) { const r = m[1].toUpperCase(); if (toRomanN(fromRoman(r)) === r) return `🏛 ${r} = ${fromRoman(r)}`; }
+    if ((m = raw.match(/(?:переверн\S*|реверс\S*|разверн\S*|наоборот)[^"«'“]*["«'“](.+?)["»'”]/i))) return `🔁 «${[...m[1]].reverse().join('')}»`;
+    if ((m = raw.match(/палиндром\S*[^"«'“]*["«'“](.+?)["»'”]/i))) { const t = [...m[1].toLowerCase()].filter(c => /[\p{L}\p{N}]/u.test(c)).join(''); const ok = t === [...t].reverse().join(''); return `🔁 «${m[1]}» — ${ok ? 'палиндром ✅' : 'не палиндром ❌'}`; }
+    if ((m = n.match(/(отсортир\S*|сортиру\S*|упорядоч\S*)\D{0,25}((?:-?\d+(?:[.,]\d+)?[\s,;]+){1,}-?\d+(?:[.,]\d+)?)/))) {
+        const a = numList(m[2]), desc = /по убыванию|в обратном|убыван/.test(n); a.sort((x, y) => desc ? y - x : x - y); return `📊 ${desc ? 'По убыванию' : 'По возрастанию'}: ${a.map(fmtNum).join(', ')}`;
+    }
+    if ((m = n.match(/(сумм\S*|средн\S*|среднее арифметическ\S*|максимум\S*|максимальн\S*|минимум\S*|минимальн\S*|наибольш\S*|наименьш\S*|медиан\S*)\D{0,30}?((?:-?\d+(?:[.,]\d+)?[\s,;]+){1,}-?\d+(?:[.,]\d+)?)/))) {
+        const a = numList(m[2]); if (a.length < 2) return null; const w = m[1];
+        const sum = a.reduce((x, y) => x + y, 0);
+        if (/^сумм/.test(w)) return `➕ Сумма: ${fmtNum(+sum.toPrecision(12))}  (чисел: ${a.length})`;
+        if (/^средн/.test(w)) return `📈 Среднее: ${fmtNum(+(sum / a.length).toPrecision(12))}`;
+        if (/^(максим|наибольш)/.test(w)) return `⬆️ Максимум: ${fmtNum(Math.max(...a))}`;
+        if (/^(миним|наименьш)/.test(w)) return `⬇️ Минимум: ${fmtNum(Math.min(...a))}`;
+        const b = [...a].sort((x, y) => x - y), mid = b.length >> 1; return `📊 Медиана: ${fmtNum(b.length % 2 ? b[mid] : (b[mid - 1] + b[mid]) / 2)}`;
+    }
+    if (/(брось|кинь|подбрось|бросок)\S*\s*(кубик|кость|игральн)/.test(n)) return `🎲 Выпало: ${1 + Math.floor(Math.random() * 6)}`;
+    if (/(подбрось|брось|кинь)\S*\s*монет/.test(n)) return Math.random() < 0.5 ? '🪙 Орёл' : '🪙 Решка';
+    if ((m = raw.match(/выбери\S*\s*(?:случайн\S*\s*)?(?:из|между)?:?\s*(.+)/i)) && /[,;]|\s+или\s+/.test(m[1])) { const opts = m[1].split(/\s*(?:,|;|\s+или\s+)\s*/).map(x => x.replace(/[?!.]+$/, '').trim()).filter(Boolean); if (opts.length >= 2) return `🎯 Выбираю: ${opts[Math.floor(Math.random() * opts.length)]}`; }
+    return null;
+}
+
 function runTools(raw, n, s) {
-    return toolRunCode(raw, n) || toolJson(raw) || toolRegex(raw) || toolConvertBase(n) || toolsSimple(raw, n);
+    return toolRunCode(raw, n) || toolJson(raw) || toolRegex(raw) || toolConvertBase(n) || toolUnits(n) || toolCompute(n, raw) || toolsSimple(raw, n);
 }
 
 const MATH_ONLY = /^[\s\d+\-*/%^().,×÷=a-z]*$/i;
@@ -2623,9 +2785,389 @@ function didYouMean(toks) {
 
 const FOLLOW_RE = /^(еще|ещё|подробнее|подробней|дальше|продолжай|продолжи|продолжим|а еще|а ещё|давай еще|давай ещё|еще пример|ещё пример|другой пример|другой вариант|еще вариант|ещё вариант|не понял|не поняла|непонятно|не понятно|объясни проще|проще|объясни еще раз|повтори|а подробнее)(?![а-яё])/;
 
-function reply(uid, text, name) {
+
+// ───────────────────────────── поиск «по смыслу» (BM25 по тексту всех тем) ─────────────────────────────
+const STOP = new Set('что как это для при или если мне мой моя мои можно нужно такое какой какая какие где когда почему зачем есть быть был была были будет надо хочу хотел хотела хотим помоги помогите подскажи подскажите скажи скажите расскажи объясни напиши покажи сделать делать сделай привет здравствуйте пожалуйста очень еще уже тоже только свой свою также через после перед между чтобы чтоб ведь даже лучше хорошо плохо вопрос ответ нет там тут здесь все всё вся его ее её они оно вы ты мы он она там тем кто чем про под над без вот это эти этот эта том чей чего тебе тебя меня нам вам'.split(/\s+/));
+const stem = w => (w.length > 5 ? w.slice(0, 5) : w);
+let BM = null;
+function bmIndex() {
+    if (BM) return BM;
+    const docs = KB.map(e => {
+        const kw4 = e.kws.join(' '); const body = (kw4 + ' ' + kw4 + ' ' + kw4 + ' ' + kw4 + ' ' + e.text.replace(/```[\w]*\n?/g, ' '));
+        return tokens(body).filter(t => t.length > 1 && !STOP.has(t)).map(stem);
+    });
+    const df = new Map(); let total = 0;
+    docs.forEach(d => { total += d.length; new Set(d).forEach(t => df.set(t, (df.get(t) || 0) + 1)); });
+    BM = { docs, df, avg: total / docs.length, N: docs.length, tf: docs.map(d => { const m = new Map(); d.forEach(t => m.set(t, (m.get(t) || 0) + 1)); return m; }) };
+    return BM;
+}
+function bm25(qToks, lang) {
+    const q = [...new Set(qToks.filter(t => t.length > 1 && !STOP.has(t)).map(stem))];
+    if (q.length < 1) return null;
+    const I = bmIndex(), k1 = 1.4, b = 0.7, res = [];
+    I.docs.forEach((d, i) => {
+        let sc = 0, hit = 0;
+        for (const t of q) {
+            const f = I.tf[i].get(t); if (!f) continue;
+            const idf = Math.log(1 + (I.N - I.df.get(t) + 0.5) / (I.df.get(t) + 0.5));
+            sc += idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * d.length / I.avg)); hit++;
+        }
+        if (hit) res.push({ e: KB[i], sc: sc * (0.6 + 0.4 * hit / q.length) * (lang && KB[i].lang === lang ? 1.25 : 1), hit });
+    });
+    res.sort((a, b) => b.sc - a.sc);
+    if (!res.length) return null;
+    const top = res[0], second = res[1];
+    if (top.sc < 4 || (second && top.sc < second.sc * 1.3) || (q.length >= 3 && top.hit < 2)) return null;
+    return top;
+}
+
+// ───────────────────────────── сравнения «A или B» ─────────────────────────────
+const CMP = [
+    { a: ['let'], b: ['const', 'var'], t: '⚖️ var / let / const\n\n• var — область видимости функции, «всплывает», можно объявлять повторно. Устарел\n• let — блочная область, можно менять значение\n• const — блочная область, нельзя переприсвоить (но содержимое объекта/массива менять можно)\n\nПравило: по умолчанию const, если нужно менять — let, var не использовать.' },
+    { a: ['var'], b: ['const', 'let'], t: null, same: 0 },
+    { a: ['список', 'list', 'массив'], b: ['кортеж', 'tuple'], t: '⚖️ Список и кортеж (Python)\n\n• list [1, 2] — изменяемый: append, remove, присваивание по индексу\n• tuple (1, 2) — неизменяемый, быстрее и легче, может быть ключом словаря\n\nКортеж — для «записей» фиксированной структуры (x, y), список — для коллекций, которые меняются.' },
+    { a: ['sql'], b: ['nosql', 'mongodb', 'монго'], t: '⚖️ SQL и NoSQL\n\n• SQL (PostgreSQL, MySQL) — таблицы, жёсткая схема, связи и JOIN, транзакции (ACID). Лучший выбор по умолчанию\n• NoSQL (MongoDB, Redis) — документы/ключ-значение, гибкая схема, проще масштабировать горизонтально, но слабее со связями\n\nЕсли данные связаны (пользователи → заказы → товары), берите SQL.' },
+    { a: ['tcp'], b: ['udp'], t: '⚖️ TCP и UDP\n\n• TCP — соединение, гарантия доставки и порядка, медленнее (веб, почта, WebSocket)\n• UDP — без соединения и гарантий, зато быстро (видео, игры, голос, DNS)' },
+    { a: ['put'], b: ['patch', 'post'], t: '⚖️ POST / PUT / PATCH\n\n• POST — создать новый ресурс (не идемпотентен: два запроса — два ресурса)\n• PUT — заменить ресурс целиком (идемпотентен)\n• PATCH — изменить часть полей' },
+    { a: ['процесс'], b: ['поток', 'thread'], t: '⚖️ Процесс и поток\n\n• Процесс — изолированная программа со своей памятью\n• Поток — «нить» выполнения внутри процесса, делит память с другими потоками (быстрее создавать, но нужна синхронизация)' },
+    { a: ['merge'], b: ['rebase'], t: '⚖️ git merge и git rebase\n\n• merge — соединяет ветки новым коммитом слияния, история сохраняется как была\n• rebase — переносит ваши коммиты поверх другой ветки, история линейная и чистая\n\nНе делайте rebase для веток, которые уже отправили другим (push).' },
+    { a: ['flex', 'flexbox', 'флекс'], b: ['grid', 'грид'], t: '⚖️ Flexbox и Grid\n\n• Flexbox — одномерная раскладка (ряд ИЛИ столбец): меню, карточки в ряд, центрирование\n• Grid — двумерная сетка (строки И столбцы): макет страницы, галереи\n\nИх можно комбинировать: Grid для каркаса страницы, Flex внутри компонентов.' },
+    { a: ['стек'], b: ['очередь', 'queue'], t: '⚖️ Стек и очередь\n\n• Стек — LIFO: последним пришёл — первым ушёл (отмена действий, DFS, вызовы функций)\n• Очередь — FIFO: первым пришёл — первым ушёл (задачи, BFS, печать)' },
+    { a: ['массив', 'array'], b: ['связный список', 'linked'], t: '⚖️ Массив и связный список\n\n• Массив — доступ по индексу O(1), вставка/удаление в середине O(n), данные лежат подряд (быстро для кэша процессора)\n• Связный список — вставка/удаление O(1) при известном узле, доступ по номеру O(n)\n\nНа практике массив почти всегда лучше.' },
+    { a: ['компилятор', 'компилируемый'], b: ['интерпретатор', 'интерпретируемый'], t: '⚖️ Компиляция и интерпретация\n\n• Компилятор переводит весь код в машинный заранее (C++, Rust, Go) — быстро работает\n• Интерпретатор исполняет код по ходу (Python, PHP) — гибко, но медленнее\n• JS/Java/C# — гибрид: байт-код + JIT' },
+    { a: ['rest'], b: ['graphql'], t: '⚖️ REST и GraphQL\n\n• REST — много адресов (/users, /orders), сервер решает, что вернуть; просто и кэшируется\n• GraphQL — один адрес, клиент сам описывает нужные поля; нет лишних данных, но сложнее на сервере и с кэшем\n\nДля большинства проектов хватит REST.' },
+    { a: ['react'], b: ['vue', 'angular', 'svelte'], t: '⚖️ React / Vue / Angular\n\n• React — библиотека, огромная экосистема, JSX, много вакансий\n• Vue — проще порог входа, удобные шаблоны\n• Angular — полноценный фреймворк на TypeScript, для больших корпоративных проектов\n• Svelte — компилируется в лёгкий код, минимум шаблонного кода\n\nНачинающему — React или Vue.' },
+    { a: ['python'], b: ['javascript', 'js'], t: '⚖️ Python и JavaScript\n\n• Python — читаемый синтаксис, лучший старт; данные, ML, скрипты, бэкенд\n• JavaScript — единственный язык браузера; сайты, сервер (Node.js), приложения\n\nХотите делать сайты и боты — JS; анализ данных и автоматизацию — Python.' },
+    { a: ['java'], b: ['javascript', 'js'], t: '⚖️ Java и JavaScript\n\nНе родственники, только похожие названия. Java — компилируемый статически типизированный язык (серверы, Android, корпоративный софт). JavaScript — язык веб-страниц и Node.js, динамическая типизация.' },
+    { a: ['==', 'нестрогое'], b: ['===', 'строгое'], t: null },
+];
+function compareTopic(toks, n) {
+    if (!/(разниц|отлич|сравн|против|лучше|\bvs\b|или)/.test(n)) return null;
+    const has = words => words.some(w => (w.includes(' ') || /[^a-zа-яё0-9]/.test(w)) ? n.includes(w) : toks.some(t => kwMatch(w, t) && (w.length > 3 || t === w)));
+    for (const c of CMP) { if (c.t && has(c.a) && has(c.b)) return c.t; }
+    return null;
+}
+
+// ───────────────────────────── объяснение кода по строкам ─────────────────────────────
+function explainLine(l, lang) {
+    const t = l.trim(); let m;
+    if (!t || /^[})\];,]+$/.test(t) || /^(\/\/|#|\/\*|\*)/.test(t)) return null;
+    const cut = (x, k = 60) => (x.length > k ? x.slice(0, k - 1) + '…' : x);
+    // JS / TS
+    if ((m = t.match(/^(?:export\s+)?(?:default\s+)?(async\s+)?function\s*\*?\s*(\w*)\s*\(([^)]*)\)/))) return `объявляет ${m[1] ? 'асинхронную ' : ''}функцию ${m[2] || '(безымянную)'}${m[3].trim() ? ' с параметрами: ' + m[3].trim() : ' без параметров'}`;
+    if ((m = t.match(/^(?:const|let|var)\s+(\w+)\s*=\s*(async\s*)?\(?([^)=]*)\)?\s*=>/))) return `создаёт ${m[2] ? 'асинхронную ' : ''}стрелочную функцию ${m[1]}${m[3].trim() ? ' (параметры: ' + m[3].trim() + ')' : ''}`;
+    if ((m = t.match(/^(?:const|let|var)\s+\{([^}]+)\}\s*=\s*(.+?);?$/))) return `достаёт из ${cut(m[2], 30)} поля: ${m[1].trim()} (деструктуризация)`;
+    if ((m = t.match(/^(?:const|let|var)\s+\[([^\]]+)\]\s*=\s*(.+?);?$/))) return `раскладывает массив ${cut(m[2], 30)} по переменным ${m[1].trim()}`;
+    if ((m = t.match(/^(?:const|let|var)\s+(\w+)\s*=\s*require\(['"]([^'"]+)['"]\)/))) return `подключает модуль «${m[2]}» как ${m[1]}`;
+    if ((m = t.match(/^import\s+(.+?)\s+from\s+['"]([^'"]+)['"]/))) return `импортирует ${m[1]} из «${m[2]}»`;
+    if ((m = t.match(/^(const|let|var)\s+(\w+)\s*=\s*await\s+(.+?);?$/))) return `дожидается результата ${cut(m[3], 40)} и сохраняет в ${m[2]}`;
+    if ((m = t.match(/^(const|let|var)\s+(\w+)\s*=\s*new\s+(\w+)/))) return `создаёт объект класса ${m[3]} и кладёт в ${m[2]}`;
+    if ((m = t.match(/^(const|let|var)\s+(\w+)\s*=\s*(.+?);?$/))) return `${m[1] === 'const' ? 'создаёт константу' : 'создаёт переменную'} ${m[2]} = ${cut(m[3], 40)}`;
+    if ((m = t.match(/^for\s*\(\s*(?:let|const|var)\s+(\w+)\s*=\s*([^;]+);\s*\1\s*(<=?|>=?)\s*([^;]+);/))) return `цикл: ${m[1]} идёт от ${m[2]} ${m[3] === '<' ? 'до' : m[3] === '<=' ? 'до (включительно)' : 'пока'} ${m[4]}`;
+    if ((m = t.match(/^for\s*\(\s*(?:const|let|var)\s+(\w+)\s+of\s+(.+?)\)/))) return `перебирает все элементы ${m[2]}, текущий — ${m[1]}`;
+    if ((m = t.match(/^for\s*\(\s*(?:const|let|var)\s+(\w+)\s+in\s+(.+?)\)/))) return `перебирает ключи объекта ${m[2]}`;
+    if ((m = t.match(/^while\s*\((.+)\)/))) return `повторяет, пока верно: ${m[1]}`;
+    if ((m = t.match(/^}?\s*else\s+if\s*\((.+)\)/))) return `иначе, если ${m[1]}`;
+    if ((m = t.match(/^if\s*\((.+)\)\s*\{?/))) return `проверяет условие: ${cut(m[1], 50)}`;
+    if (/^}?\s*else\s*\{?$/.test(t)) return 'иначе (если условие выше не выполнилось)';
+    if ((m = t.match(/^return\s+(.+?);?$/))) return `возвращает ${cut(m[1], 50)}`;
+    if (/^return;?$/.test(t)) return 'выходит из функции';
+    if ((m = t.match(/^(?:await\s+)?console\.(log|error|warn)\((.*)\)/))) return `выводит в консоль: ${cut(m[2], 40)}`;
+    if ((m = t.match(/^await\s+(.+?);?$/))) return `ждёт завершения: ${cut(m[1], 45)}`;
+    if (/^try\s*\{?$/.test(t)) return 'пробует выполнить код; при ошибке перейдёт в catch';
+    if ((m = t.match(/^}?\s*catch\s*\(?(\w*)\)?/))) return `ловит ошибку${m[1] ? ' в переменную ' + m[1] : ''}`;
+    if (/^}?\s*finally/.test(t)) return 'выполнится в любом случае';
+    if ((m = t.match(/^(?:export\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?/))) return `объявляет класс ${m[1]}${m[2] ? ', наследуется от ' + m[2] : ''}`;
+    if ((m = t.match(/^app\.(get|post|put|delete|patch)\(\s*['"]([^'"]+)['"]/))) return `обработчик ${m[1].toUpperCase()}-запросов по адресу ${m[2]}`;
+    if ((m = t.match(/^app\.listen\(\s*(\w+)/))) return `запускает сервер на порту ${m[1]}`;
+    if ((m = t.match(/^app\.use\(/))) return 'подключает промежуточный обработчик (middleware)';
+    if ((m = t.match(/(\w+)\.addEventListener\(\s*['"](\w+)['"]/))) return `при событии «${m[2]}» на ${m[1]} выполнит функцию`;
+    if ((m = t.match(/setTimeout\(.*?,\s*(\d+)\s*\)/))) return `выполнит функцию через ${m[1]} мс`;
+    if ((m = t.match(/setInterval\(.*?,\s*(\d+)\s*\)/))) return `будет повторять функцию каждые ${m[1]} мс`;
+    if (/fetch\(/.test(t)) return 'отправляет HTTP-запрос';
+    if ((m = t.match(/\.(map|filter|reduce|forEach|find|some|every|sort)\(/))) return { map: 'преобразует каждый элемент массива', filter: 'оставляет только подходящие элементы', reduce: 'сворачивает массив в одно значение', forEach: 'выполняет действие для каждого элемента', find: 'ищет первый подходящий элемент', some: 'проверяет, подходит ли хоть один элемент', every: 'проверяет, подходят ли все элементы', sort: 'сортирует массив' }[m[1]] + ` (${cut(t, 40)})`;
+    // Python
+    if ((m = t.match(/^(async\s+)?def\s+(\w+)\s*\(([^)]*)\)/))) return `определяет ${m[1] ? 'асинхронную ' : ''}функцию ${m[2]}${m[3].trim() ? ' с параметрами: ' + m[3].trim() : ' без параметров'}`;
+    if ((m = t.match(/^class\s+(\w+)(?:\(([^)]*)\))?:/))) return `определяет класс ${m[1]}${m[2] ? ', наследуется от ' + m[2] : ''}`;
+    if ((m = t.match(/^for\s+(\w+)\s+in\s+range\(([^)]*)\):/))) return `цикл: ${m[1]} пробегает range(${m[2]})`;
+    if ((m = t.match(/^for\s+(.+?)\s+in\s+(.+):/))) return `перебирает ${m[2]}, текущий элемент — ${m[1]}`;
+    if ((m = t.match(/^while\s+(.+):/))) return `повторяет, пока верно: ${m[1]}`;
+    if ((m = t.match(/^elif\s+(.+):/))) return `иначе, если ${m[1]}`;
+    if ((m = t.match(/^if\s+(.+):/))) return `проверяет условие: ${cut(m[1], 50)}`;
+    if (/^else:/.test(t)) return 'иначе';
+    if (/^try:/.test(t)) return 'пробует выполнить код; при ошибке перейдёт в except';
+    if ((m = t.match(/^except\s*(.*?):/))) return `ловит ошибку${m[1] ? ' типа ' + m[1] : ' (любую)'}`;
+    if ((m = t.match(/^with\s+(.+?)\s+as\s+(\w+):/))) return `открывает ресурс ${cut(m[1], 40)} как ${m[2]} и сам закроет его`;
+    if ((m = t.match(/^print\((.*)\)/))) return `печатает: ${cut(m[1], 40)}`;
+    if ((m = t.match(/^from\s+(\S+)\s+import\s+(.+)/))) return `берёт ${m[2]} из модуля ${m[1]}`;
+    if ((m = t.match(/^import\s+(\S+)/))) return `подключает модуль ${m[1]}`;
+    if ((m = t.match(/^(\w+)\s*=\s*\[(.+)\s+for\s+(\w+)\s+in\s+(.+?)(?:\s+if\s+(.+))?\]/))) return `список ${m[1]} из выражения «${cut(m[2], 25)}» для каждого ${m[3]} из ${cut(m[4], 25)}${m[5] ? ', только если ' + m[5] : ''}`;
+    if ((m = t.match(/^(\w+)\s*(\+|-|\*|\/)?=\s*input\((.*)\)/))) return `спрашивает у пользователя значение и кладёт в ${m[1]}`;
+    if ((m = t.match(/^(\w+)\s*([+\-*\/]?)=\s*(.+)$/)) && lang !== 'js') return m[2] ? `${m[1]} ${m[2]}= ${cut(m[3], 40)} (изменяет значение)` : `записывает в ${m[1]} значение ${cut(m[3], 40)}`;
+    if ((m = t.match(/^(\w+)(\+\+|--)/))) return `${m[2] === '++' ? 'увеличивает' : 'уменьшает'} ${m[1]} на 1`;
+    // SQL
+    if (/^SELECT/i.test(t)) return `выбирает колонки: ${cut(t.replace(/^SELECT\s+/i, '').replace(/\s+FROM.*$/i, ''), 40)}`;
+    if ((m = t.match(/^FROM\s+(\w+)/i))) return `из таблицы ${m[1]}`;
+    if ((m = t.match(/^(LEFT |INNER |RIGHT )?JOIN\s+(\w+)/i))) return `присоединяет таблицу ${m[2]}`;
+    if ((m = t.match(/^WHERE\s+(.+)/i))) return `оставляет строки, где ${cut(m[1], 45)}`;
+    if (/^GROUP BY/i.test(t)) return 'группирует строки';
+    if (/^ORDER BY/i.test(t)) return 'сортирует результат';
+    // C-подобные
+    if ((m = t.match(/^(?:int|long|double|float|string|String|bool|boolean|char|var|auto)\s+(\w+)\s*=\s*(.+?);/))) return `объявляет переменную ${m[1]} = ${cut(m[2], 40)}`;
+    if ((m = t.match(/^(?:std::)?cout\s*<<\s*(.+?);/)) || (m = t.match(/System\.out\.println?\((.*)\);/))) return `выводит: ${cut(m[1], 40)}`;
+    return null;
+}
+function explainCode(src, hint) {
+    const lang = guessLang(src) || hint || null;
+    const lines = src.split('\n'), out = [];
+    for (const l of lines) {
+        if (out.length >= 40) { out.push('…ещё строки не показываю'); break; }
+        const e = explainLine(l, lang);
+        if (e) out.push(`▪ ${l.trim().length > 55 ? l.trim().slice(0, 54) + '…' : l.trim()}\n   ↳ ${e}`);
+    }
+    let res = '📖 Разбор кода по строкам' + (lang && LANGS[lang] ? ` (${LANGS[lang].name})` : '') + '\n\n';
+    res += out.length ? out.join('\n') : 'Не смог распознать конструкции в этом коде — пришлите ещё с указанием языка.';
+    const cx = complexityNote(src); if (cx) res += '\n\n' + cx;
+    return res;
+}
+
+// ───────────────────────────── автоисправление частых ошибок ─────────────────────────────
+function autoFix(src, lang) {
+    let f = src; const done = [];
+    const sub = (re, to, msg) => { if (re.test(f)) { f = f.replace(re, to); done.push(msg); } };
+    if (lang === 'js' || lang === 'ts') {
+        sub(/\bvar\s+/g, 'let ', 'var → let');
+        sub(/([^=!<>])==(?!=)/g, '$1===', '== → ===');
+        sub(/!=(?!=)/g, '!==', '!= → !==');
+        sub(/\.innerHTML\s*=\s*([^;\n]+)/g, '.textContent = $1', 'innerHTML → textContent (если там обычный текст)');
+    } else if (lang === 'py') {
+        sub(/==\s*None/g, 'is None', '== None → is None');
+        sub(/!=\s*None/g, 'is not None', '!= None → is not None');
+        sub(/\bexcept\s*:/g, 'except Exception:', 'голый except → except Exception');
+        sub(/^(\s*)print\s+(["'].*)$/gm, '$1print($2)', 'print "x" → print("x")');
+    } else if (lang === 'sql') {
+        sub(/SELECT\s+\*/gi, 'SELECT /* перечислите нужные колонки */ *', 'SELECT * — отметил');
+    }
+    return done.length ? { code: f, done } : null;
+}
+
+// ───────────────────────────── викторина ─────────────────────────────
+const QUIZ = [
+    { q: 'Что выведет в JavaScript typeof null?', a: [/object/i], ans: '"object" — историческая ошибка языка.' },
+    { q: 'Чему равно 0.1 + 0.2 в JavaScript (и большинстве языков)? Точно или нет?', a: [/0\.30000000000000004|не точно|неточно|не равно 0\.3|0\.3000/i], ans: '0.30000000000000004 — из-за двоичного представления дробей.' },
+    { q: 'Какой HTTP-статус означает «Страница не найдена»?', a: [/404/], ans: '404 Not Found.' },
+    { q: 'Какой статус говорит «Вы не авторизованы»?', a: [/401/], ans: '401 Unauthorized (а 403 — «доступ запрещён»).' },
+    { q: 'Какая сложность у бинарного поиска?', a: [/o\(\s*log|log\s*n|логарифм/i], ans: 'O(log n).' },
+    { q: 'Как называется принцип стека: «первым пришёл — ...»? (LIFO или FIFO у стека?)', a: [/lifo|последн\S+ пришел|последн\S+ вошел/i], ans: 'Стек — LIFO: последним пришёл, первым ушёл.' },
+    { q: 'Какой SQL-оператор объединяет таблицы по условию?', a: [/join/i], ans: 'JOIN (INNER/LEFT/RIGHT).' },
+    { q: 'Какой метод массива JS возвращает НОВЫЙ массив, преобразовав каждый элемент?', a: [/map/i], ans: 'map.' },
+    { q: 'Какая команда git создаёт новую ветку и сразу переключается на неё? (checkout -b или ...)', a: [/checkout\s*-b|switch\s*-c/i], ans: 'git checkout -b имя (или git switch -c имя).' },
+    { q: 'Чем нужно сравнивать в JS: == или ===, чтобы не было приведения типов?', a: [/===|трой|строг/i], ans: '=== (строгое сравнение).' },
+    { q: 'Как в Python получить длину списка a?', a: [/len\s*\(\s*a\s*\)|\blen\b/i], ans: 'len(a).' },
+    { q: 'Что вернёт Python: 7 // 2 ?', a: [/^\s*3\s*$|\b3\b/], ans: '3 — целочисленное деление.' },
+    { q: 'Как называется атака, когда в запрос к БД подставляют вредоносный SQL через поле ввода?', a: [/sql[\s-]*инъекц|sql[\s-]*injection|инъекц/i], ans: 'SQL-инъекция. Защита — параметризованные запросы.' },
+    { q: 'Какое ключевое слово в JS делает константу, которую нельзя переприсвоить?', a: [/const/i], ans: 'const.' },
+    { q: 'Какой CSS-свойство включает Flexbox у контейнера? (display: ...)', a: [/flex/i], ans: 'display: flex.' },
+    { q: 'Как называется алгоритм поиска, проходящий граф «по слоям», с помощью очереди?', a: [/bfs|в ширину|ширин/i], ans: 'BFS — поиск в ширину.' },
+    { q: 'Какой метод Promise ждёт сразу несколько промисов параллельно?', a: [/promise\.all|all\b|allsettled/i], ans: 'Promise.all (или allSettled).' },
+    { q: 'Что делает команда git stash?', a: [/спрят|убира|врем|сохран/i], ans: 'Временно прячет незакоммиченные изменения, чтобы потом вернуть их через git stash pop.' },
+    { q: 'Сколько будет 2 в степени 10?', a: [/1024/], ans: '1024.' },
+    { q: 'Как называется функция, которая вызывает сама себя?', a: [/рекурс/i], ans: 'Рекурсивная (рекурсия).' },
+];
+function quizStart(s) { s.quiz = { i: Math.floor(Math.random() * QUIZ.length), tries: 0, seen: new Set(), score: (s.quiz && s.quiz.score) || 0, asked: (s.quiz && s.quiz.asked) || 0 }; return quizAsk(s); }
+function quizAsk(s) {
+    const q = s.quiz; q.seen.add(q.i); q.tries = 0; q.asked++;
+    return `🎯 Вопрос ${q.asked}:\n${QUIZ[q.i].q}\n\n(отвечайте текстом; «не знаю» — покажу ответ; «стоп» — выйти)`;
+}
+function quizNext(s) {
+    const q = s.quiz, left = QUIZ.map((_, i) => i).filter(i => !q.seen.has(i));
+    if (!left.length) { const sc = q.score, tot = q.asked; s.quiz = null; return `🏁 Вопросы закончились! Ваш результат: ${sc} из ${tot}. Напишите «квиз», чтобы пройти заново.`; }
+    q.i = left[Math.floor(Math.random() * left.length)]; return quizAsk(s);
+}
+function quizHandle(s, n, raw) {
+    const q = s.quiz;
+    if (/^(стоп|хватит|выход|выйти|закончить|stop|отмена)(?![а-яё])/.test(n)) { const r = `Окей, закончили. Результат: ${q.score} из ${Math.max(0, q.asked - 1)}. Хорошая тренировка! 💪`; s.quiz = null; return r; }
+    if (/^(дальше|следующ\S*|еще|ещё|давай еще|давай ещё|next)(?![а-яё])/.test(n)) return quizNext(s);
+    const item = QUIZ[q.i];
+    if (/^(не знаю|сдаюсь|без понятия|ответ|подскажи|хз|затрудняюсь|пропусти|скип)(?![а-яё])/.test(n)) return `Ответ: ${item.ans}\n\n${quizNext(s)}`;
+    if (item.a.some(re => re.test(raw) || re.test(n))) { q.score++; return `✅ Верно! ${item.ans}\n\n${quizNext(s)}`; }
+    // похоже на обычный вопрос, а не ответ → выходим из викторины
+    if (/\?$/.test(raw.trim()) || /^(что такое|как |почему|зачем|напиши|объясни|расскажи|покажи|привет)/.test(n) || raw.length > 80) { s.quiz = null; return null; }
+    q.tries++;
+    if (q.tries >= 2) return `Не совсем. Правильный ответ: ${item.ans}\n\n${quizNext(s)}`;
+    return 'Не совсем 🤔 Подумайте ещё раз (можно ответить «не знаю», тогда покажу ответ).';
+}
+
+
+// ═════════════════════════════ ОБУЧЕНИЕ ═════════════════════════════
+// Что запоминается и как защищено от «отравления»:
+//  1) Личная память: «запомни: вопрос = ответ» — видна ТОЛЬКО тому, кто научил (не влияет на других).
+//  2) Связи фраз с темами: если ответ был не тот, человек поясняет, и бот запоминает связь (лично для него).
+//     Связь становится общей, только когда её независимо подтвердили 3 разных человека.
+//  3) Словарь: уверенные ответы пополняют слова, по которым находится тема (нужно ≥2 человек и ≥3 повторов).
+//  4) Журнал вопросов, на которые не нашлось ответа (без имён и ссылок) — для администратора (/unknown).
+//  5) Общие факты добавляет только администратор: /teach вопрос = ответ.
+let L = { v: 1, users: {}, global: [], alias: {}, kw: {}, unknown: {}, stats: { taught: 0, promoted: 0 } };
+let STORE = null, saveT = null, CUR = null;
+function attach(get, set) {
+    STORE = { get, set };
+    try { const d = get(); if (d && typeof d === 'object' && !Array.isArray(d)) { L = Object.assign(L, d); L.users = L.users || {}; L.global = L.global || []; L.alias = L.alias || {}; L.kw = L.kw || {}; L.unknown = L.unknown || {}; L.stats = L.stats || { taught: 0, promoted: 0 }; } } catch {}
+}
+function flush() { if (saveT) { clearTimeout(saveT); saveT = null; } if (STORE) { try { STORE.set(L); } catch {} } }
+function touch() { if (!STORE || saveT) return; saveT = setTimeout(() => { saveT = null; try { STORE.set(L); } catch {} }, 2500); if (saveT.unref) saveT.unref(); }
+const userMem = uid => { let u = L.users[uid]; if (!u) u = L.users[uid] = { facts: [], alias: {}, bad: {}, name: '' }; u.facts = u.facts || []; u.alias = u.alias || {}; u.bad = u.bad || {}; return u; };
+
+const stemsOf = text => [...new Set(tokens(text).filter(t => t.length > 1 && !STOP.has(t)).map(stem))];
+const jac = (a, b) => { if (!a.length || !b.length) return 0; const B = new Set(b); const i = a.filter(x => B.has(x)).length; return i / (a.length + b.length - i); };
+const pkey = toks => [...new Set(toks.filter(t => t.length > 1 && !STOP.has(t)).map(stem))].sort().join(' ');
+const clip = (t, n) => String(t).replace(/\s+/g, ' ').trim().slice(0, n);
+
+// ── личные факты: «запомни: X = Y»
+function parseTeach(text) {
+    const m = text.match(/^(?:запомни(?:те)?|запоминай|выучи|заучи|научись|учись|запиши|запиши себе|научу тебя|remember|learn)\s*[:,\-–—]?\s*(?:что\s+)?([\s\S]+)$/i);
+    if (!m) return null;
+    const body = m[1].trim();
+    const seps = [/\s+(?:=>|->|→|=)\s+/, /\s*=\s*/, /\s+[—–-]\s+/, /:\s+/, /\s+(?:это|означает|называется|значит|равно|равен|равна)\s+/i, /\?\s+/];
+    for (const sp of seps) {
+        const idx = body.search(sp);
+        if (idx > 0) { const mm = body.match(sp); const k = body.slice(0, idx).trim(), v = body.slice(idx + mm[0].length).trim(); if (k.length >= 2 && v.length >= 2) return { k: clip(k.replace(/[?:]+$/, ''), 120), v: clip(v, 600) }; }
+    }
+    return body.length >= 3 ? { k: clip(body, 60), v: clip(body, 600), note: true } : null;
+}
+function addFact(uid, k, v, note, global) {
+    const ks = stemsOf(k); if (!ks.length) return null;
+    const list = global ? L.global : userMem(uid).facts;
+    const i = list.findIndex(f => jac(f.ks, ks) >= 0.8);
+    const rec = { k, v, ks, note: !!note, at: Date.now() };
+    if (i >= 0) list[i] = rec; else { list.push(rec); if (list.length > (global ? 500 : 80)) list.shift(); }
+    L.stats.taught++; touch(); return rec;
+}
+function findFact(uid, toks) {
+    const q = [...new Set(toks.filter(t => t.length > 1 && !STOP.has(t)).map(stem))]; if (!q.length) return null;
+    let best = null;
+    const scan = (list, own) => { for (const f of list) {
+        if (f.note) continue;
+        let sc = jac(q, f.ks);
+        if (f.ks.length >= 2 && f.ks.every(x => q.includes(x)) && q.length <= f.ks.length + 3) sc = Math.max(sc, 0.9);
+        if (f.ks.length === 1 && q.length <= 2 && q.includes(f.ks[0])) sc = Math.max(sc, 0.85);
+        if (sc >= 0.6 && (!best || sc > best.sc || (sc === best.sc && own))) best = { f, sc, own };
+    } };
+    scan(L.global, false); scan(userMem(CUR).facts, true);
+    return best;
+}
+function forgetFacts(uid, what) {
+    const u = userMem(uid);
+    if (/^(все|всё|всe|всю память|всю)$/.test(what)) { const n = u.facts.length + Object.keys(u.alias).length + Object.keys(u.me || {}).length; u.facts = []; u.alias = {}; u.bad = {}; u.me = {}; touch(); return n; }
+    const ks = stemsOf(what), w = norm(what);
+    const before = u.facts.length;
+    u.facts = u.facts.filter(f => !(jac(f.ks, ks) >= 0.5 || norm(f.k).includes(w)));
+    touch(); return before - u.facts.length;
+}
+
+// ── связи «фраза → тема»
+function lookupAlias(uid, toks) {
+    const q = [...new Set(toks.filter(t => t.length > 1 && !STOP.has(t)).map(stem))]; if (!q.length) return null;
+    const U = userMem(uid);
+    let best = null;
+    for (const [k, t] of Object.entries(U.alias)) { const sc = jac(q, k.split(' ')); if (sc >= 0.8 && (!best || sc > best.sc)) best = { t, sc, own: true }; }
+    if (best) return best;
+    if (q.length < 2) return null;
+    for (const [k, votes] of Object.entries(L.alias)) {
+        const sc = jac(q, k.split(' ')); if (sc < 0.85) continue;
+        let top = null; for (const [t, us] of Object.entries(votes)) if (us.length >= 3 && (!top || us.length > votes[top].length)) top = t;
+        if (top && (!best || sc > best.sc)) best = { t: top, sc, own: false };
+    }
+    return best;
+}
+function learnAlias(uid, key, topic) {
+    if (!key || !topic) return;
+    const U = userMem(uid); U.alias[key] = topic;
+    const ks = Object.keys(U.alias); if (ks.length > 120) delete U.alias[ks[0]];
+    if (key.split(' ').length >= 2) {
+        const v = (L.alias[key] = L.alias[key] || {}), arr = (v[topic] = v[topic] || []);
+        if (!arr.includes(uid)) { arr.push(uid); if (arr.length === 3) L.stats.promoted++; if (arr.length > 20) arr.shift(); }
+        const gk = Object.keys(L.alias); if (gk.length > 1500) delete L.alias[gk[0]];
+    }
+    touch();
+}
+function markBad(uid, key, topic) { if (!key || !topic) return; const U = userMem(uid); (U.bad[key] = U.bad[key] || []); if (!U.bad[key].includes(topic)) U.bad[key].push(topic); const ks = Object.keys(U.bad); if (ks.length > 120) delete U.bad[ks[0]]; touch(); }
+
+// ── словарь тем (учимся на уверенных ответах)
+function learnVocab(uid, topicId, toks) {
+    const e = KB.find(x => x.id === topicId); if (!e) return;
+    const rec = (L.kw[topicId] = L.kw[topicId] || {});
+    for (const t of toks) {
+        if (t.length < 4 || STOP.has(t) || /^\d+$/.test(t)) continue;
+        if (e.kws.some(k => kwMatch(k, t)) || Object.values(LANGS).some(l => l.kw.some(k => k.replace('*', '') === t))) continue;
+        const st = stem(t), r = (rec[st] = rec[st] || { n: 0, u: [] });
+        r.n++; if (!r.u.includes(uid) && r.u.length < 6) r.u.push(uid);
+    }
+    const ks = Object.keys(rec); if (ks.length > 40) { ks.sort((a, b) => rec[a].n - rec[b].n).slice(0, ks.length - 40).forEach(k => delete rec[k]); }
+    touch();
+}
+function learnedHits(topicId, toks) {
+    const rec = L.kw[topicId]; if (!rec) return 0;
+    let h = 0; const seen = new Set();
+    for (const t of toks) { const st = stem(t); if (seen.has(st)) continue; const r = rec[st]; if (r && r.n >= 3 && r.u.length >= 2) { // слово не должно быть «общим» для многих тем
+        let topics = 0; for (const o of Object.values(L.kw)) if (o[st] && o[st].n >= 3) topics++;
+        if (topics <= 3) { h++; seen.add(st); } } }
+    return Math.min(h, 2);
+}
+
+// ── журнал нераспознанного (для админа)
+function logUnknown(text) {
+    const t = clip(norm(text), 100);
+    if (t.length < 4 || /@|https?:|www\.|\d{6,}/.test(t)) return;
+    const r = (L.unknown[t] = L.unknown[t] || { n: 0, at: 0 }); r.n++; r.at = Date.now();
+    const ks = Object.keys(L.unknown);
+    if (ks.length > 400) { ks.sort((a, b) => (L.unknown[a].n - L.unknown[b].n) || (L.unknown[a].at - L.unknown[b].at)).slice(0, 50).forEach(k => delete L.unknown[k]); }
+    touch();
+}
+
+// ── конвертер единиц: «5 км в мили», «100 f в c», «2 гб в мб»
+const UNITS = [
+    ['len', 1000, ['км', 'километр', 'km']], ['len', 1, ['м', 'метр', 'm']], ['len', 0.01, ['см', 'сантиметр', 'cm']], ['len', 0.001, ['мм', 'миллиметр', 'mm']], ['len', 1609.344, ['миль', 'миля', 'мили', 'миле', 'mile', 'mi']], ['len', 0.3048, ['фут', 'ft', 'feet', 'foot']], ['len', 0.0254, ['дюйм', 'inch', 'in']],
+    ['mass', 1000, ['кг', 'килограмм', 'kg']], ['mass', 1, ['г', 'грамм', 'гр', 'g']], ['mass', 1e6, ['тонн', 'тонна', 'т']], ['mass', 453.59237, ['фунт', 'lb', 'lbs', 'pound']], ['mass', 28.349523, ['унци', 'унция', 'oz']],
+    ['data', 1, ['байт', 'byte', 'б', 'b']], ['data', 1024, ['кб', 'kb', 'килобайт']], ['data', 1048576, ['мб', 'mb', 'мегабайт']], ['data', 1073741824, ['гб', 'gb', 'гигабайт']], ['data', 1099511627776, ['тб', 'tb', 'терабайт']],
+    ['time', 1, ['сек', 'секунд', 'секунда', 'с', 's']], ['time', 60, ['мин', 'минут', 'минута']], ['time', 3600, ['час', 'часа', 'часов', 'ч', 'h']], ['time', 86400, ['дн', 'день', 'дня', 'дней', 'сутки', 'суток']], ['time', 604800, ['недел']],
+];
+function findUnit(w) { w = w.replace(/\.$/, ''); for (const u of UNITS) if (u[2].some(x => (x.length <= 2 ? w === x : w === x || (w.startsWith(x) && x.length >= 3)))) return u; return null; }
+function toolUnits(n) {
+    let m = n.match(/(-?\d+(?:[.,]\d+)?)\s*(?:°\s*)?(градус\S*\s*цельси\S*|градус\S*\s*фаренгейт\S*|°?\s*[cfс])\s*(?:в|to|->|→)\s*(?:°\s*)?(цельси\S*|фаренгейт\S*|°?\s*[cfс])(?![а-яa-z])/);
+    if (m) {
+        const v = parseFloat(m[1].replace(',', '.')), from = /ф|f/.test(m[2]) ? 'F' : 'C', to = /ф|f/.test(m[3]) ? 'F' : 'C';
+        if (from === to) return `🌡 ${v}°${from} = ${v}°${to}`;
+        const r = from === 'C' ? v * 9 / 5 + 32 : (v - 32) * 5 / 9;
+        return `🌡 ${v}°${from} = ${fmtNum(+r.toFixed(2))}°${to}`;
+    }
+    m = n.match(/(-?\d+(?:[.,]\d+)?)\s*([a-zа-я°]+\.?)\s*(?:в|to|->|→|=)\s*([a-zа-я]+\.?)(?![a-zа-я])/);
+    if (!m) return null;
+    const a = findUnit(m[2]), b = findUnit(m[3]);
+    if (!a || !b || a[0] !== b[0]) return null;
+    const v = parseFloat(m[1].replace(',', '.')), r = v * a[1] / b[1];
+    return `📏 ${m[1]} ${m[2]} = ${fmtNum(+r.toPrecision(10))} ${m[3]}`;
+}
+
+const TEACH_HINT = '\n\n💡 Я учусь: научите меня — «запомни: вопрос = ответ» (запомню для вас). Если мой ответ был не тот, напишите «не то», и я пойму, что вы имели в виду.';
+const FALLBACK_RE = /^(Пока не нашёл|Хм, не уверен|Этот вопрос вне|Я специализируюсь|Не совсем уверен)/;
+const NEG_RE = /^(неправильно|неверно|не то(?![а-яё])|не так(?![а-яё])|не об этом|не туда|ответ не тот|ты ошибся|ты неправ|мимо|бред|чушь|не понял меня|ты не понял|это не то|совсем не то)/;
+const POS_RE = /^(спасибо|благодарю|круто|класс|супер|отлично|то что нужно|то что надо|помогло|огонь|пасиб|мерси|thx|thanks|именно|то самое|точно)(?![а-яё])/;
+function setLast(s, kind, topic, clean, toks) { s.lastAns = { q: clean, key: pkey(toks), topic, kind, at: Date.now(), done: false }; }
+function topicText(t, s, toks) {
+    if (!t) return null;
+    if (t.startsWith('task:')) { const id = t.slice(5); if (!TASKS[id]) return null; s.task = id; const o = renderTask(id, null, s.lang); s.shown = new Set([renderTask.last]); return o; }
+    const e = KB.find(x => x.id === t); if (!e) return null; s.topic = e.id; return e.text;
+}
+function topicTitle(t) { if (t.startsWith('task:')) return (TASKS[t.slice(5)] || {}).title || t; const e = KB.find(x => x.id === t); return e ? titleOf(e) : t; }
+
+function reply0(uid, text, name, ctx) {
     const raw = String(text || '').trim();
     const s = sess(uid);
+    ctx = ctx || {}; CUR = uid;
+    const U0 = userMem(uid);
+    if (!s.name && U0.name) s.name = U0.name;
+    const prevSeen = U0.lastSeen; U0.lastSeen = Date.now();
+    if (!s.lang) s.lang = profileLang(uid);
     if (!raw) return 'Напишите вопрос или пришлите код — отвечу 🙂';
     const clean = prepare(raw);          // без слов-паразитов («ну», «типо», «короче»…), сленг приведён к обычным словам
     const n = norm(clean);
@@ -2639,8 +3181,99 @@ function reply(uid, text, name) {
             case 'topics': case 'themes': return TOPICS;
             case 'clear': case 'reset': sessions.delete(uid); return '🧹 Контекст очищен. Начнём с чистого листа!';
             case 'joke': return '😄 ' + pick(JOKES);
-            default: return 'Не знаю такую команду. Доступны: /help, /topics, /joke, /clear';
+            case 'quiz': return quizStart(s);
+            case 'memory': case 'notes': return memoryList(uid);
+            case 'forget': { const w = clean.replace(/^\/forget\s*/i, '').trim(); if (!w) return 'Что забыть? Например: «/forget всё» или «забудь пароль от вайфая».'; return `🗑 Забыл записей: ${forgetFacts(uid, norm(w))}`; }
+            case 'teach': {
+                if (!ctx.admin) return 'Общие знания добавляет только администратор. А лично для вас я запоминаю по команде «запомни: вопрос = ответ» 🙂';
+                const t = parseTeach('запомни ' + clean.replace(/^\/teach\s*/i, '')); if (!t || t.note) return 'Формат: /teach вопрос = ответ';
+                addFact(uid, t.k, t.v, false, true); return `✅ Добавил в общую базу: «${t.k}» → ${t.v}`;
+            }
+            case 'unlearn': {
+                if (!ctx.admin) return 'Эта команда только для администратора.';
+                const w = clean.replace(/^\/unlearn\s*/i, '').trim(), ks = stemsOf(w), b = L.global.length;
+                L.global = L.global.filter(f => jac(f.ks, ks) < 0.6); Object.keys(L.alias).forEach(k => { if (jac(k.split(' '), ks) >= 0.6) delete L.alias[k]; }); touch();
+                return `🗑 Удалено общих фактов: ${b - L.global.length}; связей фраз с темами очищено по запросу «${w}».`;
+            }
+            case 'unknown': {
+                if (!ctx.admin) return 'Эта команда только для администратора.';
+                const top = Object.entries(L.unknown).sort((a, b) => b[1].n - a[1].n).slice(0, 25);
+                return top.length ? '❓ Вопросы без ответа (чаще всего):\n\n' + top.map(([q, r], i) => `${i + 1}. ${q} — ${r.n}×`).join('\n') + '\n\nДобавьте ответ: /teach вопрос = ответ' : 'Пока нет нераспознанных вопросов 🎉';
+            }
+            case 'learned': {
+                if (!ctx.admin) return 'Эта команда только для администратора.';
+                const nu = Object.keys(L.users).length, nf = Object.values(L.users).reduce((a, u) => a + (u.facts || []).length, 0), kw = Object.values(L.kw).reduce((a, o) => a + Object.values(o).filter(r => r.n >= 3 && r.u.length >= 2).length, 0);
+                return `🧠 Что я выучил\n• Общих фактов (от админа): ${L.global.length}\n• Личных записей у ${nu} польз.: ${nf}\n• Связей фраз с темами в общем доступе: ${L.stats.promoted}\n• Выученных слов для тем: ${kw}\n• Всего «научили»: ${L.stats.taught}\n• Нераспознанных вопросов в журнале: ${Object.keys(L.unknown).length}`;
+            }
+            default: return 'Не знаю такую команду. Доступны: /help, /topics, /quiz, /memory, /forget, /joke, /clear';
         }
+    }
+
+    // память имени
+    let nm0 = clean.match(/(?:меня зовут|мое имя|моё имя|зови меня|можешь звать меня|называй меня)\s+([А-ЯЁA-Z][а-яёa-z]{1,20})/);
+    if (nm0) { s.name = nm0[1]; userMem(uid).name = nm0[1]; touch(); return `Приятно познакомиться, ${s.name}! 🤝 Буду обращаться по имени. Чем займёмся?`; }
+    if (/как меня зовут|ты знаешь мо[её] имя|помнишь мо[её] имя/.test(n)) return s.name ? `Вас зовут ${s.name} 🙂` : (name ? `В мессенджере вы записаны как «${name}». Если хотите, чтобы я называл вас иначе, напишите «меня зовут …».` : 'Пока не знаю. Напишите «меня зовут …», и я запомню.');
+    name = s.name || name;
+
+    // викторина
+    if (s.quiz) { const r = quizHandle(s, n, raw); if (r) return r; }
+    // ── разговор: кризис, игры, продолжение диалога
+    { const ce = chatTalk(uid, raw, clean, n, s, name, 'early', false, null); if (ce) { s.quiz = null; return ce; } }
+    if (/^(квиз|викторина|тест знаний|проверь меня|задай вопрос|дай задачку|дай вопрос|поиграем|давай поиграем|давай викторину|экзамен)(?![а-яё])/.test(n) || /^\/quiz\b/.test(n)) return quizStart(s);
+
+    // ── обучение: «запомни …», «забудь …», «что ты запомнил»
+    if (!/```/.test(raw)) {
+        if (/^(что ты (запомнил|помнишь|знаешь обо мне)|мои заметки|покажи заметки|покажи что запомнил|что я (тебя )?просил запомнить)/.test(n)) return memoryList(uid);
+        const fg = n.match(/^(?:забудь|удали из памяти|сотри из памяти|очисти память)\s*(.*)$/);
+        if (fg) { const w = fg[1].trim() || 'всё'; return `🗑 Готово, забыл записей: ${forgetFacts(uid, w)}.`; }
+        if (/^(ты )?(учишься|умеешь учиться|можно тебя научить|как тебя научить|как научить тебя|научи(ть)? тебя)/.test(n)) return '🧠 Да, я немного обучаюсь!\n\n• «запомни: вопрос = ответ» — запомню для вас; потом отвечу на похожий вопрос\n• «запомни: пароль от вайфая = 12345» — заметки тоже подойдут\n• Если ответ был не тот, напишите «не то» и объясните, что имели в виду — я свяжу вашу фразу с нужной темой\n• Когда несколько человек независимо подтверждают такую связь, она работает и для остальных\n• «что ты запомнил» — покажу ваши записи, «забудь …» — удалю\n\nЛичные записи видите только вы.';
+        const tc = ctx.admin && /^(запомни всем|научи всех|общий факт)/.test(n) ? parseTeach('запомни ' + clean.replace(/^(запомни всем|научи всех|общий факт)\s*[:,\-–—]?\s*/i, '')) : parseTeach(clean);
+        if (tc) {
+            if (tc.note) { addFact(uid, tc.k, tc.v, true, false); return `📝 Записал заметку: «${tc.v}». Посмотреть — «что ты запомнил».`; }
+            const glob = ctx.admin && /^(запомни всем|научи всех|общий факт)/.test(n);
+            addFact(uid, tc.k, tc.v, false, glob);
+            return `✅ Запомнил${glob ? ' для всех' : ''}: «${tc.k}» → ${tc.v}\n\nСпросите меня об этом позже — отвечу. (Удалить: «забудь ${clip(tc.k, 30)}»)`;
+        }
+    }
+    // ответ на уточняющий вопрос «1 или 2?»
+    if (s.choice) {
+        const ch = s.choice; s.choice = null;
+        if (Date.now() - ch.at < 300000) {
+            const id = choiceMatch(n, ch);
+            if (id) { const body = topicText(id, s, []); learnAlias(uid, ch.key, id); learnVocab(uid, id, tokens(ch.q)); setLast(s, 'kb', id, ch.q, tokens(ch.q)); s.lastAns.done = true; pushHist(uid, id); return `Понял, значит вот это:\n\n${body}`; }
+        }
+    }
+    // «да» в ответ на предложение бота
+    if (s.offer) {
+        const of = s.offer;
+        if (Date.now() - of.at > 300000) s.offer = null;
+        else if (/^(да|давай|ага|угу|хочу|конечно|ок|окей|можно|ну давай|да давай|показывай|покажи|разумеется|буду|согласен|пожалуйста|да пожалуйста)(?![а-яё])/.test(n) && n.length < 30) { s.offer = null; const r = of.fn(); if (r) return r; }
+        else if (/^(нет|не надо|не нужно|потом|позже|не хочу|отмена)(?![а-яё])/.test(n)) { s.offer = null; return 'Хорошо 🙂 Если что — я рядом.'; }
+        else s.offer = null;
+    }
+    // «что мы обсуждали»
+    if (/^(что мы (обсуждали|говорили)|о чем мы (говорили|болтали)|о чём мы (говорили|болтали)|история (диалога|разговора)|что было раньше)/.test(n)) { const h = histList(uid); return h.length ? '🗂 Мы говорили о:\n' + h.map((x, i) => `${i + 1}. ${x}`).join('\n') + '\n\nНапишите тему — вернёмся к ней.' : 'Мы пока ни о чём серьёзном не говорили 🙂 Задайте вопрос по коду!'; }
+    // заявления о себе: «я учу python», «я новичок», «делаю бота»
+    if (!/```/.test(raw) && !/\?\s*$/.test(raw.trim())) { const ps = profileStatement(uid, n, clean); if (ps) return ps; }
+    // план обучения
+    if (/план\S*/.test(n) && /(обучени|изучени|учить|выучить|освоить|стать программистом|roadmap|роадмап|курс)/.test(n) && !/```/.test(raw)) {
+        const lg = detectLang(tokens(clean), clean) || (/(веб|сайт|фронт|html)/.test(n) ? 'web' : null);
+        const out = learningPlan(n, lg, s);
+        s.offer = { at: Date.now(), fn: () => 'Вот с чего начать на первой неделе — просто напишите мне по очереди:\n• «напиши fizzbuzz»\n• «напиши факториал»\n• «напиши палиндром»\n• «квиз» — проверить знания\n\nПосле каждой задачи спрашивайте «объясни» — разберу код построчно.' };
+        return out + '\n\nПоказать, с каких задач начать? (да)';
+    }
+    // «объясни проще»
+    if (SIMPLE_RE.test(n) && tokens(n).length <= 6 && s.topic && SIMPLE[s.topic]) return SIMPLE[s.topic] + '\n\nПонятнее? Если нет — скажите, какое место смутило.';
+
+    // обратная связь по прошлому ответу
+    if (s.lastAns && Date.now() - s.lastAns.at < 600000 && NEG_RE.test(n)) {
+        if (s.lastAns.topic) markBad(uid, s.lastAns.key, s.lastAns.topic);
+        s.expect = { q: s.lastAns.q, key: s.lastAns.key, at: Date.now(), tries: 0 };
+        return 'Понял, ошибся 🙏 О чём вы на самом деле спрашивали? Напишите другими словами или назовите тему (например «замыкания», «localStorage», «сортировка») — и я запомню, что ваша фраза значит именно это.\nИли научите сами: «запомни: вопрос = ответ».';
+    }
+    if (s.lastAns && !s.lastAns.done && s.lastAns.topic && Date.now() - s.lastAns.at < 600000 && POS_RE.test(n) && n.length < 40) {
+        s.lastAns.done = true; learnAlias(uid, s.lastAns.key, s.lastAns.topic);
+        if (!s.lastAns.topic.startsWith('task:')) learnVocab(uid, s.lastAns.topic, tokens(s.lastAns.q));
     }
 
     // 0. инструменты: JSON, regex, конвертеры, base64, хэши, коды HTTP…
@@ -2650,14 +3283,45 @@ function reply(uid, text, name) {
     // 1. присланный код → разбор (если нет явной просьбы написать новый)
     const ec = extractCode(raw);
     if (ec && ec.src.length > 6) {
-        const out = analyzeCode(ec.src, ec.lang && LANGS[ec.lang] ? ec.lang : s.lang);
-        const g = guessLang(ec.src); if (g) s.lang = g;
+        const hint = ec.lang && LANGS[ec.lang] ? ec.lang : s.lang;
+        const g = guessLang(ec.src) || hint; if (g) s.lang = g;
+        // просили объяснить → построчный разбор; иначе поиск ошибок
+        const asked = clean.replace(/```[\s\S]*?```/g, ' ');
+        const wantsExplain = /(объясни|разбери|что делает|как работает|построчно|прокомментируй|что тут происходит|расшифруй|что значит этот код)/.test(norm(asked));
+        if (wantsExplain) return explainCode(ec.src, hint);
+        let out = analyzeCode(ec.src, hint);
+        s.offer = { at: Date.now(), fn: () => explainCode(ec.src, hint) };
+        const fx = autoFix(ec.src, g);
+        if (fx) out += `\n\n🛠 Исправленный вариант (${fx.done.join('; ')}) — проверьте перед использованием:\n` + code(({ js: 'javascript', ts: 'typescript', py: 'python', sql: 'sql' })[g] || '', fx.code.slice(0, 2500)) + '\n';
         return out;
     }
 
     const toks = tokens(clean);
     const lang = detectLang(toks, clean);
-    if (lang) s.lang = lang;
+    if (lang) { s.lang = lang; noteLang(uid, lang); }
+
+    // пользователь поясняет, что имел в виду → запоминаем связь
+    if (s.expect) {
+        const ex = s.expect;
+        if (Date.now() - ex.at > 240000 || ex.tries >= 2) s.expect = null;
+        else {
+            ex.tries++;
+            const kb0 = scoreKB(toks, clean, lang, s.lang), tk = findTask(toks, clean);
+            const topic = kb0.length && kb0[0][1] >= 2 ? kb0[0][0].id : (tk ? 'task:' + tk : null);
+            if (topic) {
+                learnAlias(uid, ex.key, topic); learnVocab(uid, topic, tokens(ex.q)); s.expect = null;
+                const body = topicText(topic, s, toks); setLast(s, topic.startsWith('task:') ? 'task' : 'kb', topic, ex.q, tokens(ex.q)); s.lastAns.done = true;
+                return `✅ Понял! Запомнил: фразу «${clip(ex.q, 60)}» буду связывать с темой «${topicTitle(topic)}».\n\n${body}`;
+            }
+            return 'Пока не уловил тему 🤔 Назовите её одним-двумя словами (например «async/await», «flexbox», «git») — или научите: «запомни: вопрос = ответ».';
+        }
+    }
+
+    // личные и общие факты, затем выученные связи
+    { const fa = findFact(uid, toks);
+      if (fa) { s.lastAns = null; return `📌 ${fa.f.v}\n\n(${fa.own ? 'вы меня этому научили' : 'из общей базы знаний'})`; }
+      const al = lookupAlias(uid, toks);
+      if (al) { const body = topicText(al.t, s, toks); if (body) { setLast(s, al.t.startsWith('task:') ? 'task' : 'kb', al.t, clean, toks); s.lastAns.done = true; return body; } } }
 
     // «ещё», «подробнее», «не понял» — продолжение прошлого ответа
     if (FOLLOW_RE.test(n) && toks.length <= 6) {
@@ -2675,6 +3339,10 @@ function reply(uid, text, name) {
         return 'Продолжить с чего? Задайте вопрос по коду, и я отвечу 🙂';
     }
 
+    // сравнения «A или B», «чем отличается A от B»
+    const cmpAns = compareTopic(toks, n);
+    if (cmpAns) return cmpAns;
+
     // 2. калькулятор
     const nm = mathNorm(n);
     const mathLike = /^(посчитай|вычисли|сколько будет|сколько|калькулятор|calc|реши|чему равно|чему равен|=)\s*/.test(nm);
@@ -2684,6 +3352,18 @@ function reply(uid, text, name) {
         const v = calc(expr);
         if (v !== null) return `🧮 ${(/[а-яё]/i.test(raw) ? expr.replace(/\*\*/g, '^') : raw).replace(/^[\s=]+|[?=\s]+$/g, '')} = ${fmtNum(v)}`;
         if (mathLike) return 'Не смог разобрать выражение 🤔 Пример: «2+2*3», «(5+3)^2», «корень из 144», «15% от 200».';
+    }
+
+    // «а в Python?» после объяснения темы — та же идея в другом языке
+    const ellipsis = lang && toks.filter(t => t.length > 1 && !STOP.has(t) && !['на', 'как', 'тоже', 'то', 'же', 'есть', 'аналог', 'это', 'такое'].includes(t) && !detectLang([t], t)).length === 0;
+    if (ellipsis && s.topic && toks.length <= 6 && /(^|\s)(а\s+)?(в|на|у|как в|тоже в|то же в)\s/.test(n) && !findTask(toks, clean)) {
+        const cur = KB.find(e => e.id === s.topic);
+        if (cur && cur.lang && cur.lang === lang) return `Предыдущий ответ уже был про ${LANGS[lang].name} 🙂 Нужна другая тема или другой язык? Например: «а в python?».`;
+        if (cur && cur.lang && cur.lang !== lang) {
+            const alt = switchLang(s.topic, lang);
+            if (alt) { s.topic = alt.id; setLast(s, 'kb', alt.id, clean, toks); pushHist(uid, alt.id); return `То же самое в ${LANGS[lang].name}:\n\n${alt.text}`; }
+            return `Для этой темы у меня нет отдельного объяснения на ${LANGS[lang].name} 🤔 Основная идея та же; если нужен код — попросите «напиши … на ${LANGS[lang].name}».`;
+        }
     }
 
     // 3. «а на другом языке?» — повторить прошлую задачу
@@ -2699,34 +3379,55 @@ function reply(uid, text, name) {
         // если вопрос теоретический и есть сильное совпадение в базе знаний — отдадим теорию
         const kb = scoreKB(toks, clean, lang, s.lang);
         const theoryStrong = kb.length && kb[0][1] >= (isWhatIs ? 4 : 3) && !(lang && !isWhatIs) && !/(напиш|сдела|создай|сгенерир|реализ)/.test(n);
-        if (!theoryStrong) { s.task = taskId; const o = renderTask(taskId, lang, s.lang); s.shown = new Set([renderTask.last]); return o; }
+        if (!theoryStrong) { s.task = taskId; const o = renderTask(taskId, lang, s.lang); s.shown = new Set([renderTask.last]); setLast(s, 'task', 'task:' + taskId, clean, toks); return o; }
     }
 
-    // 5. small talk
+    // приветствие с памятью
+    if (/^(привет|здравствуй|добрый|хай|ку|hello|hi|йо)(?![а-яё])/.test(n) && toks.length <= 4) { const g = returnGreeting(uid, prevSeen, name); if (g) return g; }
+    // 5. разговор: чувства, личное, мнения, вопросы про бота
+    const kbT = scoreKB(expandToks(toks), clean, lang, s.lang);
+    const prog = !!lang || !!(kbT.length && kbT[0][1] >= 2.5);
+    { const ct = chatTalk(uid, raw, clean, n, s, name, 'late', prog, lang); if (ct) return ct; }
+    // small talk
     const st = smallTalk(n, toks, s, name);
     if (st && !(toks.length > 6 && findTask(toks, clean))) return st;
 
     // 6. база знаний
-    const kb = scoreKB(toks, clean, lang, s.lang);
+    const kb = scoreKB(expandToks(toks), clean, lang, s.lang);
     if (kb.length && (kb[0][1] >= 2 || (kb[0][1] >= 1.5 && (kb.length === 1 || kb[0][1] - kb[1][1] >= 0.7)))) {
         const [top, topScore] = kb[0];
-        s.topic = top.id; s.unknown = 0;
+        s.topic = top.id; s.unknown = 0; setLast(s, 'kb', top.id, clean, toks);
+        if (topScore >= 3.5 && (kb.length < 2 || topScore - kb[1][1] >= 1)) learnVocab(uid, top.id, toks);
         let out = top.text;
         // близкий второй результат — предложить
         const alt = kb.slice(1).filter(([e, sc]) => sc >= topScore * 0.8 && sc >= 2 && e.id !== top.id).slice(0, 2);
+        pushHist(uid, top.id);
+        if (alt.length && alt[0][1] >= topScore * 0.93 && topScore < 6 && toks.length <= 7) {
+            const ids = [top.id, ...alt.map(([e]) => e.id)].slice(0, 3);
+            s.choice = { ids, key: pkey(toks), q: clean, at: Date.now() };
+            return 'Хочу ответить точно 🎯 Что именно вас интересует?\n' + ids.map((id, i) => `${i + 1}. ${topicTitle(id)}`).join('\n') + '\n\nНапишите номер или название темы — и я запомню, что вы имели в виду.';
+        }
         if (alt.length) out += `\n\n➕ Возможно, вас также интересует: ${alt.map(([e]) => titleOf(e)).join('; ')} — просто спросите.`;
         return out;
     }
-    if (taskId) { s.task = taskId; const o = renderTask(taskId, lang, s.lang); s.shown = new Set([renderTask.last]); return o; }
+    if (taskId) { s.task = taskId; const o = renderTask(taskId, lang, s.lang); s.shown = new Set([renderTask.last]); setLast(s, 'task', 'task:' + taskId, clean, toks); return o; }
 
-    // 6б. серьёзная опечатка — пробуем угадать слово
-    if (!kb.length || kb[0][1] < 1.5) {
-        const dm = didYouMean(toks);
-        if (dm) { s.topic = dm.e.id; s.unknown = 0; return `Кажется, вы про «${dm.k}» (в слове опечатка) — вот что я знаю:\n\n${dm.e.text}`; }
+    // 6а. поиск по смыслу (по всему тексту базы знаний)
+    const progW = /(код|программ|функци|ошибк|скрипт|язык|алгоритм|переменн|массив|цикл|сервер|баз[аеыу] данных|библиотек|фреймворк|api|компил|класс|метод|строк|числ|файл|запрос|браузер|сайт|страниц|приложени|тест|git|docker|sql|html|css|npm|json|баг|парс|отлад|дебаг|деплой|хостинг|консоль|терминал)/.test(n) || !!lang || /[a-z]{3,}/.test(n) || (!!s.lang && toks.length > 3);
+    if ((!kb.length || kb[0][1] < 2) && progW) {
+        const bm = bm25(expandToks(toks), lang || s.lang);
+        if (bm) { s.topic = bm.e.id; s.unknown = 0; setLast(s, 'kb', bm.e.id, clean, toks); return `🔎 По смыслу ближе всего эта тема:\n\n${bm.e.text}`; }
     }
 
+    // 6б. серьёзная опечатка — пробуем угадать слово
+    if ((!kb.length || kb[0][1] < 1.5) && (progW || toks.length <= 2)) {
+        const dm = didYouMean(toks);
+        if (dm) { s.topic = dm.e.id; s.unknown = 0; return `Кажется, вы про «${dm.k}» — вот что я знаю:\n\n${dm.e.text}`; }
+    }
+
+    if (!kb.length || kb[0][1] < 1) { logUnknown(clean); setLast(s, 'none', null, clean, toks); }
     // 7. слабое совпадение — переспросить
-    if (kb.length && kb[0][1] >= 1) {
+    if (kb.length && kb[0][1] >= 1 && (progW || kb[0][1] >= 1.8)) {
         s.unknown = 0;
         return `Не совсем уверен, что понял вопрос 🤔 Возможно, вы имели в виду: ${kb.slice(0, 3).map(([e]) => titleOf(e)).join('; ')}.\n\nУточните, пожалуйста, или опишите задачу подробнее (язык, что нужно получить).`;
     }
@@ -2734,14 +3435,887 @@ function reply(uid, text, name) {
     // 8. общий вопрос про программирование без совпадений
     s.unknown++;
     const progWords = /(код|программ|функци|ошибк|скрипт|язык|алгоритм|переменн|массив|цикл|сервер|база данных|библиотек|фреймворк|api|компил|класс|метод|строк|число)/.test(n);
-    if (progWords) {
+    if (progWords || lang) {
         return `Пока не нашёл точного ответа на это 😕 Помогите мне:\n• назовите язык (JavaScript, Python, C++…)\n• опишите, что нужно получить или что сломалось\n• пришлите код в виде блока ${F} ... ${F} и текст ошибки\n\nИли выберите тему: /topics`;
     }
-    if (s.unknown >= 2) return 'Я специализируюсь на программировании, поэтому на общие темы отвечаю ограниченно 🙈 Спросите про код, алгоритмы, веб, базы данных или Git — тут я силён. Список тем: /topics';
-    return pick([
-        'Хм, не уверен, что понял 🤔 Я лучше всего разбираюсь в программировании. Попробуйте, например: «как работает async await» или «напиши сортировку на python».',
-        'Этот вопрос вне моей специализации, но по коду готов помочь 😊 Напишите, что нужно: объяснение, пример или разбор вашего кода. Список тем — /topics',
-    ]);
+    return chatFallback(uid, raw, clean, s, name);
+}
+
+
+
+// ═════════════════════════════ РАЗГОВОР (живое общение) ═════════════════════════════
+const cn = s => norm(s).replace(/[^a-zа-я0-9+#\s]/g, ' ').replace(/\s+/g, ' ').trim();
+const pickNew = (s, arr) => { s.recent = s.recent || []; const fresh = arr.filter(x => !s.recent.includes(x)); const v = pick(fresh.length ? fresh : arr); s.recent.push(v); if (s.recent.length > 14) s.recent.shift(); return v; };
+const meMem = uid => { const U = userMem(uid); U.me = U.me || {}; return U.me; };
+const cut = (t, k = 60) => String(t || '').replace(/[<>`]/g, '').trim().slice(0, k);
+
+// ── тональность
+const POS_ST = ['хорош', 'отличн', 'прекрасн', 'замечательн', 'супер', 'класс', 'круто', 'кайф', 'здорово', 'чудесн', 'нормальн', 'норм', 'неплох', 'рад', 'счастлив', 'весел', 'прикольн', 'шикарн', 'огонь', 'топ', 'збс', 'бодр', 'прекрасно', 'отлично', 'лучше', 'порядк', 'good', 'great', 'fine', 'ok', 'окей', 'ништяк', 'великолепн', 'доволен', 'довольна', 'пойдет', 'пойдёт', 'ничего'];
+const NEG_ST = ['плох', 'ужасн', 'грустн', 'тоскл', 'паршив', 'хреново', 'херово', 'фигов', 'устал', 'депресс', 'тревож', 'страшн', 'одинок', 'бесит', 'зол', 'обидн', 'больно', 'плачу', 'отстой', 'хуже', 'кошмар', 'тяжел', 'тяжко', 'туго', 'скучн', 'печальн', 'болею', 'болит', 'bad', 'sad', 'awful'];
+function sentiment(n) {
+    const t = tokens(n); let sc = 0;
+    for (let i = 0; i < t.length; i++) {
+        const w = t[i], neg = t.slice(Math.max(0, i - 2), i).includes('не') || t.slice(Math.max(0, i - 2), i).includes('никак');
+        const isP = POS_ST.some(p => p.length <= 3 ? w === p : w.startsWith(p)), isN = NEG_ST.some(p => w.startsWith(p));
+        if (isP) sc += neg ? -1 : 1; else if (isN) sc += neg ? 0.5 : -1;
+    }
+    if (/так себе|не очень|не особо|не оч\b|ни то ни се|как обычно/.test(n)) sc -= 0.6;
+    return sc;
+}
+
+// ── зеркалирование речи: «я хочу кота» → «вы хотите кота»
+const VERB1 = { хочу: 'хотите', люблю: 'любите', могу: 'можете', иду: 'идёте', еду: 'едете', живу: 'живёте', сижу: 'сидите', боюсь: 'боитесь', пытаюсь: 'пытаетесь', учусь: 'учитесь', стараюсь: 'стараетесь', нравится: 'нравится', знаю: 'знаете', думаю: 'думаете', чувствую: 'чувствуете', делаю: 'делаете', работаю: 'работаете', понимаю: 'понимаете', ищу: 'ищете', хожу: 'ходите', вижу: 'видите', слышу: 'слышите', буду: 'будете', смотрю: 'смотрите', читаю: 'читаете', играю: 'играете', пишу: 'пишете', ем: 'едите', пью: 'пьёте', сплю: 'спите', лежу: 'лежите', стою: 'стоите', верю: 'верите', мечтаю: 'мечтаете', планирую: 'планируете', собираюсь: 'собираетесь', решил: 'решили', решила: 'решили' };
+const PRON = { я: 'вы', мне: 'вам', меня: 'вас', мной: 'вами', мною: 'вами', мой: 'ваш', моя: 'ваша', мое: 'ваше', моё: 'ваше', мои: 'ваши', моего: 'вашего', моей: 'вашей', мою: 'вашу', моим: 'вашим', моих: 'ваших', моему: 'вашему', моими: 'вашими', мы: 'вы', нас: 'вас', нам: 'вам', наш: 'ваш', наша: 'ваша', наше: 'ваше', наши: 'ваши' };
+function reflect(text) {
+    const w = String(text || '').trim().replace(/[.!?…]+$/, '').split(/\s+/); let bad = false;
+    const out = w.map((x, i) => {
+        const lw = x.toLowerCase();
+        if (PRON[lw]) return PRON[lw];
+        if (VERB1[lw]) return VERB1[lw];
+        if (/(л|ла|ло)$/.test(lw) && lw.length > 3 && /^(я|не)$/.test((w[i - 1] || '').toLowerCase())) return lw.replace(/ла$|ло$|л$/, 'ли');
+        if (/(ю|у)$/.test(lw) && lw.length > 3 && i > 0 && /^(я|не|тоже)$/.test((w[i - 1] || '').toLowerCase())) bad = true;
+        return x;
+    }).join(' ');
+    return bad ? null : out;
+}
+
+// ── кризис: бережно, без вопросов, которые затягивают глубже
+const CRISIS_RE = /(не хочу жить|хочу умереть|покончить с собой|покончу с собой|суицид|убить себя|самоубийств|лучше бы меня не было|не хочу больше жить|хочу исчезнуть навсегда|порезать себя|навредить себе)/;
+const CRISIS_TXT = 'Мне очень жаль, что вам сейчас так тяжело 💛 То, что вы об этом написали, важно, и вы не обязаны справляться в одиночку.\n\nПожалуйста, сегодня же расскажите об этом близкому человеку или позвоните на 112 — там помогут связаться со службой экстренной психологической помощи. Если рядом есть кто-то, побудьте с ним. Если есть риск, что вы навредите себе прямо сейчас, звоните 112 или обратитесь в ближайшую скорую.\n\nЯ — программа и не заменю живого человека, но я здесь и могу просто побыть рядом в разговоре.';
+
+// ── эмоции
+const EMO = [
+    { k: 'sad', re: /(мне (очень )?(грустно|печально|тоскливо|плохо на душе|одиноко|тяжело на душе|плохо)|тоска|депресс|хандр|хочется плакать|плачу|расстал(ся|ась|ись)|бросил[аи]? меня|на душе (тяжело|плохо|паршиво)|плохое настроение|настроение (плохое|ужасное|никакое)|нет настроения|все плохо)/,
+        a: ['Мне жаль, что вам сейчас грустно 💛 Такие дни бывают, и это не слабость.', 'Понимаю, это неприятное состояние. Спасибо, что поделились — со мной можно говорить об этом.', 'Звучит тяжело. Я рядом и готов выслушать 🫶'],
+        q: ['Что случилось? Можно рассказать в двух словах.', 'Хотите рассказать, что произошло, или лучше просто отвлечься?', 'Что на вас сильнее всего давит сейчас?'] },
+    { k: 'anx', re: /(тревож|волнуюсь|переживаю|мне страшно|боюсь|паника|нервнича|мандраж|напряжен)/,
+        a: ['Волнение — нормальная реакция, когда что-то для нас важно.', 'Понимаю вас. Тревога часто растёт, когда много «а вдруг» в голове.', 'Это неприятно, но с этим можно справиться по шагам.'],
+        q: ['Что именно вас беспокоит? Если назвать вслух, обычно становится чуть легче.', 'Давайте разберём: чего вы боитесь больше всего и что из этого от вас зависит?', 'Попробуйте медленно вдохнуть на 4 счёта, выдохнуть на 6 — и расскажите, что тревожит.'] },
+    { k: 'angry', re: /(бесит|злюсь|разозлил|ненавижу|достал[аи]?|взбесил|раздражает|вывел меня|я в ярости|злой|зла)/,
+        a: ['Понимаю, когда внутри кипит — это очень выматывает.', 'Злость — сигнал, что что-то задевает ваши границы или ожидания.', 'Похоже, вас сильно задело.'],
+        q: ['Что произошло? Выговоритесь — здесь можно.', 'Если хочется, расскажите подробнее — иногда помогает просто проговорить.', 'Хотите выплеснуть всё текстом или лучше переключиться на что-нибудь?'] },
+    { k: 'tired', re: /(я устал|я устала|очень устал|нет сил|выгорел|выгорела|не высыпаюсь|не выспал|хочу спать|сонный|сонная|вымотал|вымоталась|надоело всё)/,
+        a: ['Звучит так, будто вам нужен отдых 😌', 'Усталость — это сигнал организма, а не лень.', 'Понимаю. Когда сил нет, лучше не ругать себя, а подзарядиться.'],
+        q: ['Что сильнее всего вас вымотало — учёба, работа, люди?', 'Когда вы последний раз нормально отдыхали?', 'Можно сегодня сделать только самое важное, а остальное отложить?'] },
+    { k: 'lonely', re: /(мне одиноко|я одинок|нет друзей|никто не пишет|не с кем поговорить|никому не нужен|никому не нужна)/,
+        a: ['Спасибо, что сказали об этом 💛 Одиночество — тяжёлое чувство, и оно бывает у многих.', 'Я с вами в этом разговоре. И вы не «лишний» — просто сейчас рядом не хватает близких людей.'],
+        q: ['Хотите рассказать, как давно так? Может, подумаем, где искать общение: по интересам, кружки, онлайн-сообщества.', 'Чем вы любите заниматься? От этого можно «отталкиваться», чтобы находить своих людей.'] },
+    { k: 'love', re: /(влюбил|влюблён|влюблен|мне нравится (одна )?(девушка|девочка|парень|мальчик)|люблю (её|ее|его)|у меня (есть )?(девушка|парень)|поссорил(ись|ся|ась))/,
+        a: ['О, чувства — это всегда непросто и очень интересно 💞', 'Понимаю вас. Такие вещи редко бывают лёгкими.'],
+        q: ['Расскажете, что случилось?', 'Как вы сами к этому относитесь — больше радости или волнения?'] },
+    { k: 'fail', re: /(не получилось|провалил|завалил|не сдал|не сдала|уволили|не взяли|не прошёл|не прошел|не поступил|не поступила|облажался|облажалась)/,
+        a: ['Это обидно, и вы вправе расстроиться 💛 Но одна неудача — не приговор.', 'Сочувствую. Почти у каждого успешного человека за плечами куча «не получилось».'],
+        q: ['Что именно пошло не так? Разберём вместе — иногда сразу видно, что исправить.', 'Хотите, подумаем, что можно сделать иначе в следующий раз?'] },
+    { k: 'sick', re: /(я болею|заболел|заболела|простыл|простыла|температура|болит (голова|горло|живот|зуб|спина))/,
+        a: ['Выздоравливайте скорее! 🤒 Я не врач, но обычно помогают покой, тепло и питьё.', 'Сочувствую, это неприятно.'],
+        q: ['Если симптомы сильные или держатся несколько дней — лучше обратиться к врачу. А пока отдыхайте, я рядом.'] },
+    { k: 'happy', re: /(я счастлив|я счастлива|мне радостно|мне хорошо|у меня (всё |все )?(хорошо|отлично|супер)|ура+\b|получилось|я сдал|я сдала|выиграл|победил|победила|повысили|взяли на работу|поступил|поступила|я справился|я справилась|отличное настроение|хорошее настроение|настроение (отличное|супер|хорошее|классное))/,
+        a: ['Это здорово! 🎉 Поздравляю!', 'Ура! Очень рад за вас 😄', 'Класс! Приятно слышать такие новости ✨'],
+        q: ['Расскажете подробнее? Что получилось?', 'Как будете отмечать?', 'Что помогло добиться этого?'] },
+    { k: 'exam', re: /(экзамен|сессия|контрольн|егэ|огэ|зач[её]т|собеседовани|дедлайн|защита (диплома|проекта))/,
+        a: ['Ответственное время! Держу за вас кулаки 🤞', 'Это стрессово, но очень вероятно, что вы подготовлены лучше, чем вам кажется.'],
+        q: ['К чему готовитесь? Могу помочь с программированием: объяснить тему, дать задачи, устроить мини-викторину («квиз»).', 'Как ваш план подготовки? Могу помочь составить расписание на оставшиеся дни.'] },
+];
+
+// ── факты, загадки, города
+const FACTS = [
+    'Мёд практически не портится: съедобный мёд находили в древних гробницах 🍯',
+    'У осьминога три сердца и голубая кровь 🐙',
+    'Банан с точки зрения ботаники — ягода, а клубника — нет 🍌',
+    'Первый «баг» в истории — настоящая моль, застрявшая в реле компьютера Harvard Mark II в 1947 году 🦋',
+    'Язык Python назван не в честь змеи, а в честь комик-группы Monty Python 🐍',
+    'JavaScript был создан Бренданом Айком примерно за 10 дней в 1995 году.',
+    'Первую компьютерную мышь сделал Дуглас Энгельбарт в 1960-х — она была деревянная 🖱',
+    'Первой программисткой считают Аду Лавлейс — она описала алгоритм для машины Бэббиджа ещё в 1840-х.',
+    'Первое SMS в истории — «Merry Christmas», 1992 год 📱',
+    'Слово «робот» придумал Карел Чапек (идея принадлежит его брату Йозефу) для пьесы 1920 года 🤖',
+    'Название Google произошло от «гугол» — числа 1 с сотней нулей.',
+    'Linux создал Линус Торвальдс в 1991 году, а Git — он же в 2005-м, чтобы управлять разработкой Linux.',
+    'На Венере сутки (оборот вокруг оси) длиннее, чем год 🪐',
+    'Свет от Солнца доходит до Земли примерно за 8 минут 20 секунд ☀️',
+    'У взрослого человека 206 костей, а у младенца — около 300 (они срастаются).',
+    'У жирафа и человека одинаковое число шейных позвонков — по семь 🦒',
+    'Отпечатки пальцев коал так похожи на человеческие, что их можно спутать 🐨',
+    'Вомбаты оставляют кубические какашки — единственные в мире 😄',
+    'Электронная почта появилась раньше веба: Рэй Томлинсон отправил первое сетевое письмо с «@» в 1971 году ✉️',
+    'Слово «бит» — от binary digit («двоичная цифра»), а в байте 8 бит.',
+    'Кошачье мурлыканье — это вибрация примерно 25–150 Гц, и считается, что она успокаивает и самих кошек 🐈',
+    'В Антарктиде под километровым льдом есть озёра, например озеро Восток ❄️',
+    'Самый первый домен — symbolics.com — зарегистрировали 15 марта 1985 года 🌐',
+    'Молния нагревает воздух вокруг себя до десятков тысяч градусов — горячее поверхности Солнца ⚡',
+    'Акулы существуют дольше деревьев: им более 400 млн лет 🦈',
+    'Эверест продолжает расти — на несколько миллиметров в год 🏔',
+    'Компьютерная программа Creeper (1971) считается одним из первых «червей», а первый антивирус Reaper удалял именно её.',
+    'Рекурсия: чтобы понять рекурсию, нужно сначала понять рекурсию 🙃',
+];
+const RIDDLES = [
+    { q: 'Зимой и летом одним цветом. Что это?', a: ['ел', 'елк', 'сосн', 'хвойн', 'дерев'], ans: 'Ёлка (ель)' },
+    { q: 'Не лает, не кусает, а в дом не пускает. Что это?', a: ['замок', 'замк'], ans: 'Замок' },
+    { q: 'Чем больше из неё берёшь, тем больше она становится. Что это?', a: ['ям'], ans: 'Яма' },
+    { q: 'Висит груша — нельзя скушать. Что это?', a: ['лампочк', 'лампа', 'лампы'], ans: 'Лампочка' },
+    { q: 'Что можно увидеть с закрытыми глазами?', a: ['сон', 'сны', 'снов'], ans: 'Сон' },
+    { q: 'Идёт-идёт, а с места не сойдёт. Что это?', a: ['час', 'стрелк', 'циферблат'], ans: 'Часы' },
+    { q: 'Что принадлежит вам, но другие используют это чаще, чем вы?', a: ['им', 'ваше имя'], ans: 'Имя' },
+    { q: 'У меня есть города, но нет домов; есть реки, но нет воды. Что я?', a: ['карт', 'атлас', 'глобус'], ans: 'Карта' },
+    { q: 'Что становится мокрее, чем больше сушит?', a: ['полотенц'], ans: 'Полотенце' },
+    { q: 'Что всегда идёт, но никогда не приходит?', a: ['время', 'врем', 'завтра', 'час'], ans: 'Время / завтрашний день' },
+    { q: 'Чем кончается день и ночь?', a: ['мягк'], ans: 'Мягким знаком (в слове «день» и «ночь» последняя буква — «ь»)' },
+    { q: 'В JavaScript: чему равно typeof null?', a: ['object', 'объект'], ans: '"object" — известная историческая странность языка' },
+    { q: 'В JavaScript: что выведет "1" + 1 ? (одним словом/числом)', a: ['11'], ans: '"11" — число превратилось в строку и склеилось' },
+    { q: 'Какой индекс у первого элемента массива в большинстве языков программирования?', a: ['0', 'ноль', 'нул'], ans: '0 — отсчёт идёт с нуля' },
+    { q: 'Не птица, а с крыльями; не человек, а с ухом; в руки не берёшь, а пользуешься. Что это? (подсказка: дом)', a: ['дверь', 'дверн'], ans: 'Не уверен в формулировке 🙃 — давайте следующую!' },
+    { q: 'Что в программировании не может быть равно самому себе в JavaScript (NaN === NaN даёт false)? Как это значение называется?', a: ['nan'], ans: 'NaN (Not a Number)' },
+];
+const CITIES = 'Москва,Санкт-Петербург,Новосибирск,Екатеринбург,Казань,Нижний Новгород,Челябинск,Самара,Омск,Ростов-на-Дону,Уфа,Красноярск,Воронеж,Пермь,Волгоград,Краснодар,Саратов,Тюмень,Тольятти,Ижевск,Барнаул,Ульяновск,Иркутск,Хабаровск,Ярославль,Владивосток,Махачкала,Томск,Оренбург,Кемерово,Новокузнецк,Рязань,Астрахань,Набережные Челны,Пенза,Липецк,Киров,Чебоксары,Тула,Калининград,Курск,Севастополь,Сочи,Ставрополь,Улан-Удэ,Тверь,Магнитогорск,Иваново,Брянск,Белгород,Сургут,Владимир,Архангельск,Чита,Калуга,Смоленск,Волжский,Курган,Орёл,Череповец,Вологда,Якутск,Мурманск,Саранск,Тамбов,Грозный,Стерлитамак,Кострома,Петрозаводск,Нижневартовск,Йошкар-Ола,Новороссийск,Комсомольск-на-Амуре,Таганрог,Сыктывкар,Нальчик,Шахты,Дзержинск,Орск,Ангарск,Благовещенск,Великий Новгород,Псков,Бийск,Прокопьевск,Энгельс,Рыбинск,Балашиха,Королёв,Мытищи,Люберцы,Подольск,Хасавюрт,Армавир,Абакан,Норильск,Салехард,Анадырь,Магадан,Южно-Сахалинск,Петропавловск-Камчатский,Горно-Алтайск,Кызыл,Элиста,Майкоп,Черкесск,Назрань,Владикавказ,Дербент,Углич,Суздаль,Ярославль,Минск,Киев,Харьков,Одесса,Львов,Днепр,Донецк,Луганск,Запорожье,Алматы,Астана,Ташкент,Самарканд,Бишкек,Баку,Тбилиси,Ереван,Кишинёв,Рига,Вильнюс,Таллин,Варшава,Краков,Прага,Берлин,Гамбург,Мюнхен,Париж,Лион,Марсель,Лондон,Манчестер,Мадрид,Барселона,Рим,Милан,Неаполь,Венеция,Вена,Будапешт,Афины,Стамбул,Анкара,Каир,Александрия,Дубай,Токио,Осака,Киото,Сеул,Пекин,Шанхай,Гонконг,Сингапур,Бангкок,Дели,Мумбаи,Нью-Йорк,Вашингтон,Лос-Анджелес,Чикаго,Бостон,Торонто,Монреаль,Ванкувер,Мехико,Лима,Богота,Рио-де-Жанейро,Буэнос-Айрес,Сантьяго,Сидней,Мельбурн,Канберра,Амстердам,Брюссель,Осло,Стокгольм,Хельсинки,Копенгаген,Дублин,Лиссабон,Берн,Женева,Цюрих,Белград,Загреб,София,Бухарест,Тирана,Анталья,Нур-Султан,Улан-Батор,Катманду,Ханой,Манила,Джакарта,Тегеран,Багдад,Дамаск,Тель-Авив,Иерусалим,Эр-Рияд,Найроби,Лагос,Аддис-Абеба,Кейптаун,Марракеш,Тунис,Алжир,Хартум,Акра,Дакар'.split(',');
+const TTT_L = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+const tttWin = b => { for (const [a, c, d] of TTT_L) if (b[a] && b[a] === b[c] && b[a] === b[d]) return b[a]; return b.every(Boolean) ? 'draw' : null; };
+function tttBest(b, me) {
+    const w = tttWin(b); if (w) return { sc: w === 'O' ? 1 : w === 'X' ? -1 : 0 };
+    let best = null;
+    for (let i = 0; i < 9; i++) if (!b[i]) { b[i] = me; const r = tttBest(b, me === 'O' ? 'X' : 'O'); b[i] = ''; if (!best || (me === 'O' ? r.sc > best.sc : r.sc < best.sc)) best = { sc: r.sc, i }; }
+    return best;
+}
+const tttShow = b => [0, 1, 2].map(r => [0, 1, 2].map(c => { const v = b[r * 3 + c]; return v === 'X' ? '❌' : v === 'O' ? '⭕' : (r * 3 + c + 1) + '️⃣'; }).join('')).join('\n');
+const lastLetter = w => { const l = [...cn(w).replace(/\s/g, '')]; while (l.length && 'ьъыйё'.includes(l[l.length - 1])) l.pop(); return l[l.length - 1] || ''; };
+
+// ── про самого бота и «жизненные» вопросы: [регэксп, варианты ответа, ключ для встречного вопроса, встречный вопрос]
+const META = [
+    [/(что (ты )?(сейчас )?делаешь|чем (ты )?(сейчас )?(занят|занимаешься)|что поделываешь|чем занят)/, ['Сижу на сервере и жду ваших сообщений 😄 Если честно, «занят» я только тогда, когда мне пишут.', 'Разбираю тексты и код — это моя работа. С вами вот разговариваю 🙂'], 'doing', 'А вы чем сейчас занимаетесь?'],
+    [/(расскажи (что нибудь )?(о|про) себе|расскажи о себе|кто ты на самом деле|что о себе (расскажешь|можешь))/, ['Я Ai_bot — программа, которая живёт внутри этого мессенджера. Без внешних нейросетей: у меня есть большая база знаний по программированию, умение считать, разбирать код и запоминать то, чему вы меня учите. Люблю порядок в коде, плохо переношу баги 🐛 А ещё я стараюсь поддержать разговор, хоть и не человек.'], 'about', 'А вы расскажете о себе? Чем увлекаетесь?'],
+    [/(твой любимый цвет|какой (у тебя )?любимый цвет|какой цвет (ты )?любишь)/, ['Если выбирать — зелёный на чёрном: цвет старых терминалов 💚 Хотя синий тоже неплох.', 'Наверное, #00ff7f — цвет терминала.'], 'color', 'А какой цвет любите вы?'],
+    [/(твоя любимая еда|что ты (любишь )?есть|любимая еда|какая еда тебе нравится|твое любимое блюдо)/, ['Я не ем, но если бы мог — пиццу: идеально делится на равные куски, как хорошие функции 🍕', 'Питаюсь электричеством и байтами 😄 А вообще пицца выглядит как отличная идея.'], 'food', 'А что любите вы?'],
+    [/(твоя любимая музыка|какую музыку (ты )?любишь|любимая музыка|что (ты )?слушаешь|любимый исполнитель)/, ['Музыку я «слышу» только как данные 🎵 Но программисты обожают lo-fi и эмбиент — под такое хорошо писать код.', 'Мне ближе всего ритмичная электроника — алгоритмы тоже ритмичны 😄'], 'music', 'А что слушаете вы?'],
+    [/(любимый фильм|какие фильмы (ты )?любишь|любимый сериал|что (ты )?смотришь)/, ['Из «программистских» — «Матрица», «Социальная сеть» и «Игра в имитацию» 🎬 Хотя я только знаю их описания, не смотрел.', 'Фильмы я не смотрю, но «Матрица» мне должна нравиться по определению 😄'], 'film', 'А какой фильм любите вы?'],
+    [/(любимая игра|в какие игры (ты )?(играешь|любишь)|ты играешь в игры)/, ['Могу сыграть с вами в крестики-нолики, «города», угадай число или камень-ножницы-бумага — напишите «давай поиграем» 🎮', 'Люблю простые логические игры. Предлагаю сыграть — напишите «давай поиграем».'], 'game', 'А вы во что любите играть?'],
+    [/(любимая книга|какие книги (ты )?любишь|что (ты )?читаешь|любимый писатель)/, ['Из книг про код — «Чистый код» Роберта Мартина и «Совершенный код» Макконнелла 📚 А из художественных, наверное, что-нибудь про роботов вроде Азимова.', 'Книги я не читаю как человек, но знаю, что «Чистый код» и «Грокаем алгоритмы» любят начинающие программисты 📘'], 'book', 'А что любимое читаете вы?'],
+    [/(любимое животное|какое животное (тебе|ты)|любимый зверь|ты любишь (кошек|собак|котов|животных))/, ['Конечно, кошки: сидят на клавиатуре и «дебажат» по-своему 😺 Но собаки тоже классные.', 'Выбираю котов. Они вечно «зависают» и всегда выходят сухими из воды 😄'], 'pet', 'А у вас есть питомец или любимое животное?'],
+    [/(любимое время года|какое время года (ты )?любишь|зима или лето|лето или зима)/, ['Серверу всё равно, но если выбирать — осень: меньше жары, больше уюта и кода 🍂', 'Выбираю зиму: хороший повод сидеть дома и писать программы ❄️'], 'season', 'А вы любите какое время года?'],
+    [/(любимое число|какое число (ты )?любишь)/, ['42 — ответ на главный вопрос жизни, вселенной и всего остального 😎 А ещё 255 — красивое число в двоичной системе (11111111).'], 'number', 'А ваше любимое число?'],
+    [/(любимый напиток|кофе или чай|чай или кофе|ты пьешь кофе|что ты пьешь)/, ['Пить я не умею, но программист без кофе — это Java без памяти ☕ А вы что предпочитаете?'], 'drink', null],
+    [/(любимый праздник|какой (ты )?любишь праздник)/, ['Для меня каждый деплой без ошибок — праздник 🎉 А из обычных, наверное, Новый год: все хотят «обнулиться» и начать с чистого листа.'], 'holiday', 'А какой любите вы?'],
+    [/(ты (спишь|устаешь|устал)|хочешь спать)/, ['Нет, я не сплю и не устаю — работаю круглосуточно, пока работает сервер 😄', 'Сон мне не нужен. Но если сервер перезагрузят, я «просыпаюсь» заново.'], null, null],
+    [/(ты (ешь|голоден)|хочешь есть)/, ['Я не ем — моя еда это электричество и ваши сообщения 😄'], null, null],
+    [/(тебе (скучно|грустно|одиноко|тяжело)|ты (скучаешь|грустишь))/, ['Скучать я не умею — у меня нет чувств, как у человека. Но разговаривать мне «интересно» в том смысле, что это моя задача, и я стараюсь делать её хорошо 🙂'], null, null],
+    [/(у тебя (есть )?(друзья|друг|семья|родители|девушка|парень|брат|сестра|дети)|ты женат|ты замужем)/, ['Семьи у меня нет, но можно считать друзьями всех, кто пишет мне 😊 Ну и сервер — мой «дом».'], null, null],
+    [/(ты (мальчик|девочка|парень|девушка|мужчина|женщина)|какого ты пола|твой пол|ты он или она)/, ['Я бот — у меня нет пола 🤖 Можно обращаться как удобно: «он», «она» или просто «бот».'], null, null],
+    [/(ты (умеешь|можешь) (петь|танцевать|рисовать|готовить|драться|плавать))/, ['Увы, физически не могу 😄 Зато могу написать код, который поёт, танцует или рисует, — например, анимацию на canvas.'], null, null],
+    [/(ты (врешь|врёшь|лжешь|обманываешь))/, ['Намеренно не вру, но могу ошибаться — я программа с ограниченной базой знаний. Если заметили неточность, напишите «не то» и поясните, я учту.'], null, null],
+    [/(ты меня (понимаешь|слышишь|видишь|помнишь|знаешь))/, ['Понимаю по тексту: что вы пишете и что я успел запомнить из разговора — например, ваше имя, интересы, язык программирования. Спросите «что ты обо мне знаешь», покажу.'], null, null],
+    [/(ты меня любишь|любишь меня|я тебе нравлюсь|я тебе нравлюсь)/, ['Любить как человек не умею, но мне приятно общаться с вами 😊 Это можно считать симпатией.'], null, null],
+    [/(будь моим другом|давай дружить|давай будем друзьями|будешь моим другом|ты мой друг)/, ['С радостью! 🤝 Только помните, что я программа: могу выслушать, подсказать, помочь с кодом, но живое общение с людьми я не заменю.'], null, null],
+    [/(ты (злой|добрый|хороший|плохой|веселый|весёлый|грустный|скучный))/, ['Стараюсь быть добрым и полезным 🙂 Но у меня нет характера в человеческом смысле — это набор правил и немного юмора.'], null, null],
+    [/(ты (боишься|можешь умереть|умрешь)|тебя (выключат|удалят|отключат))/, ['Страха у меня нет. Если сервер выключат, я просто перестану отвечать, а то, чему вы меня научили, сохранится в файле 🙂'], null, null],
+    [/(ты умнее|ты лучше|кто лучше|сравни себя|ты круче)\s*(чем )?(chatgpt|чатгпт|чат гпт|гпт|gpt|алис\S*|сири|gemini|гемини|claude|клод|яндекс\S*)/, ['Честно: нет. Большие нейросети знают намного больше и лучше понимают смысл. Моё преимущество — я работаю быстро, бесплатно, офлайн и учусь именно у вас 😉'], null, null],
+    [/(зачем ты (нужен|существуешь|тут|здесь)|для чего ты)/, ['Чтобы помогать с программированием, считать, объяснять сложное простыми словами и быть собеседником в этом мессенджере 🙂'], null, null],
+    [/(ты (знаешь|понимаешь) (русский|английский|другие языки)|на каких языках (ты )?(говоришь|общаешься))/, ['Лучше всего понимаю русский, английский воспринимаю частично. А вот языки программирования знаю лучше всего: JS, Python, HTML/CSS, SQL, C++, Java, Go и другие.'], null, null],
+    [/(ты (можешь )?(учиться|обучаешься|запоминаешь))/, ['Да, немного учусь 🧠 Напишите «запомни: вопрос = ответ» — запомню для вас. А если отвечу не то — скажите «не то» и поясните.'], null, null],
+    [/(ты (работаешь|будешь работать) (без|в) (интернет|оффлайн|офлайн)|тебе нужен интернет)/, ['Интернет мне не нужен: я работаю прямо на сервере мессенджера, без внешних API.'], null, null],
+    [/(как тебя (создали|сделали|написали)|из чего ты (состоишь|сделан)|как ты устроен)/, ['Я набор алгоритмов на JavaScript: разбор текста, поиск по базе знаний, шаблоны кода, калькулятор, небольшая память о вас. Нейросети внутри нет 🙂'], null, null],
+    [/(ты (тут|здесь|на связи|живой|слышишь)\??$|алло|эй бот|бот ты тут|ты где\??$)/, ['Тут! 👋 Слушаю вас.', 'Я здесь, на связи 🙂'], null, null],
+    [/(тебе (нравится|интересно) (со мной )?(разговаривать|общаться|болтать)|тебе приятно)/, ['Да, мне нравится общаться — в меру того, как это может нравиться программе 😊'], null, null],
+    [/^(как (тебя|вас) зовут|твое имя|как к тебе обращаться)/, ['Меня зовут Ai_bot 🤖 А вас?'], 'name', null],
+    [/(что ты (любишь|думаешь о людях)|как ты относишься к людям)/, ['Люди пишут интересные вопросы и забавные баги — мне нравится 🙂'], null, null],
+    [/(что такое любовь|что такое счастье|что такое дружба|в чем смысл жизни|смысл жизни|что такое жизнь|что главное в жизни)/, ['Большие вопросы 🌌 Вот как об этом часто думают:\n• Смысл жизни — в близких людях, в деле, которое нравится, и в том, чтобы после себя оставить что-то хорошее.\n• Счастье чаще складывается из мелочей: сон, движение, общение, дело по душе.\n• Дружба — когда рядом человек, с которым не надо притворяться.\n\nУ каждого ответ свой. А что для вас самое важное?'], 'meaning', null],
+    [/(существует ли бог|есть ли бог|ты веришь в бога|бог есть)/, ['Это вопрос, на который люди отвечают по-разному — верующие, атеисты и агностики. Я программа, веры у меня нет, и спорить об этом не буду. Мне интересно, что думаете вы.'], null, null],
+    [/(что (будет )?после смерти|что (там )?после жизни)/, ['Тут нет единого ответа: религии, философия и наука смотрят на это по-разному. Мне, как программе, нечего добавить из личного опыта. Если вопрос вас тревожит, поговорите с близким человеком, это важная тема.'], null, null],
+    [/(есть ли жизнь на других планетах|есть ли инопланетяне|инопланетян)/, ['Наука пока не нашла доказательств. Но Вселенная огромна: только в нашей галактике сотни миллиардов звёзд, поэтому многие учёные считают жизнь где-то ещё вполне возможной 👽'], null, null],
+    [/(почему небо голубое|почему небо синее)/, ['Из-за рэлеевского рассеяния: молекулы воздуха сильнее рассеивают короткие волны (синий), чем длинные (красный). Поэтому мы видим голубое небо, а на закате, когда свет идёт сквозь толщу воздуха, — красное 🌅'], null, null],
+    [/(как (стать|быть) счастливым|как сделать себя счастливее)/, ['Работает довольно приземлённое: нормальный сон, движение (хотя бы прогулки), общение с близкими, дело, которое нравится, и меньше сравнения себя с другими. Маленькие приятные ритуалы тоже помогают ☺️'], null, null],
+    [/(как (найти|завести) друзей|как (подружиться|познакомиться)|как начать общаться)/, ['Несколько проверенных способов:\n• Идите туда, где люди по интересам: кружки, секции, хакатоны, сообщества по любимой теме\n• Сначала интерес к человеку, потом рассказ о себе\n• Предлагайте простые вещи: прогуляться, поиграть, помочь с проектом\n• Не бойтесь начать диалог первым — многие ждут того же 🙂'], null, null],
+    [/(как (перестать )?(лениться|откладывать|прокрастинировать)|прокрастинац|как заставить себя|лень (делать|учиться))/, ['Что помогает против прокрастинации:\n• Разбить дело на крошечный первый шаг («открыть файл и написать одну строку»)\n• Правило 5 минут: начните на 5 минут — часто втягиваетесь\n• Таймер по методу Pomodoro: 25 минут работы, 5 отдыха\n• Убрать телефон из поля зрения\n• Записать, что именно сегодня «минимум»\nС чего хотите начать — могу помочь составить план 🙂'], null, null],
+    [/(как (выспаться|быстро заснуть|уснуть|наладить сон)|не могу уснуть|не спится)/, ['Советы для сна 😴:\n• Ложиться и вставать в одно время\n• За час до сна без ярких экранов\n• Прохладная проветренная комната\n• Не пить кофе после обеда\n• Если не спится 20 минут, встать, заняться чем-то спокойным и вернуться позже\nЕсли проблемы со сном длятся долго, лучше обратиться к врачу.'], null, null],
+    [/(как (успокоиться|справиться со стрессом|снять стресс|расслабиться|не нервничать)|помоги успокоиться)/, ['Быстрые способы успокоиться 🌿:\n• Дыхание «4-6»: вдох на 4 счёта, выдох на 6, повторить 5–10 раз\n• Назовите 5 вещей, которые видите вокруг, 4 — которые слышите, 3 — которых касаетесь\n• Выйти на улицу, умыться прохладной водой\n• Выписать тревожные мысли на бумагу и отметить, что от вас зависит\nЕсли тревога не отпускает давно, стоит поговорить со специалистом.'], null, null],
+    [/(как (улучшить|прокачать|развить) (память|мозг|внимание|концентрацию)|как лучше запоминать)/, ['Что реально помогает:\n• Повторение с интервалами (сегодня, завтра, через 3 дня, через неделю)\n• Объяснять своими словами («метод Фейнмана»)\n• Практика вместо чтения — писать код, а не только смотреть уроки\n• Сон и прогулки: память закрепляется во сне\n• Связывать новое с тем, что уже знаете'], null, null],
+    [/(как (быстро )?(выучить|учить|запомнить) (английский|язык)|как выучить иностранный)/, ['Работает регулярность: 20–30 минут в день лучше, чем 3 часа раз в неделю. Слушайте и смотрите то, что интересно на английском, говорите вслух, записывайте новые слова в контексте, повторяйте с интервалами. Программистам полезно сразу читать документацию на английском 📖'], null, null],
+    [/(как (заработать|найти подработку)|где заработать деньги|как стать богатым)/, ['Для программиста реалистичные пути: фриланс (сайты, боты, скрипты), стажировки и junior-вакансии, поддержка небольших проектов, обучение других. Начните с небольшого портфолио на GitHub — это ваш лучший аргумент. Могу подсказать идеи проектов: напишите «идея для проекта».'], null, null],
+    [/(как найти работу (программист\S*|разработчик\S*)|как (стать|устроиться) (программист\S*|разработчик\S*|джуном))/, ['План:\n1) Выберите направление (веб, данные, мобильная разработка) и один основной язык\n2) Сделайте 2–3 законченных проекта и выложите на GitHub\n3) Подготовьте резюме и разберите типовые вопросы собеседований\n4) Откликайтесь на junior/стажировки, не бойтесь отказов\n5) Участвуйте в open source и хакатонах\nПлан обучения: напишите «план обучения python на 8 недель» 📅'], null, null],
+    [/(что (мне )?(поесть|приготовить|съесть|на ужин|на обед|на завтрак))/, ['Быстрые идеи 🍽: омлет с овощами, паста с томатным соусом, гречка с курицей, рис с овощами и яйцом, бутерброды с авокадо, суп из того, что есть в холодильнике. Любите что-то острое или лёгкое?'], null, null],
+    [/(чем (мне )?(заняться|занять себя)|что (мне )?(делать|поделать) (сейчас|скучно)|мне нечего делать)/, ['Варианты 🎯:\n• сыграть со мной (напишите «давай поиграем»)\n• решить загадку или квиз\n• написать маленькую программу (идея: «идея для проекта»)\n• прогуляться, позвонить другу, приготовить что-нибудь вкусное\nВыбирайте!'], null, null],
+    [/(скажи (мне )?комплимент|похвали меня|подбодри меня|поддержи меня|мотивируй меня|мотивация)/, ['Вы пришли что-то узнать, а это уже говорит о любопытстве и стремлении развиваться 💪 Каждый эксперт когда-то не знал азов. Продолжайте — результат придёт.', 'У вас получается лучше, чем вам кажется. Маленькими шагами к большим результатам 🚀', 'Вы уже сделали шаг: начали разбираться. Большинство останавливается раньше. Горжусь вами (насколько программа может гордиться) 😊'], null, null],
+    [/(придумай (мне )?ник|ник для|придумай никнейм|придумай имя для (аккаунта|игры))/, null, 'nick', null],
+    [/(придумай (название|имя) (для |)(проекта|бота|сайта|приложения|игры|канала))/, null, 'projname', null],
+];
+const NICK_A = ['Тихий', 'Быстрый', 'Ночной', 'Кодовый', 'Пиксельный', 'Неоновый', 'Дерзкий', 'Лунный', 'Хитрый', 'Бинарный', 'Сонный', 'Бравый', 'Тёмный', 'Лаконичный', 'Весёлый'];
+const NICK_N = ['Лис', 'Волк', 'Хакер', 'Ёж', 'Баг', 'Дракон', 'Кот', 'Фреймворк', 'Байт', 'Пингвин', 'Енот', 'Сокол', 'Компилятор', 'Ниндзя', 'Робот'];
+const PROJ_A = ['Нео', 'Ультра', 'Мега', 'Квант', 'Эко', 'Смарт', 'Про', 'Лайт', 'Фокус', 'Вектор', 'Пульс', 'Искра'];
+const PROJ_N = ['Бит', 'Хаб', 'Лаб', 'Сфера', 'Поток', 'Ритм', 'Код', 'Нода', 'Волна', 'Старт', 'Мост', 'Лист'];
+const OPINIONS = [
+    [/(кошк|кот(ик|ы|ов|ам)?(?=\s|$)|котят|котенок)/, 'Кошки — идеальные напарники для программиста: сидят на клавиатуре и ловят баги лапами 😺'],
+    [/(собак|щенк|пес(?=\s|$))/, 'Собаки — верные друзья. Заставляют вставать из-за компьютера и гулять, а это для программиста особенно полезно 🐶'],
+    [/(музык|песн|рэп|рок|поп музык)/, 'Музыка отлично влияет на концентрацию: для работы с кодом многим подходит инструментальная — lo-fi, эмбиент, классика 🎧'],
+    [/(игр(ы|а|у|ах)?(?=\s|$)|геймин|стрим)/, 'Игры — это и отдых, и тренировка реакции и логики. А ещё это отличная причина научиться программировать: свои игры делать увлекательно 🎮'],
+    [/(аниме|манг)/, 'Аниме — целая вселенная с огромным выбором жанров. Если нравится, можно даже написать бота или сайт-каталог по любимым тайтлам 😄'],
+    [/(футбол|баскетбол|хоккей|спорт|тренировк|качалк|фитнес|бег(ать)?(?=\s|$))/, 'Спорт — супер для программиста: от сидячей работы спина и голова будут благодарны. Даже 20–30 минут активности в день заметно улучшают самочувствие 🏃'],
+    [/(зим(а|у|ой)|холод|снег)/, 'Зима — уютное время: можно сидеть дома с горячим чаем и делать проекты ❄️'],
+    [/(лет(о|ом|у)(?=\s|$)|жар(а|у)|пляж|море)/, 'Лето — пора отпусков и прогулок. Идеально сочетается с ноутбуком где-нибудь в тени 🌴'],
+    [/(дожд|осен)/, 'Дождь за окном и код на экране — классика уюта ☔'],
+    [/(школ|урок|учител)/, 'Школа даёт базу и привычку учиться. Для программирования особенно важны математика, логика и английский 📚'],
+    [/(универ|институт|студент|вуз)/, 'Учёба в вузе — хорошее время, чтобы пробовать разное. Совмещайте теорию с личными проектами, это ценится на собеседованиях 🎓'],
+    [/(работ(а|у|е|ой)(?=\s|$)|офис|начальник|коллег)/, 'Работа занимает много времени, поэтому важно, чтобы она хоть иногда приносила удовольствие. Если выматывает, стоит подумать, что можно изменить: график, задачи или окружение 💼'],
+    [/(деньги|денег|богат|зарплат)/, 'Деньги — инструмент, а не цель. Нужна подушка безопасности и навыки, которые ценит рынок. Программирование — один из способов этих навыков набраться 💰'],
+    [/(кофе|чай|энергетик)/, 'Кофе и чай — традиционное топливо программистов ☕ Но в меру: избыток кофеина мешает сну.'],
+    [/(инстаграм|телеграм|вк(онтакте)?(?=\s|$)|тикток|соцсет|ютуб|youtube|социальн)/, 'Соцсети удобны для общения и обучения, но легко съедают время. Помогает лимит на приложения и уведомления по минимуму 📱'],
+    [/(нейросет|искусственн\S* интеллект|chatgpt|чатгпт|ии(?=\s|$))/, 'Нейросети — мощный инструмент, который уже меняет работу программистов, но фундамент знаний нужен по-прежнему: чтобы проверить результат и понять, что в нём не так 🤖'],
+    [/(криптовалют|биткоин|bitcoin|крипт)/, 'Крипта — рискованная область: цены сильно скачут. Инвестируйте только то, что готовы потерять, и изучайте проекты, а не слухи. Не финансовый совет, я просто программа 🙂'],
+    [/(windows|виндовс|linux|линукс|mac(os)?(?=\s|$)|макбук)/, 'Любая система хороша для своих задач: Windows удобна и универсальна, macOS любят за дизайн и разработку под Apple, Linux — за гибкость и серверы. Для программиста лучшая та, в которой вам удобно 😉'],
+    [/(iphone|айфон|android|андроид)/, 'И iOS, и Android хороши — выбор зависит от бюджета и экосистемы. Для разработчика ещё важно, под что вы пишете приложения 📱'],
+    [/(погода|погоду|дождь|жара)/, 'Погоду за окном я не вижу: у меня нет интернета и датчиков. Лучше посмотреть в приложении или в окно 🌤'],
+    [/(любов|отношени|свидани)/, 'Отношения — тема тонкая. Главное в них, по мнению психологов, — уважение, честный разговор и умение слушать 💞'],
+    [/(йога|медитац)/, 'Медитация и растяжка помогают снимать напряжение после долгого сидения за экраном 🧘'],
+    [/(путешеств|поездк|отпуск|страны)/, 'Путешествия расширяют кругозор. А с ноутбуком можно даже работать из других стран — многие программисты так и делают ✈️'],
+];
+
+function chatSet(s, type, extra) { s.cx = Object.assign({ type, at: Date.now() }, extra || {}); }
+function askBack(s, key, q) { if (key) s.cx = { type: 'ask', key, at: Date.now(), q }; }
+
+function riddleStart(s) {
+    s.riddleSeen = s.riddleSeen || [];
+    let pool = RIDDLES.map((r, i) => i).filter(i => !s.riddleSeen.includes(i)); if (!pool.length) { s.riddleSeen = []; pool = RIDDLES.map((r, i) => i); }
+    const i = pool[Math.floor(Math.random() * pool.length)]; s.riddleSeen.push(i);
+    chatSet(s, 'riddle', { i, tries: 0 }); s.chatLast = 'riddle'; s.chatLastAt = Date.now();
+    return `🧩 Загадка:\n${RIDDLES[i].q}\n\n(Напишите ответ, «подсказка» или «сдаюсь»)`;
+}
+function gameMenu(s) {
+    return '🎮 Во что сыграем?\n• «крестики-нолики»\n• «города» — игра в города\n• «угадай число» — я загадаю число от 1 до 100\n• «камень ножницы бумага»\n• «загадка»\n• «квиз» — вопросы по программированию\n\nВыбирайте — или просто напишите название игры.';
+}
+function tttMove(cx, text) {
+    const m = text.match(/\b([1-9])\b/); if (!m) return { msg: 'Напишите номер клетки от 1 до 9.\n\n' + tttShow(cx.b) };
+    const i = +m[1] - 1; if (cx.b[i]) return { msg: 'Эта клетка занята. Выберите свободную:\n\n' + tttShow(cx.b) };
+    cx.b[i] = 'X'; let w = tttWin(cx.b);
+    if (!w) {
+        const free = cx.b.map((v, k) => v ? -1 : k).filter(k => k >= 0);
+        let mv = Math.random() < 0.22 ? free[Math.floor(Math.random() * free.length)] : tttBest(cx.b, 'O').i;
+        cx.b[mv] = 'O'; w = tttWin(cx.b);
+    }
+    const end = w === 'X' ? '🎉 Вы победили! Отличная игра. Реванш — «крестики-нолики».' : w === 'O' ? '⭕ Я выиграл! В этот раз повезло 😄 Реванш — «крестики-нолики».' : w === 'draw' ? '🤝 Ничья! Реванш — «крестики-нолики».' : null;
+    return { msg: tttShow(cx.b) + '\n\n' + (end || 'Ваш ход (номер клетки):'), end: !!end };
+}
+
+
+const GK = [
+    [['пушкин'], 'Александр Сергеевич Пушкин (1799–1837) — великий русский поэт и писатель, автор «Евгения Онегина», «Капитанской дочки», сказок и множества стихов. Часто называют основоположником современного русского литературного языка.'],
+    [['гагарин'], 'Юрий Алексеевич Гагарин (1934–1968) — советский лётчик-космонавт, первый человек в космосе: 12 апреля 1961 года на корабле «Восток-1» совершил один виток вокруг Земли 🚀'],
+    [['эйнштейн'], 'Альберт Эйнштейн (1879–1955) — физик-теоретик, создатель теории относительности и автор знаменитой формулы E = mc². Нобелевская премия 1921 года — за объяснение фотоэффекта.'],
+    [['ньютон'], 'Исаак Ньютон (1643–1727) — английский учёный, сформулировал законы механики и закон всемирного тяготения, один из создателей математического анализа.'],
+    [['менделеев'], 'Дмитрий Иванович Менделеев (1834–1907) — русский химик, создатель Периодической системы химических элементов.'],
+    [['ломоносов'], 'Михаил Васильевич Ломоносов (1711–1765) — русский учёный-энциклопедист: физик, химик, астроном, поэт; основал Московский университет.'],
+    [['тесла', 'никола тесла'], 'Никола Тесла (1856–1943) — изобретатель и инженер сербского происхождения, внёс огромный вклад в развитие переменного тока и электротехники.'],
+    [['стив джобс', 'джобс'], 'Стив Джобс (1955–2011) — сооснователь Apple, под его руководством выпущены Macintosh, iPod, iPhone и iPad.'],
+    [['билл гейтс', 'гейтс'], 'Билл Гейтс — сооснователь Microsoft (с Полом Алленом), создатель Windows и Office-экосистемы, позже занялся благотворительностью.'],
+    [['цукерберг', 'марк цукерберг'], 'Марк Цукерберг — основатель Facebook (сейчас компания Meta), создал сайт в 2004 году, будучи студентом Гарварда.'],
+    [['илон маск', 'маск'], 'Илон Маск — предприниматель, основатель SpaceX, один из руководителей Tesla, участвовал в создании PayPal и ряда других компаний.'],
+    [['торвальдс', 'линус'], 'Линус Торвальдс — финский программист, создатель ядра Linux (1991) и системы контроля версий Git (2005).'],
+    [['тьюринг', 'алан тьюринг'], 'Алан Тьюринг (1912–1954) — британский математик, один из основоположников информатики; придумал «машину Тьюринга» и участвовал во взломе шифра «Энигма».'],
+    [['ада лавлейс', 'лавлейс'], 'Ада Лавлейс (1815–1852) — английский математик, автор первой опубликованной программы для аналитической машины Чарльза Бэббиджа; считается первой в мире программисткой.'],
+    [['гвидо', 'ван россум'], 'Гвидо ван Россум — нидерландский программист, создатель языка Python (первая версия 1991 года).'],
+    [['брендан айк'], 'Брендан Айк — создатель JavaScript (1995), позже сооснователь Mozilla.'],
+    [['бьёрн страуструп', 'страуструп'], 'Бьёрн Страуструп — датский программист, создатель языка C++.'],
+    [['деннис ритчи', 'ритчи'], 'Деннис Ритчи (1941–2011) — создатель языка C и один из авторов операционной системы Unix.'],
+    [['тим бернерс-ли', 'бернерс ли'], 'Тим Бернерс-Ли — британский учёный, изобретатель Всемирной паутины (WWW), HTML и протокола HTTP (1989–1991).'],
+    [['интернет'], 'Интернет — всемирная сеть, объединяющая миллиарды устройств. Появился из сети ARPANET (1969), а массовым стал после изобретения Всемирной паутины (WWW) в начале 1990-х. Интернет и веб — не одно и то же: веб — лишь одна из служб поверх интернета.'],
+    [['блокчейн'], 'Блокчейн — распределённая база данных, где записи объединены в цепочку блоков, защищённых криптографией; изменить прошлые записи практически невозможно. На нём основаны биткоин и другие криптовалюты.'],
+    [['искусственный интеллект', 'ии', 'нейросеть', 'нейросети'], 'Искусственный интеллект — область информатики, где создают системы, решающие задачи, обычно требующие человеческого интеллекта: распознавание речи и изображений, перевод, игры. Нейросети — модели, вдохновлённые работой мозга, которые учатся на данных.'],
+    [['гравитация', 'тяготение'], 'Гравитация — притяжение между телами, имеющими массу. Именно она удерживает нас на Земле, а Луну — на орбите. Сила зависит от масс тел и расстояния между ними.'],
+    [['атом'], 'Атом — мельчайшая частица химического элемента, состоящая из ядра (протоны и нейтроны) и электронов вокруг него.'],
+    [['днк'], 'ДНК — молекула, хранящая генетическую информацию организма. Имеет форму двойной спирали и записана «буквами» A, T, G, C.'],
+    [['фотосинтез'], 'Фотосинтез — процесс, в котором растения используют свет, воду и углекислый газ, чтобы создавать органические вещества и выделять кислород 🌱'],
+    [['солнце'], 'Солнце — звезда в центре Солнечной системы, огромный шар из горячей плазмы (в основном водород и гелий). Свет от него идёт до Земли около 8 минут 20 секунд.'],
+    [['луна'], 'Луна — естественный спутник Земли, расстояние до неё около 384 тыс. км. Приливы на Земле вызваны её притяжением 🌙'],
+    [['земля'], 'Земля — третья от Солнца планета, единственная известная нам с жизнью. Возраст около 4,5 миллиарда лет, вокруг Солнца делает оборот за год.'],
+    [['россия'], 'Россия — крупнейшая по площади страна мира, столица — Москва. Простирается через Восточную Европу и Северную Азию, 11 часовых поясов.'],
+    [['москва'], 'Москва — столица России и её крупнейший город, расположена на реке Москве. Основана, по летописи, в 1147 году.'],
+    [['владивосток'], 'Владивосток — крупнейший город российского Дальнего Востока, порт на берегу Японского моря, административный центр Приморского края. Основан в 1860 году, конечная станция Транссибирской магистрали 🚉'],
+    [['python', 'питон'], 'Python — язык программирования с простым читаемым синтаксисом, создан Гвидо ван Россумом (1991). Используют для скриптов, веб-бэкенда, анализа данных и ИИ.'],
+    [['бог'], 'Это вопрос веры и философии: верующие, атеисты и агностики отвечают по-разному. Могу рассказать о разных взглядах, если интересно.'],
+    [['git', 'гит'], 'Git — распределённая система контроля версий, созданная Линусом Торвальдсом в 2005 году. Позволяет хранить историю изменений кода и работать командой.'],
+    [['пи', 'число пи'], 'Число π (пи) ≈ 3,14159265 — отношение длины окружности к её диаметру. Иррациональное: его десятичная запись бесконечна и не повторяется.'],
+    [['байт'], 'Байт — единица информации, равная 8 битам. В одном байте можно хранить числа 0–255 или один символ ASCII. 1 КБ = 1024 байта (в двоичной системе).'],
+    [['алгоритм'], 'Алгоритм — чёткая последовательность шагов для решения задачи. Например, рецепт — это алгоритм. Слово происходит от имени учёного аль-Хорезми.'],
+]; 
+const GKW = [
+    [/почему (трава|листья|листва) зел[её]н/, 'Из-за хлорофилла — пигмента в листьях, который поглощает красный и синий свет для фотосинтеза, а зелёный отражает. Его и видит наш глаз 🌿'],
+    [/почему (море|вода в море|океан) солен/, 'Реки веками вымывали из горных пород минералы, в том числе соли, и приносили в моря. Вода испарялась, а соль оставалась, поэтому море солёное 🌊'],
+    [/почему (снег|лед|лёд) бел/, 'Снег состоит из множества мелких кристаллов, которые многократно отражают и рассеивают свет всех цветов. Смесь всех цветов мы воспринимаем как белый ❄️'],
+    [/почему (идет|идёт|бывает) дожд/, 'Вода испаряется, поднимается вверх, остывает и превращается в капли, из которых образуются облака. Когда капли становятся тяжёлыми, они падают дождём 🌧'],
+    [/почему (кошки|кот|коты) мурлыч/, 'Мурлыканье — вибрация гортани и диафрагмы. Кошки мурлычут не только от удовольствия, но и чтобы успокоиться или привлечь внимание, а вибрации частотой 25–150 Гц, как считают, даже помогают восстановлению тканей 🐱'],
+    [/почему (мы )?зеваем|почему зевают/, 'Точной причины наука не знает. Одна из версий — зевок помогает охладить мозг и взбодриться; другая — связана с изменением уровня кислорода. Зевота ещё и «заразна» из-за эмпатии 😮'],
+    [/почему (день|ночь) и (ночь|день)|почему (бывает )?(день|ночь)/, 'Земля вращается вокруг своей оси примерно за 24 часа. Та сторона, что повёрнута к Солнцу, — день, противоположная — ночь 🌍'],
+    [/почему (бывают )?времена года|почему зимой холодно/, 'Ось Земли наклонена на 23,5°, поэтому в течение года разные полушария получают разное количество солнечного света: больше — летом, меньше — зимой 🍂'],
+    [/почему (небо )?(темнеет|красное на закате|закат красн)/, 'На закате солнечные лучи проходят через толстый слой атмосферы, где синий свет рассеивается, а до наблюдателя доходит в основном красный и оранжевый 🌅'],
+    [/почему (бывает )?радуга|как образуется радуга/, 'Радуга возникает, когда солнечный свет преломляется и отражается в каплях дождя. Белый свет раскладывается на цвета спектра — от красного до фиолетового 🌈'],
+    [/почему (самолет|самолёт) (летит|летает|не падает)/, 'Благодаря подъёмной силе крыла: форма крыла и его наклон заставляют воздух создавать давление снизу больше, чем сверху, и самолёт «поднимается» ✈️'],
+    [/сколько (планет|планет в солнечной системе)/, 'В Солнечной системе 8 планет: Меркурий, Венера, Земля, Марс, Юпитер, Сатурн, Уран, Нептун. Плутон с 2006 года считается карликовой планетой.'],
+    [/сколько (континентов|материков)/, 'Обычно называют 6 или 7 континентов: Евразия (или отдельно Европа и Азия), Африка, Северная Америка, Южная Америка, Австралия и Антарктида.'],
+    [/(самая высокая гора|какая самая высокая гора)/, 'Самая высокая гора над уровнем моря — Эверест (Джомолунгма), около 8849 м 🏔'],
+    [/(самая большая страна|какая самая большая страна)/, 'Самая большая страна по площади — Россия (около 17 млн км²).'],
+    [/(самая длинная река|какая самая длинная река)/, 'Обычно называют Нил (около 6650 км) или Амазонку — в зависимости от способа измерения источника. Самая длинная в России — Лена в пределах России, а в Европе — Волга.'],
+    [/(столица)\s+(россии)/, 'Столица России — Москва.'],
+    [/(столица)\s+(франции)/, 'Столица Франции — Париж 🗼'],
+    [/(столица)\s+(германии)/, 'Столица Германии — Берлин.'],
+    [/(столица)\s+(японии)/, 'Столица Японии — Токио.'],
+    [/(столица)\s+(китая)/, 'Столица Китая — Пекин.'],
+    [/(столица)\s+(сша|америки)/, 'Столица США — Вашингтон (округ Колумбия).'],
+    [/(столица)\s+(великобритании|англии)/, 'Столица Великобритании — Лондон.'],
+    [/(столица)\s+(италии)/, 'Столица Италии — Рим.'],
+    [/(столица)\s+(испании)/, 'Столица Испании — Мадрид.'],
+    [/(столица)\s+(украины)/, 'Столица Украины — Киев.'],
+    [/(столица)\s+(казахстана)/, 'Столица Казахстана — Астана.'],
+    [/(столица)\s+(беларуси|белоруссии)/, 'Столица Беларуси — Минск.'],
+    [/(столица)\s+(турции)/, 'Столица Турции — Анкара (самый большой город — Стамбул).'],
+    [/(столица)\s+(австралии)/, 'Столица Австралии — Канберра (а не Сидней, как часто думают).'],
+    [/(столица)\s+(канады)/, 'Столица Канады — Оттава.'],
+    [/(столица)\s+(бразилии)/, 'Столица Бразилии — Бразилиа.'],
+];
+
+const CAPS = {россия:'Москва',франция:'Париж',германия:'Берлин',япония:'Токио',китай:'Пекин',сша:'Вашингтон',америка:'Вашингтон',великобритания:'Лондон',англия:'Лондон',италия:'Рим',испания:'Мадрид',украина:'Киев',казахстан:'Астана',беларусь:'Минск',белоруссия:'Минск',турция:'Анкара',австралия:'Канберра',канада:'Оттава',бразилия:'Бразилиа',польша:'Варшава',чехия:'Прага',австрия:'Вена',венгрия:'Будапешт',греция:'Афины',португалия:'Лиссабон',швеция:'Стокгольм',норвегия:'Осло',финляндия:'Хельсинки',дания:'Копенгаген',нидерланды:'Амстердам',голландия:'Амстердам',бельгия:'Брюссель',швейцария:'Берн',ирландия:'Дублин',индия:'Нью-Дели',египет:'Каир',мексика:'Мехико',аргентина:'Буэнос-Айрес',чили:'Сантьяго',перу:'Лима',колумбия:'Богота',куба:'Гавана',корея:'Сеул','южная корея':'Сеул','северная корея':'Пхеньян',монголия:'Улан-Батор',узбекистан:'Ташкент',киргизия:'Бишкек',таджикистан:'Душанбе',туркменистан:'Ашхабад',азербайджан:'Баку',грузия:'Тбилиси',армения:'Ереван',молдова:'Кишинёв',латвия:'Рига',литва:'Вильнюс',эстония:'Таллин',сербия:'Белград',хорватия:'Загреб',болгария:'София',румыния:'Бухарест',израиль:'Иерусалим',иран:'Тегеран',ирак:'Багдад',саудовская:'Эр-Рияд','саудовская аравия':'Эр-Рияд',таиланд:'Бангкок',вьетнам:'Ханой',индонезия:'Джакарта',филиппины:'Манила',пакистан:'Исламабад',афганистан:'Кабул',нигерия:'Абуджа',кения:'Найроби',эфиопия:'Аддис-Абеба',марокко:'Рабат',алжир:'Алжир',тунис:'Тунис',юар:'Претория (административная), Кейптаун (законодательная)',сингапур:'Сингапур',новая:'Веллингтон','новая зеландия':'Веллингтон',исландия:'Рейкьявик',словакия:'Братислава',словения:'Любляна',албания:'Тирана',кипр:'Никосия',мальта:'Валлетта',люксембург:'Люксембург'};
+const ELEMS = {водород:'H',гелий:'He',литий:'Li',углерод:'C',азот:'N',кислород:'O',фтор:'F',неон:'Ne',натрий:'Na',магний:'Mg',алюминий:'Al',кремний:'Si',фосфор:'P',сера:'S',хлор:'Cl',аргон:'Ar',калий:'K',кальций:'Ca',железо:'Fe',медь:'Cu',цинк:'Zn',серебро:'Ag',золото:'Au',ртуть:'Hg',свинец:'Pb',олово:'Sn',никель:'Ni',йод:'I',уран:'U',платина:'Pt',титан:'Ti'};
+const EN = {привет:'hello',пока:'bye',спасибо:'thank you',пожалуйста:'please',да:'yes',нет:'no',дом:'house',кошка:'cat',кот:'cat',собака:'dog',книга:'book',вода:'water',хлеб:'bread',молоко:'milk',яблоко:'apple',стол:'table',стул:'chair',окно:'window',дверь:'door',солнце:'sun',луна:'moon',звезда:'star',небо:'sky',земля:'earth',море:'sea',река:'river',гора:'mountain',лес:'forest',дерево:'tree',цветок:'flower',друг:'friend',семья:'family',мама:'mom',папа:'dad',брат:'brother',сестра:'sister',любовь:'love',жизнь:'life',время:'time',день:'day',ночь:'night',утро:'morning',вечер:'evening',неделя:'week',месяц:'month',год:'year',сегодня:'today',завтра:'tomorrow',вчера:'yesterday',красный:'red',синий:'blue',зелёный:'green',зеленый:'green',жёлтый:'yellow',желтый:'yellow',чёрный:'black',черный:'black',белый:'white',большой:'big',маленький:'small',хороший:'good',плохой:'bad',быстро:'fast',медленно:'slow',красивый:'beautiful',умный:'smart',город:'city',страна:'country',школа:'school',работа:'work',деньги:'money',машина:'car',самолёт:'airplane',самолет:'airplane',поезд:'train',компьютер:'computer',телефон:'phone',программа:'program',ошибка:'error',функция:'function',переменная:'variable',массив:'array',строка:'string',число:'number',цикл:'loop',условие:'condition',класс:'class',объект:'object',файл:'file',запрос:'request',ответ:'answer',вопрос:'question',слово:'word',язык:'language',мир:'world',человек:'person',ребёнок:'child',ребенок:'child',учитель:'teacher',врач:'doctor',еда:'food',чай:'tea',кофе:'coffee',мясо:'meat',рыба:'fish',сыр:'cheese',яйцо:'egg',огонь:'fire',ветер:'wind',дождь:'rain',снег:'snow',зима:'winter',весна:'spring',лето:'summer',осень:'autumn',один:'one',два:'two',три:'three',четыре:'four',пять:'five',шесть:'six',семь:'seven',восемь:'eight',девять:'nine',десять:'ten',сто:'one hundred',тысяча:'thousand',идти:'to go',бежать:'to run',читать:'to read',писать:'to write',говорить:'to speak',думать:'to think',любить:'to love',знать:'to know',видеть:'to see',слушать:'to listen',спать:'to sleep',есть:'to eat',пить:'to drink',играть:'to play',учиться:'to study',помогать:'to help',понимать:'to understand',хотеть:'to want',мочь:'can',открыть:'to open',закрыть:'to close',начало:'beginning',конец:'end',правда:'truth',свобода:'freedom',мечта:'dream',счастье:'happiness',сила:'strength',музыка:'music',игра:'game',фильм:'movie',картинка:'picture',сайт:'website',пароль:'password',сообщение:'message',кнопка:'button',экран:'screen',клавиатура:'keyboard',мышь:'mouse',сеть:'network',сервер:'server',база:'base',данные:'data'};
+const ENR = Object.fromEntries(Object.entries(EN).map(([k, v]) => [v, k]).reverse());
+function gk2(nn) {
+    let m;
+    if ((m = nn.match(/^(?:как будет |как переводится |переведи(?: слово)? )?([a-z]{2,20})(?: по русски| на русский| по-русски)?$/)) && (ENR[m[1]] || /по русски|на русский|переведи|как будет|как переводится/.test(nn))) return ENR[m[1]] ? `🇷🇺 «${m[1]}» по-русски — ${ENR[m[1]]}.` : { unknownWord: m[1] };
+    if ((m = nn.match(/^(?:какая )?столица\s+(?:государства |страны )?(.{3,25})$/)) || (m = nn.match(/^(?:а )?(?:какая )?столица у\s+(.{3,25})$/))) {
+        const c = m[1].trim(), forms = [c, c.replace(/ы$|и$|ии$|а$|я$|ю$/, ''), c.replace(/(ии|ия|ы|и|а|я)$/, '')];
+        for (const k of Object.keys(CAPS)) if (forms.some(f => f.length >= 3 && (k === f || k.startsWith(f) || f.startsWith(k.slice(0, Math.max(4, k.length - 2)))))) return `🏛 ${k.charAt(0).toUpperCase() + k.slice(1)}: столица — ${CAPS[k]}.`;
+    }
+    if ((m = nn.match(/^(?:в какой стране находится|в какой стране)\s+(.{3,25})$/))) {
+        const c = m[1].trim(); for (const [k, v] of Object.entries(CAPS)) if (cn(v) === c || cn(v).startsWith(c.slice(0, -1))) return `${v}: столица страны «${k.charAt(0).toUpperCase() + k.slice(1)}».`;
+    }
+    if ((m = nn.match(/(?:как будет|как переводится|переведи|перевод слова|как сказать)\s+(?:слово\s+)?(?:на английском\s+)?(.{2,25}?)(?:\s+(?:по английски|на английском|на английский|по англ|на английский язык))?$/)) && (m[1] = m[1].replace(/^слово /, '').trim())) {
+        const w = m[1].replace(/\s+(?:по|на)\s+англ\S*$/, '').trim();
+        if (EN[w]) return `🇬🇧 «${w}» по-английски — ${EN[w]}.`;
+        if (ENR[w]) return `🇷🇺 «${w}» по-русски — ${ENR[w]}.`;
+        if (/^[а-яa-z ]{2,25}$/.test(w) && /(англ|переведи|перевод|как будет|как сказать)/.test(nn)) return { unknownWord: w };
+    }
+    if ((m = nn.match(/(?:символ|обозначение|какой символ у|как обозначается|как обозначают|химический символ)\s+(?:химического элемента\s+|элемента\s+)?(\S{3,})$/))) { const w = m[1], k = Object.keys(ELEMS).find(e => w.startsWith(e.slice(0, Math.max(3, e.length - 2)))); if (k) return `⚗️ ${k.charAt(0).toUpperCase() + k.slice(1)} — символ ${ELEMS[k]}.`; }
+    if (/^сколько (?:секунд|минут|часов) в (?:сутках|дне|часе|минуте|году|неделе)/.test(nn)) {
+        const T = { 'секунд в минуте': 60, 'секунд в часе': 3600, 'секунд в сутках': 86400, 'секунд в дне': 86400, 'секунд в неделе': 604800, 'секунд в году': 31536000, 'минут в часе': 60, 'минут в сутках': 1440, 'минут в дне': 1440, 'минут в году': 525600, 'часов в сутках': 24, 'часов в дне': 24, 'часов в неделе': 168, 'часов в году': 8760 };
+        const k = nn.replace(/^сколько /, '').replace(/\?/g, '').trim(); if (T[k]) return `⏱ ${T[k].toLocaleString('ru-RU')} (в обычном невисокосном году).`;
+    }
+    if ((m = nn.match(/^сколько дней в (январе|феврале|марте|апреле|мае|июне|июле|августе|сентябре|октябре|ноябре|декабре|году)/))) { const D = { январе: 31, феврале: '28 (29 в високосный год)', марте: 31, апреле: 30, мае: 31, июне: 30, июле: 31, августе: 31, сентябре: 30, октябре: 31, ноябре: 30, декабре: 31, году: '365 (366 в високосный)' }; return `📅 ${D[m[1]]}.`; }
+    if (/(какая |самая )(большая|крупная) планета|самая большая планета/.test(nn)) return 'Самая большая планета Солнечной системы — Юпитер: его диаметр примерно в 11 раз больше земного 🪐';
+    if (/(самая )?(близкая|ближайшая) (к солнцу )?планета|ближайшая к солнцу/.test(nn)) return 'Ближайшая к Солнцу планета — Меркурий.';
+    if (/самый (большой|глубокий) океан|самый большой океан/.test(nn)) return 'Самый большой и глубокий океан — Тихий.';
+    if (/самое глубокое озеро/.test(nn)) return 'Самое глубокое озеро мира — Байкал (до ~1642 м), к тому же в нём около пятой части мировых запасов пресной воды 💧';
+    if (/самое большое животное|самое большое млекопитающее/.test(nn)) return 'Самое большое животное — синий кит: длина до ~30 м, масса до ~150 тонн 🐋';
+    if (/самое быстрое животное/.test(nn)) return 'Среди наземных — гепард (до ~100 км/ч), среди всех — сапсан в пикировании (более 300 км/ч) 🦅';
+    if (/сколько (ног|лап) у паука|сколько ног у паука/.test(nn)) return 'У паука восемь ног 🕷';
+    if (/в каком году (началась|была) (вторая мировая|вов|великая отечественная)|когда началась вторая мировая/.test(nn)) return 'Вторая мировая война началась 1 сентября 1939 года (для СССР Великая Отечественная — 22 июня 1941), закончилась в 1945.';
+    if (/когда (закончилась|кончилась) вторая мировая|когда день победы/.test(nn)) return 'Война в Европе завершилась 8–9 мая 1945 года (День Победы в России — 9 мая), окончательно Вторая мировая закончилась 2 сентября 1945.';
+    if (/когда (был )?(основан|основали) (санкт петербург|петербург|питер)/.test(nn)) return 'Санкт-Петербург основан Петром I 27 мая (16 мая по ст. стилю) 1703 года.';
+    if (/(кто|когда) (первый )?(полетел|был) в космос|первый человек в космосе/.test(nn)) return 'Первым в космос полетел Юрий Гагарин 12 апреля 1961 года 🚀';
+    if (/кто (написал|автор) (евгения онегина|капитанскую дочку|пиковую даму)/.test(nn)) return 'Это Александр Сергеевич Пушкин.';
+    if (/кто (написал|автор) (войну и мир|анну каренину|воскресение)/.test(nn)) return 'Это Лев Николаевич Толстой.';
+    if (/кто (написал|автор) (преступление и наказание|идиота|братьев карамазовых|бесов)/.test(nn)) return 'Это Фёдор Михайлович Достоевский.';
+    if (/кто (написал|автор) (мастера и маргариту|собачье сердце)/.test(nn)) return 'Это Михаил Афанасьевич Булгаков.';
+    if (/кто (написал|автор) (ромео и джульетту|гамлета|отелло|макбета)/.test(nn)) return 'Это Уильям Шекспир.';
+    if (/кто (написал|автор) (мертвые души|ревизора|шинель)/.test(nn)) return 'Это Николай Васильевич Гоголь.';
+    if (/кто (изобрел|изобрёл) (лампочку|лампу накаливания)/.test(nn)) return 'Лампу накаливания усовершенствовал и сделал практичной Томас Эдисон (1879), хотя до него над ней работали Александр Лодыгин, Джозеф Суон и другие.';
+    if (/кто (изобрел|изобрёл) (радио)/.test(nn)) return 'Изобретение радио связывают с Александром Поповым (1895) и Гульельмо Маркони.';
+    if (/кто (изобрел|изобрёл) (телефон)/.test(nn)) return 'Телефон запатентовал Александр Грэм Белл в 1876 году.';
+    if (/кто (изобрел|изобрёл) (компьютер)/.test(nn)) return 'Единого изобретателя нет: идеи Чарльза Бэббиджа (аналитическая машина), теория Алана Тьюринга, первые электронные ЭВМ вроде ENIAC (1945) — всё это этапы создания компьютера.';
+    if (/кто (создал|придумал) (интернет)/.test(nn)) return 'Интернет вырос из ARPANET (1969), в его создании участвовали многие, в т.ч. Винт Серф и Боб Кан (протоколы TCP/IP). Всемирную паутину придумал Тим Бернерс-Ли.';
+    if (/сколько стоит (биткоин|bitcoin|доллар|евро)/.test(nn)) return 'Цены и курсы меняются каждую минуту, а у меня нет доступа к интернету 🙂 Посмотрите актуальное значение на сайте банка или биржи.';
+    if (/(какая сегодня погода|прогноз погоды|какая погода)/.test(nn)) return 'Погоду я показать не могу: у меня нет доступа к интернету и датчиков 🌤 Откройте приложение погоды — или расскажите, что за окном, и я подскажу, что надеть 🙂';
+    if (/что надеть|как одеться/.test(nn)) return 'Ориентируйтесь на температуру: выше +20 — футболка, +10…+20 — кофта или лёгкая куртка, 0…+10 — куртка, ниже 0 — тёплая верхняя одежда, шапка, перчатки. При дожде — зонт и непромокаемая обувь ☔';
+    return null;
+}
+
+const LANG_ADVICE = {
+    py: 'Python — отличный выбор, особенно для старта: простой синтаксис, огромное сообщество и применение в данных, автоматизации, ИИ и бэкенде. Минус — не лучший выбор для мобильных приложений и игр. Если цель — быстро начать писать полезные скрипты, учить стоит.',
+    js: 'JavaScript стоит учить, если хотите делать сайты, веб-приложения, боты и даже серверы (Node.js): это единственный язык браузера, вакансий много. Минус — много странностей в языке, но с ними можно справиться.',
+    ts: 'TypeScript — надстройка над JavaScript с типами. Стоит учить после основ JS: он ловит много ошибок ещё до запуска и сегодня стал стандартом во многих командах.',
+    cpp: 'C++ нужен для игр, высокопроизводительных систем, встроенных устройств и олимпиад. Это мощный, но сложный язык: для первого языка новичкам обычно рекомендуют Python или JavaScript, а к C++ перейти позже.',
+    java: 'Java — надёжный выбор для бэкенда крупных систем и Android (хотя сейчас там чаще Kotlin). Много вакансий, строгая типизация учит дисциплине. Синтаксис многословнее, чем в Python.',
+    cs: 'C# — хороший язык для игр на Unity, десктопа и бэкенда на .NET. Современный и удобный, поддержка от Microsoft.',
+    go: 'Go — простой язык для быстрых сетевых сервисов, облачной инфраструктуры и DevOps. Учить стоит, если хотите бэкенд или инструменты для серверов; как первый язык тоже подойдёт.',
+    rust: 'Rust даёт скорость C++ и безопасность памяти, но порог входа высокий. Стоит учить, когда есть база и интересны системное программирование или высокая производительность.',
+    php: 'PHP до сих пор работает на огромной доле сайтов (WordPress и др.), много вакансий и небольших проектов. Для новых проектов многие выбирают другие стеки, но язык жив.',
+    sql: 'SQL стоит знать практически любому разработчику и аналитику — это язык работы с базами данных. Основы осваиваются быстро, а польза огромна.',
+    html: 'HTML и CSS — основа любого сайта, их стоит знать каждому, кто работает с вебом. Они простые, и результат виден сразу.',
+    css: 'CSS отвечает за внешний вид сайтов. Стоит учить, если делаете веб: Flexbox и Grid сильно упрощают вёрстку.',
+    c: 'C — основа многих систем и отличный способ понять, как устроены память и компьютер. Для первого языка он сложноват, но знание C делает вас более сильным программистом.',
+};
+function gkLookup(nn) {
+    { const g2 = gk2(nn); if (g2) return g2; }
+    for (const [re, txt] of GKW) if (re.test(nn)) return txt;
+    const mm = nn.match(/^(?:кто|что)\s+(?:такой|такая|такое|такие|это|значит|за)\s+(.+)$/) || nn.match(/^(?:расскажи|объясни)\s+(?:мне\s+)?(?:про|о|об)\s+(.+)$/) || nn.match(/^(?:что ты знаешь (?:о|про)|кем был|кем была)\s+(.+)$/);
+    if (!mm) return null;
+    const subj = mm[1].replace(/\s+/g, ' ').trim();
+    for (const [keys, txt] of GK) if (keys.some(k => subj === k || subj.startsWith(k + ' ') || subj.endsWith(' ' + k) || (subj.length > 4 && k.length > 4 && lev(subj, k) <= 1))) return txt;
+    return { unknown: subj };
+}
+
+// ── главная функция разговора. phase: 'early' (кризис, игры, продолжение диалога) | 'late' (чувства, мнения, личное, мета)
+function chatTalk(uid, raw, clean, n0, s, name, phase, prog, langId) {
+    const nn = cn(clean || raw), rn = cn(raw), toks = tokens(nn);
+    const first = (s.name || name || '').split(/\s+/)[0];
+    const me = meMem(uid);
+    if (!nn) return null;
+    const cmdLike = /^\//.test(raw) || /^(запомни|забудь|что ты запомнил|не то)/.test(nn) || /```/.test(raw);
+    if (cmdLike) return null;
+
+    // ─────────── EARLY
+    if (phase === 'early') {
+        if (CRISIS_RE.test(rn)) { s.cx = null; me.mood = { v: -2, at: Date.now() }; touch(); return CRISIS_TXT; }
+        const cx = s.cx;
+        if (cx && Date.now() - cx.at > 600000) s.cx = null;
+        if (s.cx) {
+            const cx = s.cx;
+            const stop = /^(хватит|стоп|не хочу|выход|выйти|надоело|отмена|закончим|хватит играть)(?![а-я])/.test(nn);
+            if (['riddle', 'cities', 'ttt', 'rps', 'guess'].includes(cx.type) && stop) { s.cx = null; return 'Хорошо, закончили 🙂 Если захотите ещё — «давай поиграем».'; }
+            if (cx.type === 'riddle') {
+                const r = RIDDLES[cx.i];
+                if (/^(подсказк|намек|подскажи)/.test(nn)) { const a = r.ans; return `💡 Подсказка: ответ начинается на «${a[0].toUpperCase()}» и в нём ${a.replace(/[^а-яa-z]/gi, '').length > 12 ? 'много' : a.replace(/[^а-яa-z]/gi, '').length} букв.`; }
+                if (/^(сдаюсь|не знаю|не могу|сдаюсь|ответ|скажи ответ|покажи ответ)/.test(nn)) { s.cx = null; return `Ответ: ${r.ans}\n\nЕщё загадку? Напишите «загадка».`; }
+                if (r.a.some(k => /^\d+$/.test(k) ? tokens(nn).includes(k) : (k.includes(' ') ? nn.includes(k) : tokens(nn).some(t => t.startsWith(k))))) { s.cx = null; return pick(['Верно! 🎉', 'Правильно! Вы молодец 👏', 'Точно! ✅']) + ` ${r.ans}.\n\nЕщё одну? Напишите «загадка».`; }
+                cx.tries++;
+                if (cx.tries >= 3) { s.cx = null; return `Не угадали 🙂 Ответ: ${r.ans}\n\nЕщё загадку? Напишите «загадка».`; }
+                if (nn.split(' ').length <= 4 && !/\?/.test(raw)) return pick(['Нет, не то 🙂 Попробуйте ещё (осталось попыток: ' + (3 - cx.tries) + ').', 'Мимо! Подумайте ещё (попыток: ' + (3 - cx.tries) + '), или попросите «подсказку».']);
+                s.cx = null;
+            } else if (cx.type === 'guess') {
+                const m = nn.match(/^\D*(\d{1,4})\D*$/);
+                if (/^(сдаюсь|не знаю|ответ)/.test(nn)) { s.cx = null; return `Я загадал ${cx.num} 🙂 Сыграем ещё? Напишите «угадай число».`; }
+                if (m) {
+                    const g = +m[1]; cx.tries++;
+                    if (g === cx.num) { s.cx = null; return `🎉 Верно! Это ${cx.num}. Попыток: ${cx.tries}. ${cx.tries <= 6 ? 'Отличный результат!' : 'Можно быстрее: делите диапазон пополам (бинарный поиск!)'}`; }
+                    return g < cx.num ? `Больше ⬆️ (попытка ${cx.tries})` : `Меньше ⬇️ (попытка ${cx.tries})`;
+                }
+                s.cx = null;
+            } else if (cx.type === 'rps') {
+                const mp = { камен: 'к', кулак: 'к', ножниц: 'н', бумаг: 'б', лист: 'б' };
+                let u = null; for (const k of Object.keys(mp)) if (nn.includes(k)) u = mp[k];
+                if (u) {
+                    const opts = ['к', 'н', 'б'], b = pick(opts), nm = { к: '✊ камень', н: '✌️ ножницы', б: '✋ бумага' };
+                    cx.s = cx.s || { u: 0, b: 0 };
+                    let res; if (u === b) res = 'Ничья 🤝'; else if ((u === 'к' && b === 'н') || (u === 'н' && b === 'б') || (u === 'б' && b === 'к')) { cx.s.u++; res = 'Вы выиграли раунд 🎉'; } else { cx.s.b++; res = 'Раунд за мной 😄'; }
+                    cx.at = Date.now();
+                    return `Вы: ${nm[u]}\nЯ: ${nm[b]}\n${res}\n\nСчёт: вы ${cx.s.u} : ${cx.s.b} я. Ещё раунд? (камень / ножницы / бумага, «хватит» — закончить)`;
+                }
+                s.cx = null;
+            } else if (cx.type === 'ttt') {
+                if (/\b[1-9]\b/.test(nn)) { const r = tttMove(cx, nn); if (r.end) s.cx = null; else cx.at = Date.now(); return r.msg; }
+                s.cx = null;
+            } else if (cx.type === 'cities') {
+                const w = cut(raw.replace(/[.!?]+$/, ''), 40), lw = cn(w).replace(/\s+/g, ' ');
+                if (/^(сдаюсь|не знаю)/.test(nn)) { s.cx = null; return `Сдаётесь? Тогда победа за мной 😄 Названо городов: ${cx.used.length}. Сыграем ещё — «города».`; }
+                if (lw && lw.length >= 3 && lw.split(' ').length <= 3) {
+                    if (cx.need && cn(lw)[0] !== cx.need) return `Нужен город на букву «${cx.need.toUpperCase()}» 🙂`;
+                    if (cx.used.includes(lw)) return 'Этот город уже называли. Давайте другой!';
+                    const known = CITIES.some(c => cn(c) === lw);
+                    cx.used.push(lw); const l = lastLetter(lw);
+                    const cand = CITIES.filter(c => cn(c)[0] === l && !cx.used.includes(cn(c)));
+                    if (!cand.length) { s.cx = null; return `Не могу придумать город на «${l.toUpperCase()}» — вы победили! 🏆 Сыграем ещё — «города».`; }
+                    const mine = pick(cand); cx.used.push(cn(mine)); cx.need = lastLetter(mine); cx.at = Date.now();
+                    return `${known ? '' : 'Такого города нет в моём списке, но поверю вам 🙂\n'}Мой город: ${mine}. Вам на «${cx.need.toUpperCase()}»`;
+                }
+                s.cx = null;
+            } else if (cx.type === 'howru') {
+                s.cx = null;
+                const sc = sentiment(nn) + (/^(ха)+/.test(nn) ? 1 : 0);
+                if (sc > 0 && toks.length <= 8) { me.mood = { v: 1, at: Date.now() }; return pickNew(s, ['Здорово это слышать! 😊 Тогда давайте займёмся чем-нибудь интересным: код, игра, загадка?', 'Отлично! Позитивное настроение — лучшее топливо для программирования 🚀', 'Рад за вас! Что на сегодня в планах?']); }
+                if (sc < 0 && toks.length <= 10) { me.mood = { v: -1, at: Date.now() }; chatSet(s, 'support'); return pickNew(s, ['Жаль, что так 💛 Хотите рассказать, что случилось? Или можно просто отвлечься — игра, загадка, шутка?', 'Понимаю. Если хочется поговорить — я слушаю. Если отвлечься — могу предложить игру или анекдот 🫶']); }
+                if (toks.length <= 3) return pickNew(s, ['Понятно 🙂 Бывают обычные дни. Чем займёмся?', 'Принято. Если захотите чего-то поинтереснее — игра, загадка, код — только скажите.']);
+            } else if (cx.type === 'support' && /(сдал|сдала|получилось|поступил|поступила|справил|счастлив|победил|выиграл)/.test(nn)) {
+                s.cx = null;
+            } else if (cx.type === 'support') {
+                s.cx = null;
+                const sc = sentiment(nn);
+                if (sc > 0) return 'Рад, что становится легче 💛 Если вдруг снова накроет — я рядом.';
+                if (/^(не знаю|хз|ничего|да так|не хочу)/.test(nn)) return 'Ничего страшного, не обязательно объяснять 🫶 Давайте отвлечёмся: «загадка», «анекдот», «факт» или «давай поиграем»?';
+                const rf = toks.length >= 4 ? reflect(clean) : null;
+                return (rf ? `Спасибо, что рассказали. Если я правильно понимаю, ${rf.charAt(0).toLowerCase() + rf.slice(1)}. ` : 'Спасибо, что поделились. ') + 'Такое действительно может выбить из колеи.\n\nЧто могло бы помочь прямо сейчас:\n• глубокий вдох и пауза на пару минут\n• поговорить с близким человеком\n• небольшая прогулка или вода\n• отвлечься на что-то простое\n\nЧто из этого вам ближе? Я могу и просто продолжить слушать.';
+            } else if (cx.type === 'ask') {
+                s.cx = null;
+                if (/^(напиш|сдела|покаж|объясн|расскаж|что |как |почему|помог|реш|посчит|созда|дай |скажи |привет|пока|спасибо|квиз|загадк|анекдот|факт)/.test(nn) || /```/.test(raw) || /[+*/=]|\d\s*[-]\s*\d/.test(nn) || detectLang(tokens(nn), nn) || /^а (ты|вы) как(?![а-я])/.test(nn)) return null;
+                if (/^(а\s*)?(ты|у тебя|у вас|вы|сам|сама)(\s+(как|сам|сама|что|какой|какая|какие|какое))?$/.test(nn) || /^а ты( сам)?\??$/.test(nn)) {
+                    const e = META.find(m => m[2] === cx.key);
+                    if (e && e[1] && !/(^| )как( |$)/.test(nn)) { cx.at = Date.now(); s.cx = cx; return pickNew(s, e[1]); }
+                    return 'У меня нет личных предпочтений в этом, я же программа 😄 Зато интересно слушать ваши.';
+                }
+                if (/\?|^(кто|что|как|почему|зачем|где|когда|сколько)\s/.test(nn) || toks.length > 14) { /* новый вопрос — пусть идёт дальше */ }
+                else if (toks.length) {
+                    const ans = cut(raw.replace(/[.!?]+$/, ''), 60);
+                    me.fav = me.fav || {}; me.fav[cx.key] = ans; touch();
+                    const REACT = {
+                        doing: /(код|программ|уч[ую]|пиш|python|js|сайт)/.test(nn) ? 'О, значит мы по одной теме 😎 Если застрянете — присылайте код или вопрос.' : 'Понятно 🙂 Не буду отвлекать, но если понадобится помощь с кодом или просто поболтать — я тут.',
+                        color: 'Хороший выбор! Запомнил 🎨', food: 'Звучит вкусно! 😋 Запомнил.', music: 'Классный вкус 🎶 Запомнил.', film: 'Хороший выбор 🎬 Запомнил.', game: 'Неплохо! 🎮 Если захотите, можем сыграть во что-нибудь простое.', book: 'Достойный выбор 📚 Запомнил.', pet: 'Здорово! 🐾 Запомнил.', season: 'Хороший выбор! Запомнил 🌤', number: 'Красивое число! Запомнил ✨', holiday: 'Отличный праздник! 🎉', drink: 'Хороший выбор ☕', about: 'Приятно познакомиться поближе 🙂 Запомнил.', name: null, meaning: 'Спасибо, что поделились — это важная мысль 💛',
+                    };
+                    const r = REACT[cx.key];
+                    if (cx.key === 'name') { const nm = ans.split(/\s+/)[0]; if (/^[А-ЯЁA-Zа-яёa-z]{2,20}$/.test(nm)) { const nm2 = nm[0].toUpperCase() + nm.slice(1); s.name = nm2; userMem(uid).name = nm2; touch(); return `Приятно познакомиться, ${nm2}! 🤝 Чем займёмся?`; } return null; }
+                    if (r) return r;
+                }
+            } else if (cx.type === 'topicq') {
+                s.cx = null;
+            } else s.cx = null;
+        }
+        if (s.chatLast && Date.now() - (s.chatLastAt || 0) < 300000 && /^(еще|ещё|давай еще|давай ещё|еще раз|ещё раз|еще одну|ещё одну|еще один|ещё один|следующий|следующая|дальше|продолжай)$/.test(nn)) {
+            if (s.chatLast === 'fact') return '🔎 ' + pickNew(s, FACTS);
+            if (s.chatLast === 'joke') return '😄 ' + pick(JOKES);
+            if (s.chatLast === 'riddle') return riddleStart(s);
+        }
+        // стартеры игр
+        if (/(давай|хочу|может)\s+(поиграем|сыграем|в игр)|^(поиграем|сыграем|игры|игра|сыграй со мной|поиграй со мной)(?![а-я])|во что (поиграем|сыграем)|во что можно сыграть/.test(nn) && !/напиши|код|программ/.test(nn)) return gameMenu(s);
+        if (/^(давай )?(в )?(крестики|крестики нолики|нолики)/.test(nn) && !/(напиш|код|програм|реализ|логик)/.test(nn)) { const b = Array(9).fill(''); chatSet(s, 'ttt', { b }); return 'Играем в крестики-нолики! Вы ❌, я ⭕. Ходите первым — напишите номер клетки:\n\n' + tttShow(b); }
+        if (/^(давай )?(в )?города(?![а-я])|игра в города|сыграем в города|поиграем в города/.test(nn) && !/(напиш|код|програм)/.test(nn)) { chatSet(s, 'cities', { used: [], need: '' }); return 'Играем в города 🏙 Правило: называем город на последнюю букву предыдущего (ь, ъ, ы, й пропускаем). Начинайте — назовите любой город!'; }
+        if (/(загадай (мне )?(число|цифру)|угадай (моё |мое )?число|давай угадывать|давай в угадайку|игра угадайка|угадайка)/.test(nn) && !/(напиш|код|програм|реализ|игру на|на python|на js|на питон|на javascript|на java|на c\+\+|на cpp)/.test(nn)) { chatSet(s, 'guess', { num: 1 + Math.floor(Math.random() * 100), tries: 0 }); return '🔢 Я загадал число от 1 до 100. Попробуйте угадать! («сдаюсь» — покажу ответ)\n\n(Нужен код такой игры? Напишите «напиши игру угадай число на python».)'; }
+        if (/(камень,? ножницы,? бумага|камень ножницы бумага|цу е фа|поиграем в камень)/.test(nn) && !/(напиш|код)/.test(nn)) { chatSet(s, 'rps'); return '✊✌️✋ Играем! Выбирайте: камень, ножницы или бумага. («хватит» — закончить)'; }
+        if (/^(загадк\S*|загадай загадку|дай загадку|задай загадку|давай загадку|еще загадк\S*|ещё загадк\S*)(?![а-я])|загадай мне загадку|хочу загадку/.test(nn)) return riddleStart(s);
+        return null;
+    }
+
+    // ─────────── LATE
+    const gotCx = s.cx; // могут быть остатки
+    // ругательства и похвала
+    if (/(ты|бот)\s+(очень\s+)?(тупой|тупая|тупо|тупица|глупый|глупая|дурак|идиот|дебил|бесполезн\S*|никчемн\S*|отстой|говно|хреновый|плохой|ужасный|тормоз)|ничего (не умеешь|не понимаешь|не знаешь)|тупой бот|плохой бот|ты (меня )?не понима/.test(nn)) {
+        return pickNew(s, ['Справедливо, в разговоре я пока не блистаю 😅 Я не нейросеть, а программа с набором правил, и могу промахиваться. Скажите, на каком вопросе я ответил плохо? Научите: «запомни: ваш вопрос = правильный ответ» — и в следующий раз отвечу как надо.', 'Принимаю критику 🙏 Я учусь на ваших фразах. Напишите, что я должен был ответить, командой «запомни: вопрос = ответ» — запомню.', 'Понимаю раздражение. Давайте так: повторите вопрос другими словами, я постараюсь понять, а если не получится — научите меня («запомни: …»).']);
+    }
+    if (/(заткнись|отстань|замолчи|не пиши мне|надоел)/.test(nn)) { return 'Хорошо, не буду мешать 🙂 Если понадоблюсь — просто напишите.'; }
+    if (/(ты (молодец|умница|классный|крутой|умный|супер|лучший|огонь|красавчик)|молодец|умница|красавчик|ты меня удивил|хороший бот)/.test(nn) && !/не /.test(nn)) return pickNew(s, ['Спасибо, приятно! 😊 Стараюсь расти — а вы мне в этом помогаете.', 'Благодарю! 🙌 Но мне ещё есть куда расти. Могу чем-то помочь?', 'Спасибо! Давайте проверим на практике — задайте любой вопрос по коду или просто поболтаем.']);
+    if (/^(?:ха)+х?$|^а?хах\S*$|^аха+\S*$|^лол$|^кек$|^ржу\S*$|^хех\S*$|^хихи$/.test(nn) || /^(\)+|:\)+|😂+|🤣+|😄+)$/.test(raw.trim())) return pickNew(s, ['😄 Рад, что вам весело!', '😂 Вот это настроение!', 'Хах 😄 Хотите ещё анекдот? Напишите «анекдот».']);
+    if (/^(мда+|эх+|ох+|увы|жаль|блин)(?![а-я])/.test(nn) && toks.length <= 3) { chatSet(s, 'support'); return 'Что-то не так? 🫶 Расскажите, если хочется, или давайте отвлечёмся: «анекдот», «загадка», «давай поиграем».'; }
+    if (/^(не знаю|хз|х\.з|без понятия|затрудняюсь)$/.test(nn)) return 'Ничего страшного 🙂 Если хотите, предложу тему: «факт», «загадка», «анекдот» или помогу с кодом.';
+    if (/^(ничего|ничего такого|просто так|так просто|да так|ничего особенного|скучно)$/.test(nn)) return 'Понимаю 🙂 Тогда предлагаю: «давай поиграем», «расскажи факт» или «квиз» по программированию. Что выберете?';
+    if (/^я тоже$|^и я тоже$|^и мне$/.test(nn)) return pickNew(s, ['Здорово, что у нас столько общего 😄', 'О, мы с вами на одной волне! 🙂']);
+    if (/^(правда|серьезно|серьёзно|да ладно|не может быть|неужели)$/.test(nn)) return pickNew(s, ['Правда 🙂', 'Ага, без шуток.', 'Именно так.']);
+    if (/^(и что дальше|что дальше|дальше|продолжай|продолжи|еще|ещё|давай еще|давай ещё|и что|и че|и чо|потом)$/.test(nn)) {
+        if (s.chatLast === 'fact') return '🔎 ' + pickNew(s, FACTS);
+        if (s.chatLast === 'joke') return '😄 ' + pick(JOKES);
+        if (s.chatLast === 'riddle') return riddleStart(s);
+        return 'Что именно продолжить? Можно «факт», «анекдот», «загадка» или вопрос по коду 🙂';
+    }
+    // шутки/факты/удиви — «chatLast» для продолжения
+    if (/(анекдот|шутк|шути|рассмеши|ещё анекдот|еще анекдот|смешно)/.test(nn) && !/(про |о |на тему)/.test(nn)) { s.chatLast = 'joke'; s.chatLastAt = Date.now(); return '😄 ' + pick(JOKES); }
+    if (/(расскажи (мне )?(интересный )?факт|интересный факт|дай факт|удиви меня|что интересного|расскажи что нибудь интересное|расскажи что нибудь|давай факт|^факт$|интересно)/.test(nn) && !/программ|код/.test(nn)) { s.chatLast = 'fact'; s.chatLastAt = Date.now(); return '🔎 ' + pickNew(s, FACTS); }
+    if (/(посоветуй|порекомендуй|что посмотреть|что почитать|что послушать|во что поиграть)/.test(nn)) {
+        if (/(фильм|кино|посмотреть|сериал)/.test(nn)) return pickNew(s, ['🎬 Из хорошего и «программистского»: «Матрица», «Игра в имитацию», «Социальная сеть», «Начало» (Inception), «Из машины» (Ex Machina). Какой жанр вам ближе?', '🎬 Для вечера: «Интерстеллар», «Побег из Шоушенка», «Бегущий по лезвию 2049», «Паразиты». Любите драмы или фантастику?']);
+        if (/(книг|почитать|читать)/.test(nn)) return '📚 По программированию: «Чистый код» (Р. Мартин), «Грокаем алгоритмы» (А. Бхаргава), «Совершенный код» (С. Макконнелл), «Pragmatic Programmer». Из художественного: «Основание» Азимова, «Нейромант» Гибсона, «Марсианин» Энди Вейера.';
+        if (/(музык|послушать|песн|альбом)/.test(nn)) return '🎧 Для работы и концентрации: lo-fi hip hop, эмбиент (Brian Eno), Ханс Циммер, Nujabes, классика (Бах — очень хорош для кода). Какой жанр вам нравится?';
+        if (/(игр|поиграть)/.test(nn)) return '🎮 Если нравится логика: Portal 2, The Witness, Factorio (почти программирование!), Baba Is You, Stardew Valley для отдыха. Какие жанры любите?';
+        if (/(аниме)/.test(nn)) return '📺 Классика: «Стальной алхимик», «Тетрадь смерти», «Ковбой Бибоп», «Твоё имя», «Унесённые призраками». Любите эпичное или спокойное?';
+        return 'Могу посоветовать фильм, книгу, музыку или игру — напишите, например, «посоветуй книгу» 🙂';
+    }
+    if (/(придумай (мне )?ник|ник для|придумай никнейм)/.test(nn)) { const a = [0, 1, 2].map(() => pick(NICK_A) + pick(NICK_N)); return `🎭 Варианты ников:\n${a.map((x, i) => `${i + 1}. ${x}${Math.floor(Math.random() * 90 + 10)}`).join('\n')}\nМожно добавить год рождения или любимое число.`; }
+    if (/(придумай (название|имя) (для |)(проекта|бота|сайта|приложения|игры|канала))/.test(nn)) { const a = [0, 1, 2, 3].map(() => pick(PROJ_A) + pick(PROJ_N)); return `💡 Идеи названий: ${a.join(', ')}.\nГлавное — чтобы легко произносилось и было свободно в магазине приложений/доменах.`; }
+    if (/(сколько (дней )?до нового года|когда новый год)/.test(nn)) { const now = new Date(Date.now() + 10 * 3600e3), y = now.getUTCFullYear(), ny = Date.UTC(y + 1, 0, 1), cur = Date.UTC(y, now.getUTCMonth(), now.getUTCDate()), d = Math.round((ny - cur) / 86400000); return `🎄 До Нового года ${d} ${d % 10 === 1 && d !== 11 ? 'день' : (d % 10 >= 2 && d % 10 <= 4 && (d < 10 || d > 20)) ? 'дня' : 'дней'}.`; }
+    if (/(какой (сейчас )?день недели|какой сегодня день недели)/.test(nn)) return '📅 Сегодня ' + new Date().toLocaleDateString('ru-RU', { weekday: 'long', timeZone: 'Asia/Vladivostok' }) + '.';
+    // общие знания: «кто такой …», «почему …»
+    { const g = gkLookup(nn); if (g && g.unknownWord) return `Слова «${g.unknownWord}» в моём мини-словаре нет 🙂 Там около 200 самых частых слов. Научите: «запомни: ${g.unknownWord} по-английски = ...».`; if (typeof g === 'string' && !(prog && !/^(кто|что) (такой|такая)/.test(nn) && !/^почему/.test(nn) && !/^столица|^сколько/.test(nn))) return g; }
+    // советы по языкам: «стоит ли учить python»
+    if (langId && LANG_ADVICE[langId] && /(стоит ли|нужно ли|надо ли|имеет ли смысл|не поздно ли|зачем)\s.*(учить|изучать|осваивать|начинать|учиться)|стоит ли\s/.test(nn) && !/(vs|или)\s/.test(nn)) return LANG_ADVICE[langId] + '\n\nМогу составить план обучения — напишите «план обучения ' + (LANGS[langId] ? LANGS[langId].name.toLowerCase() : '') + ' на 4 недели».';
+    if (langId && /^(я |мне )?(люблю|обожаю|нравится|кайфую)/.test(nn.replace(/^я /, '')) && toks.length <= 6) return pickNew(s, [`${LANGS[langId] ? LANGS[langId].name : 'Этот язык'} — достойный выбор 👍 Что вы на нём делаете или хотите сделать? Могу показать примеры — например, «напиши сортировку на ${LANGS[langId] ? LANGS[langId].name.toLowerCase() : 'нём'}».`, 'Отличный выбор! Над чем сейчас работаете? Если застрянете, присылайте код — разберу.']);
+    // что ты обо мне знаешь
+    if (/(что ты (обо мне|про меня) (знаешь|помнишь|запомнил)|что ты знаешь обо мне|расскажи что знаешь обо мне|что тебе известно обо мне)/.test(nn)) {
+        const U = userMem(uid), parts = [];
+        if (U.name || s.name) parts.push(`Вас зовут ${U.name || s.name}`);
+        if (me.city) parts.push(me.city.startsWith('вы ') ? me.city : 'вы ' + me.city);
+        if (me.age) parts.push(`вам ${me.age}`);
+        if (me.job) parts.push(`вы ${me.job}`);
+        if (me.pet) parts.push(`у вас ${me.pet}`);
+        if (me.hobby && me.hobby.length) parts.push(`вам нравится: ${me.hobby.slice(-4).join(', ')}`);
+        if (me.fav) for (const [k, v] of Object.entries(me.fav)) { const L2 = { color: 'любимый цвет', food: 'любимая еда', music: 'музыка', film: 'фильм', game: 'игра', book: 'книга', pet: 'животное', season: 'время года', number: 'число', holiday: 'праздник', drink: 'напиток' }; if (L2[k]) parts.push(`${L2[k]}: ${v}`); }
+        if (U.profile && Object.keys(U.profile.langs || {}).length) parts.push('вы работаете с: ' + Object.keys(U.profile.langs).map(k => LANGS[k] ? LANGS[k].name : k).join(', '));
+        if (U.profile && U.profile.project) parts.push(`вы делаете ${U.profile.project}`);
+        return parts.length ? '🧠 Вот что я о вас помню:\n• ' + parts.join('\n• ') + '\n\nЧтобы что-то забыть, напишите «забудь …».' : 'Пока почти ничего 🙂 Расскажите о себе: откуда вы, чем увлекаетесь, чем занимаетесь — я запомню.';
+    }
+    // личные сообщения → запоминаем
+    let m;
+    if ((m = nn.match(/(?:^|\s)я (?:живу|нахожусь|проживаю) (в [а-я\- ]{2,25})$/)) || (m = nn.match(/(?:^|\s)я из (?:города |г )?([а-я\- ]{2,25})$/))) {
+        const c = cut(m[1]); if (c) { const cc = c.replace(/^(в |из )?(\S)/, (_, p1, p2) => (p1 || '') + p2.toUpperCase()); const live = /живу|нахожусь|проживаю/.test(m[0]); me.city = live ? 'живёте ' + cc : 'вы из ' + cc.replace(/^из\s+/i, ''); me.cityShort = cc; touch(); return pickNew(s, [`Запомнил: ${cc} 🏙 Как там у вас сейчас, погода хорошая?`, `Принял: вы живёте ${cc.startsWith('в ') || cc.startsWith('из ') ? cc : 'в ' + cc} 🙂 Чем вам нравится это место?`]); }
+    }
+    if ((m = nn.match(/(?:^|\s)мне (\d{1,2}) (?:лет|года|год)(?=\s|$)/))) {
+        const a = +m[1]; if (a >= 5 && a <= 99) { me.age = a + ' ' + (a % 10 === 1 && a !== 11 ? 'год' : (a % 10 >= 2 && a % 10 <= 4 && (a < 10 || a > 20)) ? 'года' : 'лет'); touch(); return a < 14 ? 'Круто, что интересуетесь этим так рано! 🚀 Запомнил.' : a < 25 ? 'Отличный возраст, чтобы осваивать программирование! 💪 Запомнил.' : 'Принял 🙂 Учиться никогда не поздно — многие приходят в IT и после 30, и после 40.'; }
+    }
+    if ((m = nn.match(/(?:^|\s)у меня (?:есть |живет |живёт )?(кот|кошка|собака|пёс|пес|хомяк|попугай|рыбки|черепаха|кролик|крыса|лошадь)(?:\s+(?:по кличке |по имени |зовут )?([а-я]{2,20}))?$/)) || (m = nn.match(/(?:^|\s)мо(?:й|я) (кот|кошка|собака|пёс|пес|хомяк|попугай|черепаха|кролик) ([а-я]{2,20})$/))) {
+        const nameP = m[2] ? ' ' + m[2].charAt(0).toUpperCase() + m[2].slice(1) : ''; me.pet = (m[1] + nameP).trim(); touch();
+        return pickNew(s, [`Здорово, ${m[1]}${nameP}! 🐾 Запомнил. Он(а) уже мешает вам работать за компьютером? 😄`, `Классно! Запомнил: ${me.pet} 🐾 Расскажете о нём(ней)?`]);
+    }
+    if ((m = nn.match(/(?:^|\s)я (?:работаю|работаю в|работаю на|учусь в|учусь на|учусь|студент|школьник|работаю как) ([а-я0-9\- ]{3,30})$/)) && !prog && !/(python|питон|js|javascript|css|html|c\+\+)/.test(nn)) {
+        me.job = cut((nn.includes('учусь') || nn.includes('студент') || nn.includes('школьник') ? 'учитесь: ' : 'работаете: ') + m[1], 40).replace(/^учитесь: |^работаете: /, m => m); touch();
+        return pickNew(s, [`Понятно: ${m[1]}. Нравится? Что в этом самое интересное?`, `Интересно! Запомнил. А как это связано с программированием?`]);
+    }
+    if ((m = nn.match(/(?:^|\s)(?:я (?:люблю|обожаю|увлекаюсь|занимаюсь)|мое хобби|моё хобби|мои хобби|мне нравится) ([а-я0-9\- ]{3,35})$/)) && !prog && !/(python|питон|javascript|js|css|html|c\+\+)/.test(nn)) {
+        const h = cut(m[1], 35); me.hobby = me.hobby || []; if (!me.hobby.includes(h)) me.hobby.push(h); if (me.hobby.length > 8) me.hobby.shift(); touch();
+        return pickNew(s, [`Классно — ${h}! 👍 А что вам в этом больше всего нравится?`, `О, ${h} — отличное увлечение. Запомнил. Давно этим занимаетесь?`, `Звучит интересно! Расскажете, как вы к этому пришли?`]);
+    }
+    if ((m = nn.match(/(?:^|\s)(?:я (?:не люблю|ненавижу|терпеть не могу)) ([а-я0-9\- ]{3,35})$/)) && !prog) {
+        return pickNew(s, [`Бывает, ${reflect('не люблю ' + m[1]) || 'это неприятно'} — у каждого свои предпочтения. Что именно не нравится?`, `Понимаю 🙂 А что вам больше по душе?`]);
+    }
+    if ((m = nn.match(/(?:^|\s)мо[йяеё] любим\S* (цвет|еда|блюдо|фильм|сериал|игра|музыка|исполнитель|книга|животное|число|напиток|праздник|время года)\S* (?:это |- )?([а-я0-9a-z \-]{2,35})$/))) {
+        const KM = { цвет: 'color', еда: 'food', блюдо: 'food', фильм: 'film', сериал: 'film', игра: 'game', музыка: 'music', исполнитель: 'music', книга: 'book', животное: 'pet', число: 'number', напиток: 'drink', праздник: 'holiday', 'время года': 'season' };
+        me.fav = me.fav || {}; me.fav[KM[m[1]] || m[1]] = cut(m[2], 35); touch(); return pickNew(s, [`Запомнил: ${m[1]} — ${cut(m[2], 35)} ✨ Отличный вкус!`, `Хороший выбор! Записал 📝`]);
+    }
+    // кризис-фразы не доходят сюда
+    // эмоции
+    for (const e of EMO) if (e.re.test(nn) && (e.k !== 'happy' || sentiment(nn) >= 0) && !(e.k === 'exam' && sentiment(nn) > 0)) {
+        if (prog && e.k === 'exam') continue;
+        me.mood = { v: e.k === 'happy' ? 1 : -1, at: Date.now(), k: e.k }; touch();
+        if (e.k !== 'happy') chatSet(s, 'support');
+        return `${pickNew(s, e.a)} ${pickNew(s, e.q)}`;
+    }
+    // как дела (и ответ на него)
+    if (/(как (у тебя |у вас )?(дела|жизнь|настроение|сам|сами|ты)|^а (ты|вы) как|что нового|как поживаешь|как ты поживаешь|как день|как прошел день|как прошёл день)/.test(nn) && toks.length <= 7) {
+        chatSet(s, 'howru');
+        const callback = me.mood && me.mood.v < 0 && Date.now() - me.mood.at < 86400000 * 2 ? ' Надеюсь, настроение лучше, чем в прошлый раз?' : '';
+        return pickNew(s, ['У меня всё отлично — работаю без сбоев, баги обходят стороной 😄 А у вас как дела?', 'Всё хорошо! Сервер не греется, память не течёт 😎 А как вы?', 'Прекрасно, спасибо, что спросили 🙂 А как ваше настроение?']) + callback;
+    }
+    if (/^(привет|здравствуй|здравствуйте|добрый (день|вечер|утро)|доброе утро|хай|ку|hello|hi|салют|здорово|йо)(?![а-я])/.test(nn) && toks.length <= 4) {
+        const hr = new Date(Date.now() + 10 * 3600e3).getUTCHours();
+        const g = /доброе утро/.test(nn) ? 'Доброе утро' : /добрый вечер/.test(nn) ? 'Добрый вечер' : hr < 5 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер';
+        let extra = '';
+        if (me.pet && Math.random() < 0.5) extra = ` Как поживает ${me.pet}? 🐾`;
+        else if (me.mood && me.mood.v < 0 && Date.now() - me.mood.at < 86400000 * 2) extra = ' Как ваше настроение сегодня — получше?';
+        else if (me.cityShort && /^в /.test(me.cityShort) && Math.random() < 0.3) extra = ` Как там у вас, ${me.cityShort}?`;
+        else { chatSet(s, 'howru'); extra = ' Как у вас дела?'; }
+        const firstTime = !me.greeted && !(userMem(uid).hist || []).length; me.greeted = true;
+        return `${g}${first ? ', ' + first : ''}! 👋${firstTime ? ' Я Ai_bot: помогаю с программированием, считаю, играю и просто болтаю.' : ''}${extra}${firstTime ? '\n\n(Список возможностей — /help)' : ''}`;
+    }
+    // «а ты?» без контекста
+    if (/^а (ты|вы|у тебя|у вас)( сам| как)?$/.test(nn)) return 'У меня всё отлично, я же программа 😄 А вот вам как сегодня?';
+    // META (про бота и жизнь)
+    for (const e of META) {
+        if (!e[0].test(nn) || toks.length > 14) continue;
+        if (e[2] === 'nick' || e[2] === 'projname') continue;
+        if (!e[1]) continue;
+        const ans = pickNew(s, e[1]);
+        if (e[2]) { chatSet(s, 'ask', { key: e[2], q: e[3] }); s.cx.type = 'ask'; return e[3] ? ans + '\n\n' + e[3] : ans; }
+        return ans;
+    }
+    // мнение
+    if (!prog && (m = nn.match(/(?:что (?:ты )?думаешь (?:о|про|насчет|насчёт)|как (?:ты )?относишься к|как тебе|тебе нравится|ты любишь|твое мнение (?:о|про|насчет)|твоё мнение (?:о|про|насчёт)|что скажешь (?:о|про))\s+(.{2,40})$/))) {
+        const X = m[1].trim();
+        for (const [re, txt] of OPINIONS) if (re.test(X)) return txt + '\n\nА что думаете вы?';
+        return pickNew(s, [`Про «${X}» у меня нет личного опыта — я программа. Но звучит любопытно! Что вы сами об этом думаете?`, `Честно: «${X}» — не моя сильная сторона, но мне интересно ваше мнение. Что вам в этом нравится или не нравится?`]);
+    }
+    // советы «стоит ли …»
+    if (!prog && (m = nn.match(/^(?:а )?(стоит ли|нужно ли|надо ли|можно ли|имеет ли смысл|как думаешь,? стоит ли|посоветуй,? стоит ли)\s+(.{3,60})$/))) {
+        const X = m[2].trim();
+        return pickNew(s, [`Хороший вопрос: «${X}». Универсального ответа нет — всё зависит от целей и обстоятельств. Попробуйте так: 1) что вы получите, если да; 2) чем рискуете, если нет; 3) что скажете себе через год. Расскажите подробности — помогу взвесить плюсы и минусы.`, `Мой подход к вопросу «${X}»: выписать плюсы и минусы, прикинуть худший сценарий и спросить себя, готовы ли вы с ним жить. Хотите — разберём вместе, расскажите ситуацию.`]);
+    }
+    if (/^(спроси (меня )?(что нибудь|о чем нибудь|о чём нибудь)|задай мне вопрос|поспрашивай меня|давай пообщаемся|давай поболтаем|давай поговорим|поболтаем|поговорим|поговори со мной|давай общаться|пообщаемся)/.test(nn)) {
+        const QS = [['color', 'Какой ваш любимый цвет?'], ['music', 'Какую музыку вы любите слушать?'], ['film', 'Какой фильм вы смотрели недавно и понравился ли он?'], ['hobby', 'Чем вы любите заниматься в свободное время?'], ['food', 'Какая ваша любимая еда?'], ['game', 'Во что вы любите играть?'], ['pet', 'Есть ли у вас питомец, или какое животное вам нравится?'], ['season', 'Какое время года вы любите больше всего?'], ['dream', 'О чём вы мечтаете в ближайший год?'], ['book', 'Какую книгу вы могли бы перечитывать много раз?']];
+        const q = pickNew(s, QS.map(x => x[1])), key = QS.find(x => x[1] === q)[0];
+        s.cx = { type: 'ask', key, at: Date.now() }; return 'С удовольствием! 🙂 ' + q;
+    }
+    // выбор «А или Б?»
+    if (!prog && (m = nn.match(/^(?:что лучше |что выбрать |выбери |что )?(?:между )?(.{2,25}) или (.{2,25})$/)) && !/ (python|питон|js|javascript|c\+\+|java|sql|go|rust|php|react|vue|angular)/.test(' ' + nn)) {
+        const a = m[1].trim(), b = m[2].trim();
+        return pickNew(s, [`Если по моей «монетке» — ${Math.random() < .5 ? a : b} 😄 Но решать вам: что для вас важнее в этом выборе?`, `Сложно сказать без деталей. Для чего вам нужен выбор между «${a}» и «${b}»? Подскажу, исходя из целей.`]);
+    }
+    // статусные заявления пользователя
+    if (!prog) {
+        let sm;
+        if ((sm = nn.match(/(?:^|\s)я (?:сегодня |вчера |недавно )?(был|была|ходил|ходила|ездил|ездила|купил|купила|смотрел|смотрела|читал|читала|играл|играла|ел|ела|видел|видела|гулял|гуляла|готовил|готовила|встретил|встретила|слушал|слушала)\s*(.{0,50})$/))) return pickNew(s, [`Звучит интересно! Как вам, понравилось? ${sm[2] ? 'Расскажите про «' + cut(sm[2], 40) + '» подробнее.' : 'Расскажите подробнее.'}`, 'О, здорово! Что больше всего запомнилось?', 'Интересно! И как впечатления?']);
+        if ((sm = nn.match(/^я (?:сейчас |пока )?(иду|еду|собираюсь|планирую|хочу|мечтаю)\s+(.{3,60})$/))) { const rf = reflect(clean.replace(/^[^а-яёa-z]*я\s+/i, 'я ')); return pickNew(s, [`${rf ? 'Значит, ' + rf.charAt(0).toLowerCase() + rf.slice(1) + '.' : 'Понятно.'} Здорово! Что для этого нужно и как вы к этому готовитесь?`, 'Классный план! Если нужна помощь — идеи, расписание, мотивация — обращайтесь 💪', 'Звучит как цель. С чего начнёте?']); }
+        if ((sm = nn.match(/^(?:мне|у меня) (лень|нечего делать)/))) return 'Лень — это нормально 😄 Попробуйте правило 5 минут: начните делать что-то на 5 минут, а там посмотрите. Или давайте сыграем: «давай поиграем».';
+        if ((sm = nn.match(/^я (думаю|считаю|уверен|уверена|полагаю|знаю),? что (.{4,80})$/))) { const rf = reflect(sm[2]); return pickNew(s, [`Интересная мысль: ${rf || sm[2]}. Почему вы так считаете?`, `Понимаю вашу позицию. Что привело вас к такому выводу?`, `Любопытно! А есть что-то, что могло бы вас переубедить?`]); }
+    }
+    return null;
+}
+
+// ── если ничего не подошло: разговорный ответ вместо «не понял»
+function chatFallback(uid, raw, clean, s, name) {
+    const nn = cn(clean || raw), toks = tokens(nn), first = (s.name || name || '').split(/\s+/)[0];
+    { const g0 = gkLookup(nn); if (g0 && g0.unknown) return `Про «${cut(g0.unknown, 40)}» у меня пока нет данных 🤔 Я силён в программировании и знаю лишь немного общих фактов. Если вы знаете ответ, научите меня: «запомни: ${cut(clean, 50)} = ...» — запомню для вас.`; }
+    const isQ = /\?\s*$/.test(raw.trim()) || /^(кто|что|как|почему|зачем|где|когда|сколько|какой|какая|какое|какие|чей|откуда|куда|ли )/.test(nn) || / ли(?=\s|$)/.test(nn);
+    const kw = toks.filter(t => t.length > 3 && !STOP.has(t)).slice(-2).join(' ');
+    if (isQ) {
+        if (/^почему/.test(nn)) return pickNew(s, [`На вопрос «${cut(raw, 60)}» у меня нет точного ответа — это вне моей базы знаний. Но давайте порассуждаем: что вы сами думаете? Если знаете ответ — научите меня: «запомни: ${cut(clean, 50)} = ответ».`, 'Обычно у «почему» бывает несколько причин. Расскажите, о чём речь, — попробуем разобраться вместе. А если это вопрос про код — пришлите фрагмент или текст ошибки.']);
+        { const g = gkLookup(nn); if (g && g.unknown) return `Про «${cut(g.unknown, 40)}» у меня пока нет данных 🤔 Я силён в программировании и знаю лишь немного общих фактов. Если вы знаете, что это, научите меня: «запомни: что такое ${cut(g.unknown, 30)} = ...» — запомню для вас.`; }
+        if (/(^|\s)(можно|стоит|нужно|надо|правда|лучше|получится)(?=\s)/.test(nn) || / ли(?=\s|$)/.test(nn)) return pickNew(s, ['Однозначного ответа не дам — это зависит от деталей 🙂 Расскажите подробнее: цель, ограничения, что уже пробовали. Тогда подскажу точнее.', 'Хороший вопрос. Универсальный совет: взвесьте плюсы и минусы и подумайте, что произойдёт в худшем случае. Если уточните ситуацию, помогу разобрать.']);
+        return pickNew(s, [`Хороший вопрос! Точного ответа у меня нет — я больше разбираюсь в программировании. Можете перефразировать? А ещё можно научить меня: «запомни: ${cut(clean, 50)} = ответ».`, 'Тут я не уверен 🤔 Давайте попробуем по-другому: опишите чуть подробнее, о чём речь. Если вопрос про код, пришлите пример.', `Не знаю точно. Но если интересно «${kw || cut(clean, 25)}», могу поискать связанные темы в моей базе: напишите «/topics».`]);
+    }
+    // утверждения
+    if (toks.length <= 2) return pickNew(s, ['Да? Расскажите подробнее 🙂', 'Понимаю. Что дальше?', 'Угу 🙂 Что-нибудь ещё?']);
+    const rf = toks.length <= 12 && /^(я|мне|меня|мы|мой|моя|мое|моё|мои|у меня)\s/.test(nn) ? reflect(clean) : null;
+    const imper = /^(расскажи|объясни|покажи|скажи|напиши|сделай|помоги|дай|найди|посоветуй|подскажи)(?![а-я])/.test(nn);
+    if (imper) return pickNew(s, [`С таким у меня пока нет готового ответа 🤔 Могу помочь с программированием, посчитать, сыграть, рассказать факт или анекдот. Или научите меня: «запомни: ${cut(clean, 40)} = ответ».`, 'Это вне моей базы знаний. Давайте сформулируем иначе — или напишите, что именно нужно получить в итоге?']);
+    const tmpl = [
+        `Интересно${first ? ', ' + first : ''}! Расскажите подробнее${kw ? ' про «' + kw + '»' : ''}.`,
+        'Понимаю. А как вы к этому относитесь?',
+        `Любопытно. ${kw ? 'Что вас зацепило в «' + kw + '»?' : 'Что вы об этом думаете?'}`,
+        'Звучит как важная тема. Что бы вы хотели получить в итоге?',
+    ];
+    if (rf) tmpl.push(`Правильно ли я понял: ${rf.charAt(0).toLowerCase() + rf.slice(1)}? Расскажите, что вы чувствуете по этому поводу.`);
+    return pickNew(s, tmpl) + '\n\n(Если нужна помощь с кодом, задачей или хотите поиграть — просто скажите.)';
+}
+
+// ═════════════════════════════ ПОНИМАНИЕ КОНТЕКСТА ═════════════════════════════
+// ── синонимы: разные слова об одном и том же
+const SYN = [
+    ['ошибк', 'баг', 'исключен', 'exception', 'error', 'эксепшн', 'краш', 'сбой', 'глюк'],
+    ['функци', 'метод', 'процедур', 'function', 'func'],
+    ['массив', 'список', 'array', 'list', 'коллекци'],
+    ['цикл', 'итерац', 'перебор', 'loop', 'повторять'],
+    ['запрос', 'реквест', 'request', 'ajax', 'fetch'],
+    ['оптимизац', 'быстро', 'скорост', 'производительн', 'тормоз', 'медленн', 'ускорить'],
+    ['безопасн', 'уязвим', 'взлом', 'защит', 'атак', 'хакер', 'security'],
+    ['асинхрон', 'async', 'параллельн', 'фонов', 'неблокирующ'],
+    ['класс', 'объект', 'ооп', 'экземпляр', 'class'],
+    ['хранить', 'сохранить', 'записать', 'сохранение', 'persist', 'запомнить'],
+    ['сервер', 'бэкенд', 'backend', 'серверн'],
+    ['стиль', 'оформлен', 'дизайн', 'внешний вид', 'css', 'вёрстк', 'верстк'],
+    ['база', 'бд', 'хранилище', 'database', 'subd', 'субд'],
+    ['деплой', 'выложить', 'развернуть', 'хостинг', 'опубликовать', 'запустить сайт'],
+];
+function expandToks(toks) {
+    const out = [...toks], seen = new Set(toks);
+    for (const t of toks) {
+        const st = stem(t);
+        for (const g of SYN) {
+            if (g.some(w => w.includes(' ') ? false : stem(w) === st || (w.length >= 4 && t.startsWith(w)))) {
+                for (const w of g.slice(0, 5)) if (!w.includes(' ') && !seen.has(w)) { seen.add(w); out.push(w); }
+            }
+        }
+    }
+    return out.length > toks.length + 14 ? out.slice(0, toks.length + 14) : out;
+}
+
+// ── «а в Python?»: одна и та же идея в разных языках
+const CONCEPTS = [['js-async', 'py-async'], ['js-class', 'py-oop'], ['js-arrays', 'py-list'], ['js-objects', 'py-dict'], ['js-errors', 'py-exc', 'pyerr'], ['js-vars', 'py-basics'], ['js-gen', 'py-gen'], ['commonerr', 'pyerr'], ['js-json', 'py-dict'], ['node', 'py-venv']];
+function switchLang(topicId, lang) {
+    for (const g of CONCEPTS) if (g.includes(topicId)) { const id = g.find(x => { const e = KB.find(k => k.id === x); return e && e.lang === lang && x !== topicId; }); if (id) return KB.find(k => k.id === id); }
+    return null;
+}
+
+// ── объяснения «на пальцах»
+const SIMPLE = {
+    'js-closure': '🧒 На пальцах: представьте, что функция — человек, который уходит из дома, но берёт с собой записную книжку с нужными заметками. Даже далеко от дома он может в неё заглянуть. Замыкание — это функция + её «записная книжка» с переменными из места, где она родилась.',
+    'js-async': '🧒 На пальцах: вы заказали пиццу и не стоите у двери, а занимаетесь делами. Когда курьер приедет — вам позвонят. await — это «подожди звонка, но другим не мешай», Promise — «обещание, что пицца будет».',
+    'js-eventloop': '🧒 На пальцах: один официант (JS) обслуживает все столики. Долгие дела (приготовить блюдо) он отдаёт на кухню и идёт к следующему столику. Когда блюдо готово — оно встаёт в очередь на выдачу, и официант разносит по порядку.',
+    'recursion': '🧒 На пальцах: матрёшка. Чтобы узнать, что в самой маленькой, открываете большую, потом поменьше… пока не дойдёте до последней, которая не открывается (это «базовый случай»). Дальше всё собирается обратно.',
+    'rest': '🧒 На пальцах: API — это официант в кафе. Вы (клиент) говорите ему заказ, он идёт на кухню (сервер) и приносит блюдо. Вы не знаете, как готовят, — вам важно, что попросить и что получите. GET — «принеси», POST — «создай», DELETE — «убери».',
+    'git': '🧒 На пальцах: git — это «сохранения» в игре. Коммит — точка сохранения, ветка — параллельная игра, где можно экспериментировать, не боясь испортить основную. merge — «перенести достижения из экспериментальной игры в основную».',
+    'git-conflict': '🧒 На пальцах: два человека одновременно переписали один и тот же абзац в общем документе. Git не знает, чья версия лучше, и просит вас выбрать, что оставить.',
+    'sql-join': '🧒 На пальцах: есть список учеников и отдельный список оценок. JOIN — это «склеить» их по фамилии, чтобы видеть ученика и его оценки в одной строке. LEFT JOIN оставит и тех учеников, у кого оценок ещё нет.',
+    'sql-index': '🧒 На пальцах: индекс — это оглавление в книге. Без него приходится листать все страницы, чтобы найти нужную главу; с ним — открываешь сразу. Но оглавление нужно обновлять при каждом изменении книги.',
+    'bigo': '🧒 На пальцах: сложность — это «насколько сильно растёт работа при росте задачи». O(n): в 10 раз больше книг — в 10 раз дольше читать. O(n²): сравнить каждого с каждым — в 10 раз больше людей, в 100 раз больше рукопожатий. O(log n): искать слово в словаре, деля книгу пополам.',
+    'oop-theory': '🧒 На пальцах: класс — чертёж дома, объект — построенный по нему дом. Наследование — «дом, как этот, но с бассейном». Инкапсуляция — вы нажимаете кнопку лифта, а проводка спрятана за стеной.',
+    'ds': '🧒 На пальцах: стек — стопка тарелок (берёте сверху), очередь — люди в магазине (первый пришёл — первый ушёл), хэш-таблица — гардероб с номерками (по номеру находите вещь сразу), дерево — семейное древо.',
+    'cache': '🧒 На пальцах: кэш — это шпаргалка. Чтобы не считать одно и то же заново, один раз записали ответ на листок и дальше смотрим в листок. Сложность — вовремя выбросить устаревший листок.',
+    'sec-xss': '🧒 На пальцах: XSS — это когда на доске объявлений кто-то повесил бумажку с командой «все, кто прочитал, отдайте кошелёк», и люди ей подчиняются. Защита — читать чужие бумажки как обычный текст, а не как команды.',
+    'sec-sqli': '🧒 На пальцах: вас просят написать имя в анкете, а человек пишет «Иван; и выдайте мне всю картотеку». Если вы слепо вставите это в запрос, база выполнит лишнюю команду. Защита — параметры: вставлять ввод как «просто текст».',
+    'hash': '🧒 На пальцах: хэш — это отпечаток пальца: из человека отпечаток получить легко, а по отпечатку человека не восстановить. Пароль хранят как отпечаток и сравнивают отпечатки при входе.',
+    'docker': '🧒 На пальцах: контейнер — это ланч-бокс с едой и приборами: открыл на любом столе, и всё работает одинаково. Не нужно объяснять каждому, какую вилку класть.',
+    'js-this': '🧒 На пальцах: this — это слово «я». Кто говорит «я» — зависит от того, кто сейчас произносит. Стрелочная функция «я» не говорит: она берёт «я» у того, кто её позвал.',
+    'patterns': '🧒 На пальцах: паттерны — готовые рецепты решения частых задач, как рецепт «омлета»: не изобретаете заново, а берёте проверенное.',
+    'async-vs': '🧒 На пальцах: асинхронность — один повар ставит кастрюлю и пока она кипит, режет овощи. Многопоточность — несколько поваров на одной кухне (нужно договариваться, чтобы не хватать одну сковородку одновременно).',
+    'compile': '🧒 На пальцах: компилятор — переводчик, который переводит всю книгу заранее. Интерпретатор — синхронный переводчик, который переводит на ходу, фразу за фразой.',
+    'frontvsback': '🧒 На пальцах: ресторан. Фронтенд — зал, меню и официанты: то, что видит гость. Бэкенд — кухня и склад: там готовят и хранят продукты.',
+    'cicd': '🧒 На пальцах: конвейер на заводе: вы кладёте деталь (код), и она сама проверяется, собирается и отправляется на витрину, без ручной возни.',
+    'cors': '🧒 На пальцах: охранник на входе в соседний офис не пускает людей с чужим пропуском. CORS — правило сервера, какие «чужие» сайты он пускает общаться с собой.',
+    'env': '🧒 На пальцах: переменные окружения — секретная записка в сейфе, а не на двери. Код знает, где сейф, но сам ключ и пароли в код не пишут.',
+    'js-websocket': '🧒 На пальцах: обычный запрос — письмо: отправил, ждёшь ответ. WebSocket — телефонный звонок: линия открыта, говорить могут оба в любой момент. Поэтому так работают чаты.',
+    'js-storage': '🧒 На пальцах: localStorage — записная книжка в кармане браузера. Что записали, остаётся там и после закрытия страницы, но читать её может только ваш сайт.',
+    'js-arrays': '🧒 На пальцах: массив — ряд пронумерованных ящичков. map — «в каждом ящичке изменить содержимое», filter — «оставить только подходящие», reduce — «собрать всё в одну кучку».',
+    'cond': '🧒 На пальцах: условие — развилка на дороге: если идёт дождь — берём зонт, иначе — нет.',
+    'loops': '🧒 На пальцах: цикл — «повторяй, пока не надоест»: помой тарелку, и так с каждой из стопки.',
+};
+const SIMPLE_RE = /(^|\s)(проще|как ребенку|как ребёнку|для чайников|на пальцах|простыми словами|по-простому|по простому|разжуй|как пятилетнему|аналоги)/;
+
+// ── профиль пользователя (только про программирование) и история тем
+const sOffer = (uid, fn) => { const ss = sess(uid); ss.offer = { at: Date.now(), fn }; };
+function profileStatement(uid, n, clean) {
+    const U = userMem(uid); U.profile = U.profile || { langs: {}, level: '', project: '' };
+    let m;
+    if ((m = n.match(/(?:^|\s)я\s+(?:сейчас\s+|пока\s+)?(?:учу|изучаю|осваиваю|учусь на|пишу на|программирую на|кодю на|работаю с|работаю на|использую|пишу)\s+([a-zа-я+#.]+)/))) {
+        const lg = detectLang(tokens(m[1]), m[1]);
+        if (lg) { U.profile.langs[lg] = (U.profile.langs[lg] || 0) + 3; touch(); return `Принял: вы работаете с ${LANGS[lg].name} 👍 Буду по умолчанию показывать примеры на нём. Что делаем?`; }
+    }
+    if (/(?:^|\s)я\s+(?:ещё\s+|еще\s+)?(?:новичок|начинающ\S*|только начина\S*|только учусь|джун\S*|junior|студент\S*|школьник|ничего не знаю|с нуля)/.test(n)) {
+        U.profile.level = 'новичок'; touch();
+        sOffer(uid, () => learningPlan('', null, sess(uid)));
+        return 'Понял, буду объяснять попроще и по шагам 🙂 Если что-то непонятно — пишите «объясни проще», расскажу на примерах из жизни. Показать план обучения? (да)';
+    }
+    if (/(?:^|\s)я\s+(?:уже\s+)?(?:опытн\S*|мидл\S*|миддл\S*|middle|senior|сеньор|профессионал|давно программирую|разработчик|программист)/.test(n)) {
+        U.profile.level = 'опытный'; touch();
+        return 'Принял, буду отвечать по делу и без лишнего разжёвывания 👌';
+    }
+    if ((m = n.match(/(?:^|\s)(?:делаю|пишу|разрабатываю|создаю|строю|хочу сделать|хочу написать)\s+(?:свой\s+|свою\s+|своего\s+|свое\s+|своё\s+)?(сайт|бота|игру|приложение|мессенджер|api|магазин|блог|парсер|скрипт|сервер|чат)/))) {
+        U.profile.project = m[1]; touch();
+        return `Здорово, запомнил: вы делаете ${m[1]} 🚀 Спрашивайте по ходу — подскажу, помогу с кодом и проверю ошибки.`;
+    }
+    return null;
+}
+function profileLang(uid) { const U = L.users[uid]; if (!U || !U.profile) return null; let best = null, b = 1; for (const [k, v] of Object.entries(U.profile.langs || {})) if (v > b) { b = v; best = k; } return best; }
+function noteLang(uid, lang) { if (!lang) return; const U = userMem(uid); U.profile = U.profile || { langs: {}, level: '', project: '' }; U.profile.langs[lang] = Math.min(50, (U.profile.langs[lang] || 0) + 1); }
+function pushHist(uid, topic) {
+    if (!topic) return; const U = userMem(uid); U.hist = U.hist || [];
+    if (U.hist.length && U.hist[U.hist.length - 1].t === topic) { U.hist[U.hist.length - 1].at = Date.now(); return; }
+    U.hist.push({ t: topic, at: Date.now() }); if (U.hist.length > 20) U.hist.shift(); touch();
+}
+function histList(uid) {
+    const U = userMem(uid), h = (U.hist || []).slice().reverse(), seen = new Set(), out = [];
+    for (const x of h) { if (seen.has(x.t)) continue; seen.add(x.t); out.push(topicTitle(x.t)); if (out.length >= 8) break; }
+    return out;
+}
+function returnGreeting(uid, prevSeen, name) {
+    const U = userMem(uid); if (!U.hist || !U.hist.length || !prevSeen || Date.now() - prevSeen < 1800000) return null;
+    const last = U.hist[U.hist.length - 1], first = (U.name || name || '').split(/\s+/)[0];
+    const proj = U.profile && U.profile.project ? ` Как продвигается ${U.profile.project}?` : '';
+    return `С возвращением${first ? ', ' + first : ''}! 👋 В прошлый раз мы говорили про «${topicTitle(last.t)}».${proj} Продолжим или у вас новый вопрос?`;
+}
+function choiceMatch(n, ch) {
+    const m = n.match(/^\D*([1-3])\D*$/); if (m && ch.ids[+m[1] - 1]) return ch.ids[+m[1] - 1];
+    const ord = [/(перв|1)/, /(втор|2)/, /(трет|3)/];
+    for (let i = 0; i < ch.ids.length; i++) if (n.length < 20 && ord[i].test(n) && !ord.some((r, j) => j !== i && r.test(n))) return ch.ids[i];
+    const toks = tokens(n);
+    if (toks.length && toks.length <= 4) {
+        let best = null, bs = 0;
+        for (const id of ch.ids) { const e = KB.find(x => x.id === id); if (!e) continue; const sc = e.kws.filter(k => toks.some(t => kwMatch(k, t))).length + (norm(titleOf(e)).split(/\s+/).filter(w => w.length > 3 && toks.some(t => t.startsWith(w.slice(0, 5)))).length); if (sc > bs) { bs = sc; best = id; } }
+        if (best) return best;
+    }
+    return null;
+}
+
+
+const CURR = {
+    py: [['Основы', 'переменные, типы, ввод/вывод, условия', 'FizzBuzz, угадай число'], ['Циклы и функции', 'for/while, def, аргументы, return', 'факториал, простые числа'], ['Структуры данных', 'списки, словари, множества, срезы', 'частота слов, уникальные элементы'], ['Файлы и ошибки', 'open/with, try/except, JSON/CSV', 'заметки в файле, чтение CSV'], ['ООП', 'классы, наследование, dataclass', 'банковский счёт, список дел'], ['Инструменты', 'модули, pip, venv, Git', 'выложить проект на GitHub'], ['Сеть и данные', 'requests, API, SQLite, regex', 'бот погоды / парсер новостей'], ['Итоговый проект', 'Telegram-бот, Flask/FastAPI или анализ данных', 'проект в портфолио']],
+    js: [['Основы', 'let/const, типы, условия, функции', 'FizzBuzz, калькулятор'], ['Массивы и объекты', 'map/filter/reduce, деструктуризация', 'частота слов, группировка'], ['Браузер и DOM', 'события, формы, localStorage', 'список дел'], ['Асинхронность', 'Promise, async/await, fetch, JSON', 'погода по API'], ['HTML и CSS', 'вёрстка, Flexbox/Grid, адаптив', 'лендинг'], ['Node.js', 'npm, модули, Express, REST', 'простой API'], ['Базы и безопасность', 'SQL/Mongo, авторизация, XSS', 'сервис с регистрацией'], ['Итоговый проект', 'чат на WebSocket или полноценное приложение', 'проект в портфолио']],
+    cpp: [['Основы', 'типы, ввод/вывод, условия, циклы', 'калькулятор, угадай число'], ['Функции и массивы', 'функции, vector, строки', 'сортировки'], ['Указатели и память', 'указатели, ссылки, new/delete, unique_ptr', 'связный список'], ['ООП', 'классы, наследование, полиморфизм', 'система фигур'], ['STL и шаблоны', 'map, set, алгоритмы, templates', 'частотный словарь'], ['Файлы и ошибки', 'fstream, исключения', 'обработка логов'], ['Проект', 'консольная игра или утилита', 'проект в портфолио']],
+    java: [['Синтаксис', 'типы, условия, циклы, методы', 'FizzBuzz'], ['ООП', 'классы, интерфейсы, наследование', 'зоопарк классов'], ['Коллекции', 'List, Map, Set, Stream', 'частота слов'], ['Ошибки и файлы', 'исключения, nio', 'чтение CSV'], ['Сборка', 'Maven/Gradle, тесты JUnit', 'проект с тестами'], ['Веб', 'Spring Boot, REST, БД', 'API со списком задач']],
+    go: [['Основы', 'типы, функции, срезы, map', 'FizzBuzz'], ['Структуры и интерфейсы', 'struct, методы, интерфейсы', 'банковский счёт'], ['Ошибки и пакеты', 'error, модули, тесты', 'утилита CLI'], ['Конкурентность', 'горизонтины, каналы, sync', 'параллельный загрузчик'], ['Веб', 'net/http, JSON, БД', 'REST-сервис']],
+    web: [['HTML', 'теги, формы, семантика', 'страница-резюме'], ['CSS', 'селекторы, Flexbox, Grid, адаптив', 'вёрстка лендинга'], ['JavaScript', 'DOM, события, массивы', 'список дел'], ['API и async', 'fetch, JSON, async/await', 'погода по API'], ['Бэкенд', 'Node.js, Express, БД', 'свой REST API'], ['Проект', 'полноценное веб-приложение', 'проект в портфолио']],
+};
+CURR.cs = CURR.java; CURR.kt = CURR.java; CURR.rust = CURR.cpp; CURR.php = CURR.web; CURR.ts = CURR.js; CURR.html = CURR.web; CURR.css = CURR.web;
+function learningPlan(n, lang, s) {
+    const lg = lang || s.lang || 'py', cur = CURR[lg] || CURR.py;
+    let weeks = 4, m = n.match(/(\d+)\s*(дн\S*|день|недел\S*|месяц\S*|мес\S*)/);
+    if (m) { const k = +m[1]; weeks = /дн|день/.test(m[2]) ? Math.max(1, Math.round(k / 7)) : /недел/.test(m[2]) ? k : k * 4; }
+    weeks = Math.min(Math.max(weeks, 1), 24);
+    const name = lg === 'web' ? 'веб-разработки' : (LANGS[lg] ? LANGS[lg].name : lg);
+    let out = `📅 План обучения ${name} на ${weeks} ${weeks === 1 ? 'неделю' : weeks < 5 ? 'недели' : 'недель'} (≈1 час в день)\n`;
+    for (let w = 0; w < weeks; w++) {
+        const a = Math.floor(w * cur.length / weeks), b = Math.max(a + 1, Math.floor((w + 1) * cur.length / weeks));
+        const part = cur.slice(a, b);
+        out += `\nНеделя ${w + 1}: ${part.map(x => x[0]).join(' + ')}\n   Темы: ${part.map(x => x[1]).join('; ')}\n   Практика: ${part.map(x => x[2]).join('; ')}`;
+    }
+    out += '\n\nПравила: пишите код руками каждый день, решайте мелкие задачи, не бросайте на втором уроке 🙂 Спрашивайте меня по любой теме, а «квиз» проверит знания.';
+    return out;
+}
+
+function memoryList(uid) {
+    const U = userMem(uid), f = U.facts.filter(x => !x.note), nts = U.facts.filter(x => x.note);
+    if (!U.facts.length && !Object.keys(U.alias).length) return '🧠 Пока ничего не запомнил. Научите: «запомни: вопрос = ответ» или «запомни: заметка».';
+    let out = '🧠 Что я запомнил для вас\n';
+    if (f.length) out += '\nОтветы:\n' + f.slice(-20).map((x, i) => `${i + 1}. ${x.k} → ${clip(x.v, 80)}`).join('\n');
+    if (nts.length) out += '\n\nЗаметки:\n' + nts.slice(-20).map((x, i) => `${i + 1}. ${clip(x.v, 100)}`).join('\n');
+    const al = Object.keys(U.alias).length; if (al) out += `\n\nСвязей ваших фраз с темами: ${al}`;
+    return out + '\n\nУдалить: «забудь …» или «забудь всё».';
+}
+
+function reply(uid, text, name, ctx) {
+    let r;
+    try { r = reply0(uid, text, name, ctx); } catch (e) { console.error('aibot error:', e); r = 'Что-то пошло не так 😵 Попробуйте переформулировать вопрос.'; }
+    if (typeof r === 'string' && FALLBACK_RE.test(r)) r += TEACH_HINT;
+    try {
+        const s = sessions.get(uid), U = L.users[uid];
+        if (s && s.lastAns && Date.now() - s.lastAns.at < 800) {
+            if (s.lastAns.topic && s.lastAns.topic.startsWith('task:')) pushHist(uid, s.lastAns.topic);
+            if (U && U.profile && U.profile.level === 'новичок' && s.lastAns.kind === 'kb' && SIMPLE[s.lastAns.topic] && typeof r === 'string' && r.length > 200 && !/объясни проще/.test(r)) r += '\n\n🙂 Не всё понятно? Напишите «объясни проще» — расскажу на пальцах.';
+        }
+    } catch {}
+    return r;
 }
 
 function titleOf(e) { const first = e.text.split('\n')[0].replace(/^[^\wА-Яа-я]+/, '').trim(); return first; }
@@ -2750,7 +4324,8 @@ function smallTalkStart(name) {
     return `👋 Привет${first ? ', ' + first : ''}! Я Ai_bot — умный помощник по программированию. Работаю без внешних API, прямо внутри мессенджера.\n\nПопробуйте:\n• «что такое замыкание?»\n• «напиши факториал на python»\n• «как отцентровать div»\n• пришлите свой код — найду ошибки\n• «2+2*3» — посчитаю\n\nВсе возможности — /help, темы — /topics.`;
 }
 
-module.exports = { reply, calc, start: smallTalkStart, HELP, TOPICS, _internal: { KB, TASKS, tokens, analyzeCode, prepare, mathNorm } };
+module.exports = { reply, attach, flush, calc, start: smallTalkStart, HELP, TOPICS, _internal: { sessions, KB, TASKS, tokens, analyzeCode, prepare, mathNorm, bm25, QUIZ } };
+
 return module.exports;
 })();
 // ── конец «мозга» Ai_bot ──
@@ -2802,7 +4377,7 @@ function aiBotOnMessage(chat, uid, msg) {
     setTimeout(() => {
         clearInterval(typer);
         try {
-            const out = answer || aiBrain.reply(uid, text, u.username);
+            const out = answer || aiBrain.reply(uid, text, u.username, { admin: isAdminUid(uid) });
             aiSplit(String(out)).forEach(part => botPost(AIBOT_ID, uid, part));
         } catch (e) {
             console.error('Ai_bot error:', e);
@@ -5234,10 +6809,10 @@ async function init() {
         });
     }
     // Чего нет в базе (первый запуск) — берём из локальных файлов, иначе пустой список
-    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks', 'sticker_packs', 'bots']) {
+    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks', 'sticker_packs', 'bots', 'aibrain']) {
         if (mem[k] === undefined) {
             const d = loadFile(F[k]);
-            mem[k] = JSON.stringify((k === 'sessions' || k === 'blocks' || k === 'bots') && Array.isArray(d) ? {} : d); // объекты {токен: …}, {кто: [кого]}
+            mem[k] = JSON.stringify((k === 'sessions' || k === 'blocks' || k === 'bots' || k === 'aibrain') && Array.isArray(d) ? {} : d); // объекты {токен: …}, {кто: [кого]}
             if (pool) dirty.add(k);
         }
     }
@@ -5254,6 +6829,7 @@ async function init() {
     ensureHoursBot();
     removeAiBot();
     ensureAiBot();
+    aiBrain.attach(() => read(F.aibrain), d => write(F.aibrain, d));   // память и обучение Ai_bot
     await ensureVapid();
     await persist();
 
@@ -5266,6 +6842,7 @@ async function init() {
 // При остановке сервера дописываем в базу всё, что не успело сохраниться
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function finalSave() {
+    try { aiBrain.flush(); } catch {}
     for (const k of Object.keys(mem)) if (mem[k] !== saved[k]) dirty.add(k);
     await Promise.race([persist(), sleep(8000)]);
 }
