@@ -2070,6 +2070,7 @@ function renderTask(id, lang, userLang) {
         L = t[userLang] ? userLang : (t.js ? 'js' : t.py ? 'py' : t.css ? 'css' : t.html ? 'html' : Object.keys(t).find(k => LANGS[k]));
     }
     const missing = lang && !t[lang];
+    renderTask.last = L;
     const fence = { js: 'javascript', py: 'python', cpp: 'cpp', c: 'c', java: 'java', go: 'go', cs: 'csharp', rust: 'rust', php: 'php', bash: 'bash', kt: 'kotlin', swift: 'swift', lua: 'lua', html: 'html', css: 'css', sql: 'sql', ts: 'typescript' }[L] || L;
     let out = `✅ ${t.title}${LANGS[L] ? ' — ' + LANGS[L].name : ''}\n\n${code(fence, t[L])}`;
     if (missing) out = `Для ${LANGS[lang].name} у меня нет готового шаблона этой задачи, вот ближайший вариант (${LANGS[L].name}) — логика переносится почти один в один:\n\n` + out.replace(/^✅[^\n]*\n\n/, `✅ ${t.title} — ${LANGS[L].name}\n\n`);
@@ -2154,7 +2155,7 @@ K('arch-this', null, ['мой мессенджер', 'как устроен ме
 
 
 // ---- Ещё темы (расширение)
-K('express-mw', 'js', ['middleware', 'мидлвар', 'мидлвэр', 'express роутинг', 'роутинг', 'роуты', 'router', 'app.use'], `🛣 Express: middleware и роутинг\n\n${code('javascript', `const express = require('express');\nconst app = express();\n\napp.use(express.json());                       // middleware: разбор JSON\napp.use((req, res, next) => {                  // свой middleware\n  console.log(req.method, req.url);\n  next();                                      // без next() запрос «зависнет»\n});\n\nconst auth = (req, res, next) =>\n  req.headers.authorization ? next() : res.status(401).json({ error: 'нужен вход' });\n\nconst router = express.Router();\nrouter.get('/', (req, res) => res.json([]));\nrouter.post('/', auth, (req, res) => res.status(201).json(req.body));\napp.use('/api/items', router);\n\napp.use((err, req, res, next) => {             // обработчик ошибок (4 аргумента!)\n  console.error(err);\n  res.status(500).json({ error: 'Ошибка сервера' });\n});`)}`);
+K('express-mw', 'js', ['express', 'middleware', 'мидлвар', 'мидлвэр', 'express роутинг', 'роутинг', 'роуты', 'router', 'app.use'], `🛣 Express: middleware и роутинг\n\n${code('javascript', `const express = require('express');\nconst app = express();\n\napp.use(express.json());                       // middleware: разбор JSON\napp.use((req, res, next) => {                  // свой middleware\n  console.log(req.method, req.url);\n  next();                                      // без next() запрос «зависнет»\n});\n\nconst auth = (req, res, next) =>\n  req.headers.authorization ? next() : res.status(401).json({ error: 'нужен вход' });\n\nconst router = express.Router();\nrouter.get('/', (req, res) => res.json([]));\nrouter.post('/', auth, (req, res) => res.status(201).json(req.body));\napp.use('/api/items', router);\n\napp.use((err, req, res, next) => {             // обработчик ошибок (4 аргумента!)\n  console.error(err);\n  res.status(500).json({ error: 'Ошибка сервера' });\n});`)}`);
 K('testing', null, ['тест', 'тесты', 'тестирование', 'jest', 'pytest', 'unittest', 'юнит тест', 'tdd', 'mock', 'мок'], `🧪 Тестирование\n\n${code('javascript', `// Jest: npm i -D jest\nconst { add } = require('./math');\ntest('складывает числа', () => {\n  expect(add(2, 3)).toBe(5);\n});\ntest('async', async () => {\n  await expect(load()).resolves.toEqual({ ok: true });\n});`)}\n${code('python', `# pytest: pip install pytest\nfrom math_utils import add\n\ndef test_add():\n    assert add(2, 3) == 5`)}\n• Пирамида: много быстрых юнит-тестов → меньше интеграционных → мало e2e\n• Тестируйте поведение, а не реализацию\n• TDD: сначала падающий тест, потом код, потом рефакторинг`);
 K('cleancode', null, ['чистый код', 'clean code', 'рефакторинг', 'нейминг', 'как называть переменные', 'читаемость', 'код ревью', 'code review', 'dry', 'kiss', 'yagni', 'стиль кода'], `✨ Чистый код\n\n• Имена говорят сами за себя: getUserById, а не func1; isActive вместо flag\n• Функция делает одну вещь и помещается на экран\n• DRY — не копируйте код: повторяющееся выносите в функцию\n• KISS — простое решение лучше «умного»\n• YAGNI — не пишите то, что «может пригодиться»\n• Ранние return вместо глубоких if-вложений\n• Никаких «магических чисел»: const MAX_TRIES = 3\n• Комментарий объясняет ПОЧЕМУ, а не ЧТО\n• Обрабатывайте ошибки, не глотайте их молча\n• Форматтер и линтер (Prettier, ESLint, Black, Ruff) — на автомате`);
 K('cache', null, ['кэш', 'кеш', 'cache', 'redis', 'редис', 'memcached', 'ttl', 'мемоизац', 'memoize'], `⚡ Кэширование\n\nКэш хранит результат дорогой операции, чтобы не считать заново.\n\n${code('javascript', `// мемоизация\nconst memo = fn => { const c = new Map(); return x => c.has(x) ? c.get(x) : (c.set(x, fn(x)), c.get(x)); };\n\n// кэш с временем жизни\nconst cache = new Map();\nasync function getCached(key, load, ttl = 60000) {\n  const hit = cache.get(key);\n  if (hit && hit.exp > Date.now()) return hit.val;\n  const val = await load();\n  cache.set(key, { val, exp: Date.now() + ttl });\n  return val;\n}`)}\nPython: from functools import lru_cache. Для нескольких серверов — Redis. Сложнее всего — инвалидация: когда данные изменились, кэш нужно сбросить.`);
@@ -2534,11 +2535,100 @@ function runTools(raw, n, s) {
 
 const MATH_ONLY = /^[\s\d+\-*/%^().,×÷=a-z]*$/i;
 
+
+// ───────────────────────────── «понималка»: слова-паразиты, сленг, слова вместо знаков ─────────────────────────────
+const CY = 'а-яёa-z0-9_';
+const WB = src => new RegExp(`(?<![${CY}])(?:${src})(?![${CY}])`, 'gi');
+// слова-паразиты и вежливые обёртки, которые не несут смысла (ВАЖНО: «значит», «такое», «как» не трогаем)
+const FILLER_RE = new RegExp(`(?<![${CY}])(?:ну+|типо|типа|тупо|короче|как бы|как-то|вот|эм+|э+|блин|слушай|слышь|слушайте|смотри|смотрите|пожалуйста|плиз|пжлст|пж|плз|вообще|просто|бро|братан|братишка|чисто|кстати|ладно|собственно|реально|прям|прямо|эй|ой|хм+|мм+|ща|алло|в общем|в принципе|так сказать|как говорится|это самое|типа того|скажем|допустим|ага|ну-ка)(?![${CY}])[,.!…]*\\s*`, 'gi');
+
+const SLANG = [
+    [WB('не пашет|не пашут|не фурычит|не фурычат|сломалось|сломалась|сломался|глючит|багует|лагает|крашится|вылетает|косячит|не пахает|не робит'), 'не работает ошибка'],
+    [WB('прога|проги|прогу|программка|программку|проге'), 'программа'],
+    [WB('жсон|джейсон|жейсон'), 'json'],
+    [WB('жава|жаву|жаве'), 'java'],
+    [WB('шо|чо|чё|че'), 'что'],
+    [WB('фронт'), 'фронтенд'],
+    [WB('бэк|бек'), 'бэкенд'],
+    [WB('накидай|набросай|сваргань|скинь|кинь|выдай|пришли|сгенери|сгенерь|накатай|настрочи|запили|запилить|слепи|сколоти|замути'), 'напиши'],
+    [WB('растолкуй|разжуй|втолкуй|поясни|разъясни|просвети'), 'объясни'],
+    [WB('что за зверь|что за хрень|что за фигня|что за штука|в чём прикол|в чем прикол'), 'что такое'],
+    [WB('баг|баги|багов|косяк|косяки|глюк|глюки'), 'ошибка'],
+    [WB('кодить|кодим|кодинг|программить'), 'программировать'],
+    [WB('гайд|мануал|туториал|тутор'), 'инструкция'],
+];
+function prepare(text) {
+    const orig = String(text);
+    const out = orig.split(/(```[\s\S]*?```)/g).map((part, i) => {   // блоки кода не трогаем
+        if (i % 2) return part;
+        let t = part.replace(FILLER_RE, ' ');
+        for (const [re, to] of SLANG) t = t.replace(re, to);
+        return t.replace(/[ \t]{2,}/g, ' ');
+    }).join('').trim().replace(/^[,.!?…\-–—\s]+/, '');
+    // если от фразы ничего не осталось (например, просто «ну ладно») — оставляем как было
+    return out.replace(/[\s?!.,…]/g, '') ? out : orig.trim();
+}
+
+// ── слова вместо цифр и знаков для калькулятора: «пять плюс три», «10 минус 4», «2 в кубе»
+const NUM_W = { ноль: 0, нуль: 0, один: 1, одна: 1, одну: 1, два: 2, две: 2, три: 3, четыре: 4, пять: 5, шесть: 6, семь: 7, восемь: 8, девять: 9, десять: 10, одиннадцать: 11, двенадцать: 12, тринадцать: 13, четырнадцать: 14, пятнадцать: 15, шестнадцать: 16, семнадцать: 17, восемнадцать: 18, девятнадцать: 19, двадцать: 20, тридцать: 30, сорок: 40, пятьдесят: 50, шестьдесят: 60, семьдесят: 70, восемьдесят: 80, девяносто: 90, сто: 100, двести: 200, триста: 300, четыреста: 400, пятьсот: 500, шестьсот: 600, семьсот: 700, восемьсот: 800, девятьсот: 900 };
+function numWords(t) {
+    const parts = t.split(/(\s+)/); const out = []; let i = 0;
+    while (i < parts.length) {
+        if (NUM_W[parts[i]] !== undefined) {
+            let total = 0, cur = 0, j = i, last = i;
+            while (j < parts.length) {
+                const x = parts[j];
+                if (NUM_W[x] !== undefined) { cur += NUM_W[x]; last = j; }
+                else if (/^тысяч[аиу]?$/.test(x)) { total += (cur || 1) * 1000; cur = 0; last = j; }
+                else if (/^миллион\S*$/.test(x)) { total += (cur || 1) * 1e6; cur = 0; last = j; }
+                else if (!/^\s+$/.test(x)) break;
+                j++;
+            }
+            out.push(String(total + cur)); i = last + 1;
+        } else { out.push(parts[i]); i++; }
+    }
+    return out.join('');
+}
+function mathNorm(n) {
+    let t = n.replace(/[−–—‒]/g, '-');          // «длинные» минусы — тоже минус
+    const hasWords = /(?<![а-яё])(плюс|минус|умнож\S*|помнож\S*|раздел\S*|подел\S*|делить|делённое|деленное|степен\S*|квадрат\S*|куб\S*|процент\S*|остаток|по модулю)(?![а-яё])/.test(t);
+    if (!hasWords) return t.replace(/(\d)\s*[xх]\s*(?=\d)/g, '$1*');
+    t = numWords(t);
+    t = t.replace(/(\d+(?:[.,]\d+)?)\s*(?:процент\S*|%)\s*от\s*(\d+(?:[.,]\d+)?)/g, '($1/100*$2)')
+        .replace(/(?<![а-яё])плюс(?![а-яё])/g, ' + ')
+        .replace(/(?<![а-яё])минус(?![а-яё])/g, ' - ')
+        .replace(/(?<![а-яё])(?:умножить на|умноженное на|помножить на|помножь на|умножь на|умножить|помножить|умножь)(?![а-яё])/g, ' * ')
+        .replace(/(?<![а-яё])(?:разделить на|поделить на|делить на|делённое на|деленное на|разделить|поделить|делить)(?![а-яё])/g, ' / ')
+        .replace(/(?<![а-яё])(?:остаток от деления на|остаток от деления|по модулю|остаток)(?![а-яё])/g, ' % ')
+        .replace(/в квадрате/g, ' ** 2 ').replace(/в кубе/g, ' ** 3')
+        .replace(/(?<![а-яё])(?:в степени|в степень)(?![а-яё])/g, ' ** ')
+        .replace(/(\d)\s*[xх]\s*(?=\d)/g, '$1*');
+    return t.replace(/\s{2,}/g, ' ').trim();
+}
+
+// «Вы имели в виду…»: ближайшее по написанию ключевое слово (исправляет серьёзные опечатки)
+function didYouMean(toks) {
+    let best = null;
+    for (const t of toks) {
+        if (t.length < 5) continue;
+        for (const e of KB) for (const k of e.kws) {
+            if (k.length < 5 || /[^a-zа-яё0-9_]/.test(k)) continue;
+            const d = lev(t.slice(0, k.length + 1), k);
+            const lim = k.length >= 8 ? 2 : 1;
+            if (d <= lim && (!best || d < best.d)) best = { d, e, k };
+        }
+    }
+    return best;
+}
+
+const FOLLOW_RE = /^(еще|ещё|подробнее|подробней|дальше|продолжай|продолжи|продолжим|а еще|а ещё|давай еще|давай ещё|еще пример|ещё пример|другой пример|другой вариант|еще вариант|ещё вариант|не понял|не поняла|непонятно|не понятно|объясни проще|проще|объясни еще раз|повтори|а подробнее)(?![а-яё])/;
+
 function reply(uid, text, name) {
     const raw = String(text || '').trim();
     const s = sess(uid);
     if (!raw) return 'Напишите вопрос или пришлите код — отвечу 🙂';
-    const n = norm(raw);
+    const clean = prepare(raw);          // без слов-паразитов («ну», «типо», «короче»…), сленг приведён к обычным словам
+    const n = norm(clean);
 
     // команды
     const cmd = n.match(/^\/(\w+)/);
@@ -2565,42 +2655,59 @@ function reply(uid, text, name) {
         return out;
     }
 
-    const toks = tokens(raw);
-    const lang = detectLang(toks, raw);
+    const toks = tokens(clean);
+    const lang = detectLang(toks, clean);
     if (lang) s.lang = lang;
 
+    // «ещё», «подробнее», «не понял» — продолжение прошлого ответа
+    if (FOLLOW_RE.test(n) && toks.length <= 6) {
+        if (s.task) {
+            const t = TASKS[s.task], shown = s.shown || new Set();
+            const next = Object.keys(t).find(k => LANGS[k] && !shown.has(k));
+            if (next) { const out = renderTask(s.task, next, s.lang); shown.add(renderTask.last); s.shown = shown; return out; }
+            return 'Все варианты этой задачи я уже показал 🙂 Спросите про другую задачу или уточните, что усложнить.';
+        }
+        if (s.topic) {
+            const cur = KB.find(e => e.id === s.topic);
+            const rel = KB.filter(e => e.id !== s.topic && (!cur || !cur.lang || e.lang === cur.lang)).sort(() => Math.random() - 0.5).slice(0, 4);
+            return `Могу раскрыть тему подробнее, если уточните, что именно непонятно (например: «как это использовать в реальном проекте» или «покажи пример на python»).\n\nСмежные темы: ${rel.map(titleOf).join('; ')}.`;
+        }
+        return 'Продолжить с чего? Задайте вопрос по коду, и я отвечу 🙂';
+    }
+
     // 2. калькулятор
-    const mathLike = /^(посчитай|вычисли|сколько будет|сколько|калькулятор|calc|реши|=)\s*/.test(n);
-    const expr = n.replace(/^(посчитай|вычисли|сколько будет|сколько|калькулятор|calc|реши|=)\s*/, '').replace(/[?=]+$/, '').trim();
+    const nm = mathNorm(n);
+    const mathLike = /^(посчитай|вычисли|сколько будет|сколько|калькулятор|calc|реши|чему равно|чему равен|=)\s*/.test(nm);
+    const expr = nm.replace(/^(посчитай|вычисли|сколько будет|сколько|калькулятор|calc|реши|чему равно|чему равен|=)\s*/, '').replace(/[?=]+$/, '').trim();
     if (expr && (mathLike || /\d/.test(expr)) && (MATH_ONLY.test(expr) || /корень из|% от|в степени/.test(expr)) && /[\d]/.test(expr) && (/[-+*/%^×÷]|корень|sqrt|sin|cos|tan|log|ln|abs|в степени/.test(expr))) {
         if (/\/\s*0(?![\d.])/.test(expr)) return '🧮 Делить на ноль нельзя 🙂 (в JavaScript это даст Infinity, в Python — ошибку ZeroDivisionError).';
         const v = calc(expr);
-        if (v !== null) return `🧮 ${raw.replace(/^[\s=]+|[?=\s]+$/g, '')} = ${fmtNum(v)}`;
+        if (v !== null) return `🧮 ${(/[а-яё]/i.test(raw) ? expr.replace(/\*\*/g, '^') : raw).replace(/^[\s=]+|[?=\s]+$/g, '')} = ${fmtNum(v)}`;
         if (mathLike) return 'Не смог разобрать выражение 🤔 Пример: «2+2*3», «(5+3)^2», «корень из 144», «15% от 200».';
     }
 
     // 3. «а на другом языке?» — повторить прошлую задачу
-    if (s.task && lang && toks.length <= 8 && !findTask(toks, raw) && /(а на|на |теперь|давай на|то же|тоже|покажи на|переведи|перепиши|вариант)/.test(n)) {
-        return renderTask(s.task, lang, s.lang);
+    if (s.task && lang && toks.length <= 8 && !findTask(toks, clean) && /(а на|на |теперь|давай на|то же|тоже|покажи на|переведи|перепиши|вариант)/.test(n)) {
+        const o = renderTask(s.task, lang, s.lang); (s.shown = s.shown || new Set()).add(renderTask.last); return o;
     }
 
     // 4. задача с готовым кодом
-    const taskId = findTask(toks, raw);
+    const taskId = findTask(toks, clean);
     const wantsCode = TASK_TRIGGERS.test(n) || toks.length <= 4;
     const isWhatIs = /^(что такое|что значит|объясни|расскажи|в чём разница|чем отличается|зачем нужен|как работает|для чего)/.test(n);
     if (taskId && (wantsCode || !isWhatIs)) {
         // если вопрос теоретический и есть сильное совпадение в базе знаний — отдадим теорию
-        const kb = scoreKB(toks, raw, lang, s.lang);
-        const theoryStrong = kb.length && kb[0][1] >= (isWhatIs ? 4 : 3) && !/(напиш|сдела|создай|сгенерир|реализ)/.test(n);
-        if (!theoryStrong) { s.task = taskId; return renderTask(taskId, lang, s.lang); }
+        const kb = scoreKB(toks, clean, lang, s.lang);
+        const theoryStrong = kb.length && kb[0][1] >= (isWhatIs ? 4 : 3) && !(lang && !isWhatIs) && !/(напиш|сдела|создай|сгенерир|реализ)/.test(n);
+        if (!theoryStrong) { s.task = taskId; const o = renderTask(taskId, lang, s.lang); s.shown = new Set([renderTask.last]); return o; }
     }
 
     // 5. small talk
     const st = smallTalk(n, toks, s, name);
-    if (st && !(toks.length > 6 && findTask(toks, raw))) return st;
+    if (st && !(toks.length > 6 && findTask(toks, clean))) return st;
 
     // 6. база знаний
-    const kb = scoreKB(toks, raw, lang, s.lang);
+    const kb = scoreKB(toks, clean, lang, s.lang);
     if (kb.length && (kb[0][1] >= 2 || (kb[0][1] >= 1.5 && (kb.length === 1 || kb[0][1] - kb[1][1] >= 0.7)))) {
         const [top, topScore] = kb[0];
         s.topic = top.id; s.unknown = 0;
@@ -2610,7 +2717,13 @@ function reply(uid, text, name) {
         if (alt.length) out += `\n\n➕ Возможно, вас также интересует: ${alt.map(([e]) => titleOf(e)).join('; ')} — просто спросите.`;
         return out;
     }
-    if (taskId) { s.task = taskId; return renderTask(taskId, lang, s.lang); }
+    if (taskId) { s.task = taskId; const o = renderTask(taskId, lang, s.lang); s.shown = new Set([renderTask.last]); return o; }
+
+    // 6б. серьёзная опечатка — пробуем угадать слово
+    if (!kb.length || kb[0][1] < 1.5) {
+        const dm = didYouMean(toks);
+        if (dm) { s.topic = dm.e.id; s.unknown = 0; return `Кажется, вы про «${dm.k}» (в слове опечатка) — вот что я знаю:\n\n${dm.e.text}`; }
+    }
 
     // 7. слабое совпадение — переспросить
     if (kb.length && kb[0][1] >= 1) {
@@ -2637,7 +2750,7 @@ function smallTalkStart(name) {
     return `👋 Привет${first ? ', ' + first : ''}! Я Ai_bot — умный помощник по программированию. Работаю без внешних API, прямо внутри мессенджера.\n\nПопробуйте:\n• «что такое замыкание?»\n• «напиши факториал на python»\n• «как отцентровать div»\n• пришлите свой код — найду ошибки\n• «2+2*3» — посчитаю\n\nВсе возможности — /help, темы — /topics.`;
 }
 
-module.exports = { reply, calc, start: smallTalkStart, HELP, TOPICS, _internal: { KB, TASKS, tokens, analyzeCode } };
+module.exports = { reply, calc, start: smallTalkStart, HELP, TOPICS, _internal: { KB, TASKS, tokens, analyzeCode, prepare, mathNorm } };
 return module.exports;
 })();
 // ── конец «мозга» Ai_bot ──
