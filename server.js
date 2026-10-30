@@ -54,6 +54,7 @@ const F = {
     blocks: path.join(DIR, 'blocks.json'),
     stickerPacks: path.join(DIR, 'sticker_packs.json'),
     bots: path.join(DIR, 'bots.json'),
+    marsorders: path.join(DIR, 'marsorders.json'),   // заявки на покупку Mars
     aibrain: path.join(DIR, 'aibrain.json')   // чему научился Ai_bot
 };
 
@@ -1782,9 +1783,11 @@ function tokens(text) {
 }
 
 // слово-ключ vs токен: короткие — точное совпадение, длинные — по префиксу (русские окончания), с запасом на опечатку
+function rstem(w, passes) { let x = w; if (x.length <= 4) return x; for (let i = 0; i < (passes || 2); i++) x = x.replace(/(ыми|ими|ого|его|ому|ему|ами|ями|ых|их|ым|им|ах|ях|ой|ей|ою|ею|ий|ый|ая|яя|ое|ее|ые|ие|ую|юю|ом|ем|ов|ев|ам|ям|ия|ие|ию|ии|ть|ся|ет|ют|ут|ит|ат|ят|ал|ял|ила|ыла|ули|ешь|ишь|а|я|ы|и|о|е|у|ю|ь|й)$/, ''); return x.length >= 3 ? x : w; }
 function kwMatch(kw, tok) {
     if (kw.length <= 3) return tok === kw;
     if (tok.startsWith(kw)) return true;
+    if (kw.length >= 5 && tok.length >= 5 && /[а-яё]/.test(kw)) { const a = rstem(kw), b = rstem(tok); if (a.length >= 4 && b.length >= 4 && (a === b || (Math.min(a.length, b.length) >= 6 && (a.startsWith(b) || b.startsWith(a))))) return true; let cp = 0; const m = Math.min(a.length, b.length); while (cp < m && a[cp] === b[cp]) cp++; if (cp >= 8 && cp >= m - 2) return true; }
     if (kw.length >= 6 && tok.length >= 5) {
         const k = kw.length;
         if (lev(tok.slice(0, k), kw) <= 1) return true;
@@ -2199,6 +2202,9 @@ K('js-this', 'js', ['this', 'контекст', 'bind', 'call', 'apply', 'стр
 K('js-dom', 'js', ['dom', 'queryselector', 'addeventlistener', 'getelementbyid', 'событие', 'события', 'элемент страниц', 'document'], `🖱 DOM и события\n\n${code('javascript', `const btn = document.querySelector('#btn');\nconst items = document.querySelectorAll('.item');\n\nbtn.addEventListener('click', e => {\n  e.preventDefault();\n  btn.classList.toggle('active');\n  btn.textContent = 'Нажато';        // безопасно\n  // btn.innerHTML = userText;        // ОПАСНО (XSS)\n});\n\n// создать элемент\nconst li = document.createElement('li');\nli.textContent = 'Новый';\ndocument.querySelector('ul').append(li);\n\n// делегирование: один обработчик на весь список\nlist.addEventListener('click', e => {\n  const item = e.target.closest('.item');\n  if (item) console.log(item.dataset.id);\n});`)}`);
 K('js-json', 'js', ['json', 'сериализ', 'parse', 'stringify'], `📄 JSON\n\n${code('javascript', `const obj = { a: 1, list: [1, 2, 3] };\nconst text = JSON.stringify(obj);          // '{"a":1,"list":[1,2,3]}'\nconst pretty = JSON.stringify(obj, null, 2); // с отступами\nconst back = JSON.parse(text);             // обратно в объект\n\n// JSON.parse бросает исключение на невалидном тексте:\ntry { JSON.parse('{oops'); } catch (e) { console.log('плохой JSON'); }`)}\n\nВ JSON нельзя: комментарии, одинарные кавычки, undefined, функции, завершающие запятые.`);
 K('js-modules', 'js', ['import', 'export', 'модул', 'require', 'commonjs', 'esm'], `📦 Модули в JavaScript\n\n${code('javascript', `// math.js\nexport const PI = 3.14;\nexport function add(a, b) { return a + b; }\nexport default class Calc {}\n\n// main.js\nimport Calc, { PI, add } from './math.js';\n\n// CommonJS (Node по умолчанию)\nconst fs = require('fs');\nmodule.exports = { add };`)}\n\nESM: в package.json добавьте "type": "module" или используйте расширение .mjs.`);
+
+K('prog-intro', null, ['программирование', 'программировать', 'программист', 'кодинг', 'кодить', 'программированию', 'программированием', 'learn programming', 'что такое программирование'], `💻 Программирование — это...\n\nПрограммирование — это запись инструкций для компьютера на языке, который он может выполнить (JavaScript, Python, C++ и др.). Программист разбивает задачу на шаги, описывает их кодом, проверяет и исправляет ошибки.\n\nБазовые кирпичики: переменные, условия (if), циклы (for/while), функции, массивы и объекты, работа с файлами и сетью.\n\nПример (Python):\n${code('python', `name = input('Как вас зовут? ')\nfor i in range(3):\n    print('Привет,', name)`)}\nС чего начать: выберите язык (для сайтов — HTML+CSS+JavaScript, для общего — Python), делайте маленькие проекты. Спросите «примеры функции», «пример цикла», «пример игры на html» — покажу.`, 1.4);
+K('func-intro', null, ['функция', 'функции', 'функцию', 'функцией', 'функций', 'function', 'пример функции', 'примеры функций', 'что такое функция'], `🧩 Функции — пример\n\nФункция — именованный блок кода: принимает данные (аргументы) и возвращает результат.\n\nJavaScript:\n${code('javascript', `function add(a, b) { return a + b; }\nconst mul = (a, b) => a * b;\nconsole.log(add(2, 3), mul(4, 5)); // 5 20`)}\nPython:\n${code('python', `def add(a, b):\n    return a + b\n\nprint(add(2, 3))  # 5`)}\nСовет: одна функция — одна задача, понятное имя. Хотите про аргументы по умолчанию, замыкания, рекурсию, lambda — спросите.`, 1.2);
 K('js-timers', 'js', ['settimeout', 'setinterval', 'таймер', 'задержк', 'через секунд'], `⏱ Таймеры\n\n${code('javascript', `const id = setTimeout(() => console.log('через 2 сек'), 2000);\nclearTimeout(id);\n\nconst iv = setInterval(() => console.log('каждую секунду'), 1000);\nclearInterval(iv);\n\n// пауза с await\nconst sleep = ms => new Promise(r => setTimeout(r, ms));\nawait sleep(1000);`)}`);
 K('js-types', 'js', ['typeof', 'тип данных', 'типы данных', 'undefined', 'null', 'nan', 'приведение типов'], `🧬 Типы данных в JavaScript\n\nПримитивы: string, number, boolean, null, undefined, bigint, symbol. Всё остальное — объекты (массивы, функции, даты…).\n\n${code('javascript', `typeof 42          // 'number'\ntypeof 'a'         // 'string'\ntypeof null        // 'object' — историческая ошибка языка\ntypeof []          // 'object' → используйте Array.isArray(x)\ntypeof undefined   // 'undefined'\n\n'5' + 3   // '53'  (конкатенация)\n'5' - 3   // 2     (число)\n0.1 + 0.2 // 0.30000000000000004 — это норма для float`)}`);
 K('js-class', 'js', ['прототип', 'prototype', 'наследован', 'extends', 'конструктор', 'приватн поле'], `🏛 Классы и прототипы в JS\n\nclass — «сахар» над прототипами. Каждый объект имеет ссылку на прототип, по цепочке ищутся свойства и методы.\n\n${code('javascript', `class Account {\n  #balance = 0;                    // приватное поле\n  static count = 0;\n  constructor(owner) { this.owner = owner; Account.count++; }\n  deposit(x) { this.#balance += x; return this; }\n  get balance() { return this.#balance; }\n}\n\nconst a = new Account('Аня').deposit(100);\nconsole.log(a.balance); // 100`)}`);
@@ -2551,8 +2557,8 @@ function smallTalk(n, toks, st, name) {
     if (/(какой язык (лучше|выбрать|учить)|посоветуй язык|с какого языка)/.test(n)) return '🧭 Выбор языка зависит от цели:\n• Сайты и боты — JavaScript\n• Данные, автоматизация, старт «с нуля» — Python\n• Игры — C#/C++\n• Android — Kotlin, iOS — Swift\n• Сервера под нагрузкой — Go/Java\nНе знаете цели — берите Python или JavaScript. Напишите «python или javascript» — сравню.';
     if (/(сколько тебе лет|когда ты (родился|появился)|где ты живешь|где ты живёшь)/.test(n)) return 'Я программа: живу на сервере этого мессенджера, а «возраст» — со дня последнего перезапуска 😄';
     if (/(ты (любишь|нравится)|твой любимый язык|любимый язык)/.test(n)) return 'Любимчиков нет, но JavaScript и Python мне ближе всего — на них я могу показать больше всего примеров 🙂';
-    if (/^(да|ага|угу|ок|окей|ok|okay|хорошо|ладно|понятно|ясно|понял|поняла)\W*$/.test(n)) return pick(['Отлично! Над чем сейчас работаете? 🙂', 'Если понадобится помощь с кодом — пишите, я рядом.', 'Отлично! Что дальше? 🙂', 'Хорошо. Есть ещё вопросы по коду?', 'Принято 👍 Пишите, если что-то понадобится.']);
-    if (/^(нет|неа|не надо|не нужно)\W*$/.test(n)) return 'Хорошо, не буду. Если что — просто напишите вопрос 🙂';
+    if (/^(да|ага|угу|ок|окей|ok|okay|хорошо|ладно|понятно|ясно|понял|поняла)[^а-яёa-z0-9]*$/.test(n)) return pick(['Отлично! Над чем сейчас работаете? 🙂', 'Если понадобится помощь с кодом — пишите, я рядом.', 'Отлично! Что дальше? 🙂', 'Хорошо. Есть ещё вопросы по коду?', 'Принято 👍 Пишите, если что-то понадобится.']);
+    if (/^(нет|неа|не надо|не нужно)[^а-яёa-z0-9]*$/.test(n)) return 'Хорошо, не буду. Если что — просто напишите вопрос 🙂';
     if (/\b(люблю тебя|ты мне нравишься)\b/.test(n)) return 'Я всего лишь бот, но мне приятно 😄 Давайте лучше напишем что-нибудь полезное!';
     return null;
 }
@@ -2907,7 +2913,7 @@ function tryModify(uid, raw, n, s) {
     const g = s.gen; if (!g || !g.base || Date.now() - g.at > 3 * 3600 * 1000) return null;
     if (/```/.test(raw) || n.length > 160) return null;
     raw0 = raw;
-    if (/^(привет|спасибо|пока|ок|ага|да|нет|хорошо)\W*$/.test(n)) return null;
+    if (/^(привет|спасибо|пока|ок|ага|да|нет|хорошо)[^а-яёa-z0-9]*$/.test(n)) return null;
     // смена темы у собранной игры: «поменяй тему на космос»
     const th = n.match(/(?:поменяй|измени|смени|замени|сделай)\s+тему\s+(?:игры\s+)?(?:на|про)\s+(.+)/) || n.match(/(?:сделай|хочу)\s+(?:то же|так же|её|ее|это)\s+(?:но\s+)?про\s+(.+)/);
     if (th && g.genre) {
@@ -3329,6 +3335,8 @@ function anAnalyze(uid, par, name) {
         const nt = note(results);
         return { k: 'true', t: 'Верно' + (nt ? '. ' + nt : '') + (unchecked ? ` (проверено утверждений: ${results.length}; остальное проверить не смог)` : '') };
     }
+    // сверка с запомненными пунктами
+    { const pp = claimParse(text.replace(/[.!]+$/, '')); if (pp) { const subs = noteFindSubject(pp.subj); if (subs.length) { const qp = nrToks(pp.pred); const b = subs.map(x => ({ x, c: nrCover(qp, nrToks(x.p.pred)) })).sort((a, c) => c.c - a.c)[0]; if (b.c >= 0.6) return { k: 'true', t: 'Верно — совпадает с моими записями: «' + b.x.n.t.replace(/\s+/g, ' ').slice(0, 140) + '»' }; return { k: 'partial', t: 'Расходится с моими записями: «' + b.x.n.t.replace(/\s+/g, ' ').slice(0, 140) + '»' }; } } }
     // без проверяемых утверждений
     const def = anDefine(text);
     if (def && !/[.!?]\s+\S/.test(text)) return { k: 'def', t: def };
@@ -3354,19 +3362,22 @@ function analysisHandle(uid, raw, name) {
     if (!U.analysis) return null;
     if (AN_OFF.test(raw.trim().toLowerCase())) { U.analysis = false; touch(); return '📝 Режим анализа выключен. Возвращаюсь к обычному общению 🙂'; }
     if (/^\/(help|start|topics)/i.test(raw.trim())) return null;
-    if (/^(помощь|справка|как пользоваться|инструкция|что делать)\W*$/i.test(raw.trim())) return '📝 Режим анализа: отправьте текст, где пункты разделены пустой строкой. Пример:\n\nHTML не является языком программирования.\n\nБатончик.\n\nКака.\n\nЯ отвечу: 1) Верно; 2) Это кондитерское изделие; 3) Недостаточно контекста. Выход — «выход из анализа».';
+    if (/^(помощь|справка|как пользоваться|инструкция|что делать)[^а-яёa-z0-9]*$/i.test(raw.trim())) return '📝 Режим анализа: отправьте текст, где пункты разделены пустой строкой. Пример:\n\nHTML не является языком программирования.\n\nБатончик.\n\nКака.\n\nЯ отвечу: 1) Верно; 2) Это кондитерское изделие; 3) Недостаточно контекста. Выход — «выход из анализа».';
     let body = raw; const verify = /^(проверь|проанализируй|верно ли)\s*[:\-]?\s*/i.test(raw.trim()); if (verify) body = raw.trim().replace(/^(проверь|проанализируй|верно ли)\s*[:\-]?\s*/i, '');
-    if (/^(список|мои пункты|что запомнил|покажи пункты|что ты запомнил)\W*$/i.test(raw.trim())) { const N = (L.notes = L.notes || []); return N.length ? '📝 Запомнено пунктов: ' + N.length + '\n\n' + N.slice(-50).map((n, i) => (N.length - Math.min(50, N.length) + i + 1) + '. ' + n.t.slice(0, 120)).join('\n') + (N.length > 50 ? '\n…(показаны последние 50)' : '') : '📝 Пока ничего не запомнено.'; }
-    if (/^(очисти|удали|забудь)\s+(все\s+)?(пункты|запомненное|заметки)\W*$/i.test(raw.trim())) { const n0 = (L.notes || []).length; L.notes = []; touch(); return `📝 Удалил все запомненные пункты (${n0}).`; }
-    { const dm = raw.trim().match(/^(?:удали|забудь)\s+пункт\s+(\d+)\W*$/i); if (dm) { const N = (L.notes = L.notes || []); const i = +dm[1] - 1; if (i >= 0 && i < N.length) { const [x] = N.splice(i, 1); touch(); return `📝 Удалил пункт ${dm[1]}: «${x.t.slice(0, 80)}»`; } return '📝 Пункта с таким номером нет.'; } }
+    if (/^(список|мои пункты|что запомнил|покажи пункты|что ты запомнил)[^а-яёa-z0-9]*$/i.test(raw.trim())) { const N = (L.notes = L.notes || []); return N.length ? '📝 Запомнено пунктов: ' + N.length + '\n\n' + N.slice(-50).map((n, i) => (N.length - Math.min(50, N.length) + i + 1) + '. ' + n.t.slice(0, 120)).join('\n') + (N.length > 50 ? '\n…(показаны последние 50)' : '') : '📝 Пока ничего не запомнено.'; }
+    if (/^(очисти|удали|забудь)\s+(все\s+)?(пункты|запомненное|заметки)[^а-яёa-z0-9]*$/i.test(raw.trim())) { const n0 = (L.notes || []).length; L.notes = []; touch(); return `📝 Удалил все запомненные пункты (${n0}).`; }
+    { const dm = raw.trim().match(/^(?:удали|забудь)\s+пункт\s+(\d+)[^а-яёa-z0-9]*$/i); if (dm) { const N = (L.notes = L.notes || []); const i = +dm[1] - 1; if (i >= 0 && i < N.length) { const [x] = N.splice(i, 1); touch(); return `📝 Удалил пункт ${dm[1]}: «${x.t.slice(0, 80)}»`; } return '📝 Пункта с таким номером нет.'; } }
     const paras = body.replace(/\r\n?/g, '\n').split(/\n[ \t\u00a0]*\n+/).map(p => p.replace(/^\s+|\s+$/g, '')).filter(p => p.length);
     if (!paras.length) return null;
     if (!verify) {
         const N = (L.notes = L.notes || []); let added = 0, dup = 0;
-        paras.forEach(p => { const t = p.replace(/[ \t]*\n[ \t]*/g, '\n'); if (N.some(n => n.t === t)) dup++; else { N.push({ t, at: Date.now() }); added++; } });
+        let defs = 0; const conflicts = [];
+        paras.forEach(p => { const t = p.replace(/[ \t]*\n[ \t]*/g, '\n'); const tn = nz(t).replace(/[^a-zа-я0-9]/g, ''); if (N.some(n => n.t === t || nz(n.t).replace(/[^a-zа-я0-9]/g, '') === tn)) { dup++; return; }
+            const pp = noteParse(t); if (pp) { defs++; try { const ex = noteFindSubject(pp.subj)[0]; if (ex && nrCover(nrToks(pp.pred), nrToks(ex.p.pred)) < 0.4) conflicts.push(`«${pp.subj}»: раньше было «${ex.n.t.replace(/\s+/g, ' ').slice(0, 70)}»`); } catch (e) {} }
+            N.push({ t, at: Date.now() }); added++; });
         
         touch();
-        return `📝 Запомнил пунктов: ${added}${dup ? ` (уже были: ${dup})` : ''}. Всего в памяти: ${N.length}.\n\n` + paras.slice(0, 20).map((p, i) => `${i + 1}. ${p.replace(/\s+/g, ' ').slice(0, 70)}${p.length > 70 ? '…' : ''}`).join('\n') + (paras.length > 20 ? `\n…и ещё ${paras.length - 20}` : '') + '\n\nСпросите меня по любому из них — отвечу из запомненного. «список» — показать, «удали пункт N» — убрать, «проверь: текст» — проверить на верность.';
+        return `📝 Запомнил пунктов: ${added}${dup ? ` (уже были: ${dup})` : ''}. Всего в памяти: ${N.length}.\n\n` + paras.slice(0, 20).map((p, i) => `${i + 1}. ${p.replace(/\s+/g, ' ').slice(0, 70)}${p.length > 70 ? '…' : ''}`).join('\n') + (paras.length > 20 ? `\n…и ещё ${paras.length - 20}` : '') + (defs ? `\n\n🔎 Распознал определений («X — это Y»): ${defs} — смогу отвечать на «что такое X», «какие бывают…», «чем отличается A от B», «X — это Y?».` : '') + (conflicts.length ? '\n\n⚠️ Возможные противоречия с прежними записями (оставил оба):\n' + conflicts.slice(0, 5).join('\n') : '') + '\n\nСпросите меня по любому из них — отвечу из запомненного. «список» — показать, «удали пункт N» — убрать, «проверь: текст» — проверить на верность.';
     }
     const out = []; const cnt = { true: 0, false: 0, partial: 0, other: 0 };
     const capped = paras.slice(0, 150);
@@ -3396,35 +3407,107 @@ function nrSim(a, b) { // слова похожи? (регистр/суффик�
     const ka = nrKey(a), kb = nrKey(b); if (!ka || !kb) return 0;
     if (ka === kb) return 1;
     const m = Math.min(ka.length, kb.length);
+    if (/[а-яё]/.test(a) && /[а-яё]/.test(b)) { const ra = rstem(a, 1), rb = rstem(b, 1); if (ra.length >= 4 && ra === rb) return 0.95; }
+    if (m >= 3) { const sh = ka.length <= kb.length ? ka : kb, lg = ka.length <= kb.length ? kb : ka; if (lg.startsWith(sh) && lg.length - sh.length <= 2) return 0.8; }
     { let cp = 0; while (cp < m && ka[cp] === kb[cp]) cp++; const req = m <= 4 ? m - 1 : Math.max(5, m - 1); if (m >= 4 && cp >= req) return 0.9; }
     const sa = nrSkel(ka), sb = nrSkel(kb);
-    if (sa.length >= 3 && sb.length >= 3) { if (sa === sb) return 0.85; const n2 = Math.min(sa.length, sb.length); if (n2 >= 5 && (sa.startsWith(sb.slice(0, n2 - 1)) || sb.startsWith(sa.slice(0, n2 - 1)))) return 0.7; }
+    if (sa.length >= 4 && sb.length >= 4) { if (sa === sb) return 0.85; if (Math.abs(sa.length - sb.length) <= 1 && (sa.startsWith(sb) || sb.startsWith(sa))) return 0.8; const n2 = Math.min(sa.length, sb.length); if (n2 >= 5 && (sa.startsWith(sb.slice(0, n2 - 1)) || sb.startsWith(sa.slice(0, n2 - 1)))) return 0.7; }
     if (m >= 5 && Math.abs(ka.length - kb.length) <= 1) { let d = 0, i = 0, j = 0; while (i < ka.length && j < kb.length && d < 2) { if (ka[i] === kb[j]) { i++; j++; } else { d++; if (ka.length > kb.length) i++; else if (ka.length < kb.length) j++; else { i++; j++; } } } d += (ka.length - i) + (kb.length - j); if (d <= 1) return 0.8; }
     return 0;
+}
+
+// ── Структурный разбор запомненных пунктов: «Субъект — это/является/означает … предикат»
+function noteParse(t) {
+    const one = String(t).replace(/\s+/g, ' ').trim();
+    const m = one.match(/^(.{1,70}?)\s+(?:—|–|-|является|являются|представляет собой|представляют собой|означает|означают|называется|обозначает|это)\s+(?:это\s+)?(.+)$/i);
+    if (!m) {
+        const w = one.split(' ');
+        for (let i = 1; i <= Math.min(3, w.length - 2); i++) { if (/^[а-яё]+(ет|ют|ёт|ется|ются|ит|ат|ят|ен|на|ны)$/i.test(w[i]) && w[i].length > 4 && !/^(и|в|на|с|к|по|для|или|а)$/i.test(w[i - 1])) return { subj: w.slice(0, i).join(' ').replace(/[,;:]+$/, ''), pred: w.slice(i).join(' ').replace(/[.!]+$/, '') }; }
+        return null;
+    }
+    return { subj: m[1].replace(/^[«"]|[»"]$/g, '').trim(), pred: m[2].replace(/[.!]+$/, '').trim() };
+}
+function nrCover(qTokens, tokens2) { // доля слов запроса, найденных среди tokens2 (с учётом окончаний/транслита)
+    if (!qTokens.length) return 0; let h = 0;
+    qTokens.forEach(w => { if (tokens2.some(x => nrSim(w, x) >= 0.7)) h++; }); return h / qTokens.length;
+}
+function noteFindSubject(term) { // записи, где субъект похож на term
+    const N = L.notes || []; const qt = nrToks(term).map(w => NR_EN[w] || w); if (!qt.length) return [];
+    const out = [];
+    N.forEach(n => { const p = noteParse(n.t); if (!p) return; const st = nrToks(p.subj); if (!st.length) return; const c1 = nrCover(qt, st), c2 = nrCover(st, qt); if (c1 >= 0.99 && c2 >= 0.5 || c2 >= 0.99 && c1 >= 0.5) out.push({ n, p, sc: c1 + c2 }); });
+    return out.sort((a, b) => b.sc - a.sc);
+}
+function claimParse(claim) {
+    const pp = noteParse(claim); if (pp && noteFindSubject(pp.subj).length) return pp;
+    const w = String(claim).trim().split(/\s+/);
+    for (let k = 1; k <= Math.min(3, w.length - 1); k++) { const subj = w.slice(0, k).join(' '); if (noteFindSubject(subj).length) return { subj, pred: w.slice(k).join(' ').replace(/^(это|является|—|-)\s+/, '') }; }
+    return pp;
+}
+function notesSmart(raw) {
+    const N = L.notes || []; if (!N.length) return null;
+    const low = nz(raw).trim().replace(/[?!.]+$/, '').trim(); if (low.length > 200) return null;
+    let m;
+    // сравнение: «чем отличается A от B», «разница между A и B», «A или B что лучше»
+    if ((m = low.match(/^(?:чем отличается|в чем разница между|разница между|чем отличаются|отличие)\s+(.+?)\s+(?:от|и)\s+(.+)$/))) {
+        const a = noteFindSubject(m[1])[0], b = noteFindSubject(m[2])[0];
+        if (a && b) return '🧠 Сравнение по моим записям:\n\n• ' + a.n.t + '\n• ' + b.n.t;
+        if (a || b) return '🧠 Про ' + (a ? m[1] : m[2]) + ' знаю: ' + (a || b).n.t + '\nПро ' + (a ? m[2] : m[1]) + ' у меня записей нет.';
+    }
+    // перечисление: «какие бывают жанры», «какие есть игровые движки», «перечисли …», «назови …»
+    if ((m = low.match(/^(?:какие (?:бывают |есть |ты знаешь |знаешь )?|перечисли |назови |список |какие-нибудь )(.+)$/)) && !/^(игры|языки)\s+(знаешь|умеешь|можешь)/.test(m[1])) {
+        const qt = nrToks(m[1]).map(w => NR_EN[w] || w).filter(w => !/^(знаеш|умееш|можеш|бывают|есть|ещ)/.test(w));
+        if (qt.length) { const hits = []; N.forEach(n => { const p = noteParse(n.t); if (!p) return; const pt = nrToks(p.pred + ' ' + p.subj); if (nrCover(qt, pt) >= 0.99) hits.push(p.subj); });
+            if (hits.length >= 1) return '🧠 По моим записям (' + qt.join(' ') + '): ' + [...new Set(hits)].slice(0, 40).join(', ') + '.'; }
+    }
+    // да/нет: «Unity — это игровой движок?», «правда ли что Minecraft с открытым миром»
+    if ((m = low.match(/^(?:правда ли,? что|верно ли,? что|а правда что|это правда что|ведь)\s+(.+)$/)) || (/\?\s*$/.test(raw) && !/(^|\s)(что|кто|как|почему|зачем|где|когда|сколько|какой|какая|какое|какие|каких|какую|чем|ты|вы|знаешь|умеешь|можешь|сделаешь|напиши|покажи)(\s|$)/.test(low) && (m = [0, low.replace(/^(а|и|ну|так)\s+/, '')]))) {
+        const claim = m[1], pp = claimParse(claim);
+        if (pp) { const subs = noteFindSubject(pp.subj); if (subs.length) {
+            const qp = nrToks(pp.pred); const best = subs.map(x => ({ x, c: nrCover(qp, nrToks(x.p.pred)) })).sort((a, b) => b.c - a.c)[0];
+            if (best.c >= 0.6) return '🧠 Да, это совпадает с моими записями: ' + best.x.n.t;
+            return '🧠 В моих записях сказано иначе: ' + best.x.n.t;
+        } }
+    }
+    // «для чего / зачем / как работает / чем является X» → запись про X
+    if ((m = low.match(/^(?:для чего (?:нужен|нужна|нужно|нужны|используется|используют|предназначен|предназначена)|зачем (?:нужен|нужна|нужно|нужны)|как работает|что делает|чем является|что значит слово|кто создал)\s+(.+)$/))) {
+        const f = noteFindSubject(m[1])[0]; if (f) return '🧠 Из запомненного: ' + f.n.t;
+    }
+    return null;
 }
 function notesRecall(uid, raw, force) {
     const N = L.notes; if (!N || !N.length) return null;
     const low = nz(raw).trim();
     if (low.length > 220) return null;
-    const isQ = /\?\s*$/.test(raw) || /^(что|кто|как|почему|зачем|где|когда|сколько|какой|какая|какое|какие|расскажи|скажи|знаешь|объясни|напомни|what|who|how|why|where|when|tell|explain|define|is|are|does|do)(\s|$)/.test(low) || /(что такое|что значит|что означает|кто такой|кто такая|значение слова)/.test(low);
-    const bare = !isQ && !force && !/[.!,;:]/.test(raw) && nrToks(raw).length >= 1 && nrToks(raw).length <= 2;
+    { const sm = notesSmart(raw); if (sm) return sm; }
+    const defQ = /(что такое|что значит|что означает|кто такой|кто такая|значение слова|расскажи про|расскажи о|что за|what is|what are|who is|tell me about|define|explain)/.test(low);
+    const isQ = defQ || /\?\s*$/.test(raw) || /^(что|кто|как|почему|зачем|где|когда|сколько|какой|какая|какое|какие|расскажи|скажи|знаешь|объясни|напомни|what|who|how|why|where|when|tell|explain|define|is|are|does|do)(\s|$)/.test(low);
+    const qt0 = nrToks(raw);
+    const bare = !isQ && !force && !/[.!,;:]/.test(raw) && qt0.length >= 1 && qt0.length <= 2;
     if (!isQ && !force && !bare) return null;
-    let q = nrToks(raw); if (!q.length) return null; if (q.length > 12) return null;
+    let q = qt0; if (!q.length) return null; if (q.length > 12) return null;
     q = q.map(w => NR_EN[w] || w);
+    // вес слова: редкие слова в пунктах важнее частых; слово, которого нет ни в одном пункте, считается «потерянным»
+    const NT = N.map(n => nrToks(n.t)); const df = q.map(() => 0);
+    NT.forEach(nt => q.forEach((w, qi) => { if (nt.some(x => nrSim(w, x) >= 0.7)) df[qi]++; }));
+    const wt = df.map(d => Math.log(2 + N.length / Math.max(d, 0.5)));
+    const totalW = wt.reduce((a, b) => a + b, 0);
     const scored = [];
     N.forEach((n, idx) => {
-        const nt = nrToks(n.t); if (!nt.length) return;
-        let sum = 0, hit = 0, subj = 0;
-        q.forEach(w => { let best = 0, pos = -1; for (let i = 0; i < nt.length; i++) { const x = nt[i]; const sm = nrSim(w, x); if (sm > best) { best = sm; pos = i; } } if (best >= 0.7) { hit++; sum += best; if (pos <= 1) subj += 1; } });
-        if (!hit) return;
-        const frac = hit / q.length;
-        if (q.length >= 2 && frac < 0.5) return;
-        if (bare && !(subj && frac === 1)) return;
-        scored.push([sum + subj * 0.8 + frac - nt.length * 0.01, n, idx]);
+        const nt = NT[idx]; if (!nt.length) return;
+        let hitW = 0, subj = 0, sum = 0;
+        q.forEach((w, qi) => { let best = 0, pos = -1; for (let i = 0; i < nt.length; i++) { const sm = nrSim(w, nt[i]); if (sm > best) { best = sm; pos = i; } } if (best >= 0.7) { hitW += wt[qi]; sum += best * wt[qi]; if (pos <= 1) subj += wt[qi]; } });
+        if (!hitW) return;
+        const cov = hitW / totalW;
+        const rareSubj = defQ && subj > 0 && q.length <= 3;
+        if (cov < 0.67 && !rareSubj) return;
+        if (bare && !(subj && cov > 0.99 && sum / hitW >= 0.85)) return;
+        scored.push([sum + subj * 0.8 + cov * 2 - nt.length * 0.01, n, idx]);
     });
     if (!scored.length) return null;
     scored.sort((a, b) => b[0] - a[0]);
-    const top = scored[0][0]; const pick = scored.filter(x => x[0] >= top - 0.9).slice(0, 3);
+    const DEFM = /( — | - |является|означает|представляет|называется|обозначает|предназначен|используется| это )/;
+    let cand = scored; if (defQ) { cand = scored.filter(x => DEFM.test(x[1].t)); if (!cand.length) return null; }
+    const top = cand[0][0]; const pick = cand.filter(x => x[0] >= top - 0.9).slice(0, 3);
     return '🧠 Из запомненного:\n\n' + pick.map(x => x[1].t).join('\n\n');
 }
 function gameBuildMenu() {
@@ -3450,7 +3533,7 @@ function scoreKB(toks, raw, lang, ctxLang) {
         if (badList.includes(e.id)) continue;
         let s = 0, matched = 0;
         for (const k of e.kws) {
-            if (k.includes(' ') || /[^a-zа-я0-9_]/.test(k)) { if (n.includes(k)) { s += 3; matched++; } }
+            if (k.includes(' ') || /[^a-zа-я0-9_]/.test(k)) { if (n.includes(k)) { s += 3; matched++; } else if (/^[а-яё]+( [а-яё]+)+$/.test(k)) { const ws = k.split(' '); if (ws.every(w => toks.some(t => kwMatch(w, t)))) { s += 2.4; matched++; } } }
             else if (toks.some(t => kwMatch(k, t))) { s += k.length >= 6 ? 2 : k.length >= 4 ? 1.5 : 2; matched++; }
         }
         const lh = learnedHits(e.id, toks); if (lh) { s += 1.2 * lh; matched++; }
@@ -4251,7 +4334,7 @@ function reply0(uid, text, name, ctx) {
         s.offer = { at: Date.now(), fn: () => explainHtml(raw) };
         return analyzeHtml(raw);
     }
-    if (s.htmlSrc && Date.now() - s.htmlSrc.at < 30 * 60 * 1000 && /^(объясни|объясни по блокам|по блокам|разбери|что (это )?(делает|тут)|как (это )?работает|да)\W*$/.test(n) && !/```/.test(raw)) { const r = explainHtml(s.htmlSrc.src); s.offer = null; return r; }
+    if (s.htmlSrc && Date.now() - s.htmlSrc.at < 30 * 60 * 1000 && /^(объясни|объясни по блокам|по блокам|разбери|что (это )?(делает|тут)|как (это )?работает|да)[^а-яёa-z0-9]*$/.test(n) && !/```/.test(raw)) { const r = explainHtml(s.htmlSrc.src); s.offer = null; return r; }
     // ожидание кода/ошибки от пользователя («щас скину ошибку», «ну код»)
     {
         const aw = s.await && Date.now() - s.await.at < 15 * 60 * 1000 ? s.await : null;
@@ -5698,7 +5781,7 @@ function reply(uid, text, name, ctx) {
     let r;
     trackUser(uid, text);
     try { r = reply0(uid, text, name, ctx); } catch (e) { console.error('aibot error:', e); r = 'Что-то пошло не так 😵 Попробуйте переформулировать вопрос.'; }
-    if (typeof r === 'string' && FALLBACK_RE.test(r)) r += TEACH_HINT;
+    if (typeof r === 'string' && FALLBACK_RE.test(r)) { let nr = null; try { nr = notesRecall(uid, text, true); } catch (e) {} if (nr) r = nr; else r += TEACH_HINT; }
     try { r = vibeApply(uid, r); } catch (e) {}
     try { const s0 = sessions.get(uid); if (s0 && typeof r === 'string' && !s0.genMod && /^✅/.test(r) && /весь код в одном HTML/.test(r)) { const mm = r.match(/```html\n([\s\S]*?)\n```/); if (mm) s0.gen = { base: mm[1], mods: {}, at: Date.now(), kind: /<canvas/.test(mm[1]) ? 'game' : 'app', genre: /игру|Игра «/.test(r) && /\(Гонка|\(Лабиринт|\(Платформер|\(Ловля/.test(r) ? lastGenre : null }; } } catch (e) {}
     try {
@@ -5783,9 +5866,145 @@ function aiBotOnMessage(chat, uid, msg) {
     }, delay);
 }
 
+// ===================================================================
+//  Mars Shop — покупка Mars за рубли переводом на карту.
+//  Покупатель выбирает количество → переводит сумму на карту → шлёт фото чека в чат с ботом →
+//  администратору (saimon) в этот же бот приходит заявка с кнопками «Подтвердить / Отклонить».
+//  Подтвердил — Mars сразу падают на баланс покупателя. Всё решает человек, автоматики оплаты нет.
+//  Настройки (необязательно, переменные окружения): MARS_RATE_RUB, MARS_CARD, MARS_BANK
+// ===================================================================
+const MB_ID = 105;
+const MB_HANDLE = 'marsbuy_bot';
+const MB_NAME = 'Mars Shop';
+const MB_RATE = Number(process.env.MARS_RATE_RUB) > 0 ? Number(process.env.MARS_RATE_RUB) : 0.7;   // рублей за 1 Mars
+const MB_CARD = String(process.env.MARS_CARD || '2202208851123100').replace(/\D/g, '');
+const MB_BANK = process.env.MARS_BANK || 'Сбер';
+const MB_PACKS = [100, 500, 1000, 5000];
+const MB_MIN = 10, MB_MAX = 1000000, MB_MAX_PENDING = 3;
+const MB_AVATAR = 'data:image/svg+xml;base64,' + Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><radialGradient id="g" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#ff9a6a"/><stop offset="1" stop-color="#c2410c"/></radialGradient></defs><rect width="100" height="100" fill="#1b1033"/><circle cx="50" cy="50" r="30" fill="url(#g)"/><circle cx="40" cy="42" r="6" fill="#9a3412" opacity=".6"/><circle cx="60" cy="58" r="8" fill="#9a3412" opacity=".5"/><circle cx="56" cy="38" r="3.5" fill="#9a3412" opacity=".6"/><circle cx="18" cy="20" r="2" fill="#fff"/><circle cx="82" cy="78" r="2.5" fill="#fff"/><circle cx="84" cy="24" r="1.5" fill="#fff"/></svg>`).toString('base64');
+VERIFIED.add(MB_HANDLE);
+const mbCmd = (t, v) => ({ t, k: 'cmd', v });
+const mbRub = c => { const r = c / 100; return (Number.isInteger(r) ? String(r) : r.toFixed(2)).replace('.', ',') + ' ₽'; };
+const mbCents = n => Math.round(n * MB_RATE * 100);
+const mbNum = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const mbOrders = () => { const o = read(F.marsorders); return Array.isArray(o) ? o : []; };
+const mbSaveOrders = o => write(F.marsorders, o);
+const mbAdmins = () => read(F.users).filter(u => ADMIN_HANDLES.includes(u.handle)).map(u => u.id);
+
+function ensureMarsBot() {
+    const users = read(F.users), old = users.find(u => u.id === MB_ID);
+    const bio = `Покупка Mars: 1 Mars = ${String(MB_RATE).replace('.', ',')} ₽. Перевод на карту, подтверждение вручную.`;
+    if (old) {
+        let ch = false;
+        if (old.username !== MB_NAME) { old.username = MB_NAME; ch = true; }
+        if (old.avatar !== MB_AVATAR) { old.avatar = MB_AVATAR; ch = true; }
+        if (old.bio !== bio) { old.bio = bio; ch = true; }
+        if (!old.bot || !old.custom) { old.bot = true; old.custom = true; ch = true; }
+        if (ch) write(F.users, users);
+        return;
+    }
+    if (users.find(u => (u.handles || [u.handle]).includes(MB_HANDLE))) { console.warn(`⚠️ Юзернейм @${MB_HANDLE} занят, Mars Shop не создан`); return; }
+    users.push({ id: MB_ID, username: MB_NAME, handle: MB_HANDLE, bot: true, custom: true, mbLocal: true, bio, avatar: MB_AVATAR, mars: 0,
+        password: 'x' + crypto.randomBytes(24).toString('hex'), createdAt: new Date().toISOString() });
+    write(F.users, users);
+    console.log('🪐 Mars Shop создан (@' + MB_HANDLE + ')');
+}
+
+function mbMenu(uid) {
+    const rows = [MB_PACKS.slice(0, 2), MB_PACKS.slice(2)].map(r => r.map(n => mbCmd(`${mbNum(n)} Mars — ${mbRub(mbCents(n))}`, '/pack_' + n)));
+    rows.push([mbCmd('✏️ Своё количество', '/custom')]);
+    botPost(MB_ID, uid, `🪐 Покупка Mars\n\nКурс: 1 Mars = ${String(MB_RATE).replace('.', ',')} ₽\n\nВыберите количество кнопкой или просто напишите число (от ${MB_MIN} до ${mbNum(MB_MAX)}).`, rows);
+}
+
+function mbStartOrder(uid, n) {
+    n = Math.floor(Number(n));
+    if (!Number.isFinite(n) || n < MB_MIN || n > MB_MAX) return botPost(MB_ID, uid, `Введите число от ${MB_MIN} до ${mbNum(MB_MAX)}.`);
+    const orders = mbOrders();
+    if (orders.filter(o => o.uid === uid && o.status === 'pending').length >= MB_MAX_PENDING)
+        return botPost(MB_ID, uid, `У вас уже ${MB_MAX_PENDING} заявки на проверке. Дождитесь решения по ним.`);
+    orders.forEach(o => { if (o.uid === uid && o.status === 'wait') o.status = 'cancel'; });   // новый выбор заменяет прежний неоплаченный
+    const o = { id: crypto.randomBytes(3).toString('hex'), uid, mars: n, rubC: mbCents(n), status: 'wait', at: new Date().toISOString() };
+    orders.push(o); mbSaveOrders(orders);
+    botPost(MB_ID, uid, `🧾 Заказ № ${o.id}\n\nMars: ${mbNum(n)}\nК оплате: ${mbRub(o.rubC)}\n\n1️⃣ Переведите ровно ${mbRub(o.rubC)} на карту ${MB_BANK}:\n💳 ${MB_CARD}\n\n2️⃣ Пришлите сюда фото (скриншот) чека о переводе.\n\nПосле проверки Mars поступят на ваш баланс.`,
+        [[mbCmd('✖️ Отменить заказ', '/cancel')]]);
+}
+
+function mbReceipt(uid, msg) {
+    const orders = mbOrders();
+    const o = orders.filter(x => x.uid === uid && x.status === 'wait').pop();
+    if (!o) {
+        if (orders.some(x => x.uid === uid && x.status === 'pending')) return botPost(MB_ID, uid, '⏳ Ваша заявка уже на проверке. Если хотите купить ещё — выберите количество.');
+        botPost(MB_ID, uid, 'Сначала выберите, сколько Mars хотите купить 👇');
+        return mbMenu(uid);
+    }
+    const admins = mbAdmins().filter(a => a !== uid);
+    if (!admins.length) return botPost(MB_ID, uid, '⚠️ Сейчас некому проверить оплату. Попробуйте позже.');
+    o.status = 'pending'; o.photo = msg.media.url; o.sentAt = new Date().toISOString();
+    mbSaveOrders(orders);
+    const me = read(F.users).find(u => u.id === uid) || {};
+    const who = `${me.username || 'Пользователь'}${me.handle ? ' (@' + me.handle + ')' : ''}`;
+    admins.forEach(a => botPost(MB_ID, a, `💰 Новая заявка № ${o.id}\n\nОт: ${who}\nЗаказал: ${mbNum(o.mars)} Mars\nДолжен был перевести: ${mbRub(o.rubC)}\n\nСверьте сумму на чеке и поступление на карту.`,
+        [[mbCmd('✅ Подтвердить', '/ok_' + o.id), mbCmd('❌ Отклонить', '/no_' + o.id)]], { media: msg.media }));
+    botPost(MB_ID, uid, `✅ Чек получен. Заявка № ${o.id} (${mbNum(o.mars)} Mars) отправлена на проверку.\nКак только её подтвердят, Mars придут на баланс — я напишу.`);
+}
+
+function mbDecide(adminUid, id, ok) {
+    const orders = mbOrders(), o = orders.find(x => x.id === id);
+    if (!o) return botPost(MB_ID, adminUid, `Заявка № ${id} не найдена.`);
+    if (o.status !== 'pending') return botPost(MB_ID, adminUid, `Заявка № ${id} уже обработана: ${o.status === 'ok' ? 'подтверждена ✅' : o.status === 'no' ? 'отклонена ❌' : 'отменена'}.`);
+    const users = read(F.users), buyer = users.find(u => u.id === o.uid);
+    if (ok && !buyer) { o.status = 'no'; o.by = adminUid; o.decidedAt = new Date().toISOString(); mbSaveOrders(orders); return botPost(MB_ID, adminUid, `Покупатель заявки № ${id} удалил аккаунт — заявка закрыта.`); }
+    o.status = ok ? 'ok' : 'no'; o.by = adminUid; o.decidedAt = new Date().toISOString();
+    if (ok) { buyer.mars = (buyer.mars || 0) + o.mars; write(F.users, users); }   // начисление и смена статуса — в одном синхронном куске, двойной клик не начислит дважды
+    mbSaveOrders(orders);
+    botPost(MB_ID, adminUid, ok ? `✅ Заявка № ${id} подтверждена. Начислено ${mbNum(o.mars)} Mars.` : `❌ Заявка № ${id} отклонена.`);
+    if (buyer) {
+        if (ok) { botPost(MB_ID, o.uid, `🎉 Оплата подтверждена!\n\nНачислено: ${mbNum(o.mars)} Mars\nБаланс: ${mbNum(buyer.mars)} Mars\n\nСпасибо за покупку!`, [[mbCmd('🪐 Купить ещё', '/menu')]]); sendTo([o.uid], { type: 'wallet', data: walletOf(buyer) }); }
+        else botPost(MB_ID, o.uid, `❌ Заявка № ${id} (${mbNum(o.mars)} Mars) отклонена.\n\nВозможно, сумма на чеке не совпала или перевод не поступил. Если вы оплатили — попробуйте оформить заказ заново и пришлите чёткий чек.`, [[mbCmd('🪐 Новый заказ', '/menu')]]);
+    }
+}
+
+function mbAction(uid, v) {
+    let m;
+    if (v === '/menu' || v === '/start') return mbMenu(uid);
+    if ((m = v.match(/^\/pack_(\d+)$/))) return mbStartOrder(uid, +m[1]);
+    if (v === '/custom') return botPost(MB_ID, uid, `Напишите числом, сколько Mars нужно (от ${MB_MIN} до ${mbNum(MB_MAX)}). Например: 250`);
+    if (v === '/cancel') {
+        const orders = mbOrders(); let n = 0;
+        orders.forEach(o => { if (o.uid === uid && o.status === 'wait') { o.status = 'cancel'; n++; } });
+        if (n) mbSaveOrders(orders);
+        return botPost(MB_ID, uid, n ? 'Заказ отменён.' : 'Нет заказа, который можно отменить.', [[mbCmd('🪐 В меню', '/menu')]]);
+    }
+    if ((m = v.match(/^\/(ok|no)_([a-f0-9]{6})$/))) {
+        if (!mbAdmins().includes(uid)) return botPost(MB_ID, uid, 'Это действие доступно только администратору.');
+        return mbDecide(uid, m[2], m[1] === 'ok');
+    }
+}
+
+function mbOnMessage(chat, uid, msg) {
+    const text = String(msg.text || '').trim(), low = text.toLowerCase();
+    if (msg.media) {
+        if (msg.media.kind === 'image') return mbReceipt(uid, msg);
+        return botPost(MB_ID, uid, 'Нужно именно фото (скриншот) чека 📷');
+    }
+    if (!text) return;
+    const num = text.replace(/[\s_]/g, '').match(/^(\d{1,9})(?:mars|марс|марса|марсов)?$/i);
+    if (num) return mbStartOrder(uid, +num[1]);
+    if (/^\/(start|menu|buy)\b|^(меню|купить|покупка|старт|начать|привет)\W*$/i.test(low)) return mbMenu(uid);
+    if (/^(отмена|отменить|\/cancel)\W*$/i.test(low)) return mbAction(uid, '/cancel');
+    if (/^(баланс|\/balance|мой баланс)\W*$/i.test(low)) { const me = read(F.users).find(u => u.id === uid) || {}; return botPost(MB_ID, uid, `Ваш баланс: ${isUnlimited(me) ? '∞' : mbNum(me.mars || 0)} Mars`); }
+    if (/^(заявки|\/orders)\W*$/i.test(low) && mbAdmins().includes(uid)) {
+        const p = mbOrders().filter(o => o.status === 'pending');
+        if (!p.length) return botPost(MB_ID, uid, 'Заявок на проверке нет ✅');
+        return p.slice(0, 20).forEach(o => botPost(MB_ID, uid, `💰 Заявка № ${o.id}: ${mbNum(o.mars)} Mars за ${mbRub(o.rubC)}`, [[mbCmd('✅ Подтвердить', '/ok_' + o.id), mbCmd('❌ Отклонить', '/no_' + o.id)]], o.photo ? { media: { kind: 'image', url: o.photo } } : {}));
+    }
+    mbMenu(uid);
+}
+
 function onCustomBotMessage(chat, uid, msg) {
     const other = chat.members.find(i => i !== uid);
     if (other === AIBOT_ID) return aiBotOnMessage(chat, uid, msg);
+    if (other === MB_ID) return mbOnMessage(chat, uid, msg);
     const users = read(F.users), bot = users.find(u => u.id === other);
     if (!isCustomBot(bot)) return;
     const db = botsDb(), cfg = db[bot.id];
@@ -5829,6 +6048,9 @@ app.post('/api/bots/:id/start', async (req, res) => {
     if (id === HOURS_ID) {
         userSaysToBot(uid, HOURS_ID, '/start');
         hoursWelcome(uid);
+    } else if (id === MB_ID) {
+        userSaysToBot(uid, MB_ID, '/start');
+        mbMenu(uid);
     } else if (id === AIBOT_ID) {
         userSaysToBot(uid, AIBOT_ID, '/start');
         const me0 = read(F.users).find(x => x.id === uid) || {};
@@ -5852,6 +6074,13 @@ app.post('/api/bots/:id/click', async (req, res) => {
     const chat = msg && read(F.chats).find(c => c.id === msg.chatId && c.members.includes(uid) && c.members.includes(id));
     const b = chat && msg.buttons && (msg.buttons[Number(req.body.row)] || [])[Number(req.body.col)];
     if (!b || b.k !== 'cmd') return res.status(400).json({ error: 'Кнопка устарела' });
+    if (id === MB_ID) {   // Mars Shop: кнопки гасим после нажатия, чтобы не нажимали дважды
+        const allMsgs = read(F.messages), mm = allMsgs.find(m => m.id === msg.id);
+        if (mm && mm.buttons && mm.buttons.length && !/^\/(menu|custom|pack_\d+)$/.test(b.v)) { mm.buttons = []; write(F.messages, allMsgs); sendTo([uid], { type: 'botUpdate', data: { chatId: mm.chatId, messageId: mm.id, buttons: [] } }); }
+        try { mbAction(uid, b.v); } catch (e) { console.error('Mars Shop:', e); botPost(MB_ID, uid, 'Ошибка, попробуйте ещё раз.'); }
+        await persist();
+        return res.json({ success: true });
+    }
     const db = botsDb(), cfg = db[id];
     if (!cfg) return res.status(404).json({ error: 'Бот не настроен' });
     cfg.stats.msgs++; trackUser(cfg, uid); write(F.bots, db);
@@ -8202,7 +8431,7 @@ async function init() {
         });
     }
     // Чего нет в базе (первый запуск) — берём из локальных файлов, иначе пустой список
-    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks', 'sticker_packs', 'bots', 'aibrain']) {
+    for (const k of ['users', 'messages', 'chats', 'gifts', 'sessions', 'blocks', 'sticker_packs', 'bots', 'aibrain', 'marsorders']) {
         if (mem[k] === undefined) {
             const d = loadFile(F[k]);
             mem[k] = JSON.stringify((k === 'sessions' || k === 'blocks' || k === 'bots' || k === 'aibrain') && Array.isArray(d) ? {} : d); // объекты {токен: …}, {кто: [кого]}
@@ -8222,6 +8451,7 @@ async function init() {
     ensureHoursBot();
     removeAiBot();
     ensureAiBot();
+    ensureMarsBot();
     aiBrain.attach(() => read(F.aibrain), d => write(F.aibrain, d));   // память и обучение Ai_bot
     await ensureVapid();
     await persist();
