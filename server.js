@@ -3077,7 +3077,7 @@ function vibeApply(uid, r) {
     if (typeof r !== 'string') return r;
     let k; try { k = (userMem(uid).vibe || {}).k; } catch (e) { return r; }
     if (!k || !VIBE[k]) return r;
-    if (/```/.test(r) || r.length > 900 || /^(🧮|🔎|📚|🌐|🧯|✅|📝)/.test(r) || /(\n\s*[•\d]\)?[.)]?\s)/.test(r) && r.length > 450) return r;
+    if (/```/.test(r) || r.length > 900 || /^(🧮|🔎|📚|🌐|🧯|✅|📝|🧠)/.test(r) || /(\n\s*[•\d]\)?[.)]?\s)/.test(r) && r.length > 450) return r;
     const V = VIBE[k], st = sessions.get(uid) || {};
     const call = V.calls[(st.vibeI = ((st.vibeI || 0) + 1)) % V.calls.length];
     let out = toTy(r).replace(/Что бы вы хотели/g, 'Что бы ты хотел(а)').replace(/что вы думаете/gi, 'что ты думаешь').replace(/Как вы к этому относитесь/g, 'Как ты к этому относишься'); out = k === 'girl' ? fem(out) : mas(out);
@@ -3350,13 +3350,24 @@ function anAnalyze(uid, par, name) {
 function s0analysis(uid, v) { const U = userMem(uid); const old = !!U.analysis; if (v === false) U.analysis = false; else if (v === true) U.analysis = true; return old; }
 function analysisHandle(uid, raw, name) {
     const U = userMem(uid);
-    if (AN_ON.test(raw.trim())) { U.analysis = true; touch(); return '📝 Режим анализа текста включён.\n\nОтправьте текст — я разобью его на пункты по ПУСТЫМ строкам (обычный перенос строки пунктом не считается), прочитаю каждый пункт отдельно и отвечу по порядку: верно / неверно / частично / мнение / вопрос / недостаточно данных.\n\nВыйти из режима: «выход из анализа».'; }
+    if (AN_ON.test(raw.trim())) { U.analysis = true; touch(); return '📝 Режим анализа текста включён.\n\nОтправьте текст — я разобью его на пункты по ПУСТЫМ строкам (обычный перенос строки пунктом не считается) и ЗАПОМНЮ каждый пункт. Потом на вопросы по ним отвечу из памяти.\n\nКоманды: «список», «удали пункт N», «очисти пункты», «проверь: текст» (проверка на верность).\n\nВыйти из режима: «выход из анализа».'; }
     if (!U.analysis) return null;
     if (AN_OFF.test(raw.trim().toLowerCase())) { U.analysis = false; touch(); return '📝 Режим анализа выключен. Возвращаюсь к обычному общению 🙂'; }
     if (/^\/(help|start|topics)/i.test(raw.trim())) return null;
     if (/^(помощь|справка|как пользоваться|инструкция|что делать)\W*$/i.test(raw.trim())) return '📝 Режим анализа: отправьте текст, где пункты разделены пустой строкой. Пример:\n\nHTML не является языком программирования.\n\nБатончик.\n\nКака.\n\nЯ отвечу: 1) Верно; 2) Это кондитерское изделие; 3) Недостаточно контекста. Выход — «выход из анализа».';
-    const paras = raw.replace(/\r\n?/g, '\n').split(/\n[ \t ]*\n+/).map(p => p.replace(/^\s+|\s+$/g, '')).filter(p => p.length);
+    let body = raw; const verify = /^(проверь|проанализируй|верно ли)\s*[:\-]?\s*/i.test(raw.trim()); if (verify) body = raw.trim().replace(/^(проверь|проанализируй|верно ли)\s*[:\-]?\s*/i, '');
+    if (/^(список|мои пункты|что запомнил|покажи пункты|что ты запомнил)\W*$/i.test(raw.trim())) { const N = (L.notes = L.notes || []); return N.length ? '📝 Запомнено пунктов: ' + N.length + '\n\n' + N.slice(-50).map((n, i) => (N.length - Math.min(50, N.length) + i + 1) + '. ' + n.t.slice(0, 120)).join('\n') + (N.length > 50 ? '\n…(показаны последние 50)' : '') : '📝 Пока ничего не запомнено.'; }
+    if (/^(очисти|удали|забудь)\s+(все\s+)?(пункты|запомненное|заметки)\W*$/i.test(raw.trim())) { const n0 = (L.notes || []).length; L.notes = []; touch(); return `📝 Удалил все запомненные пункты (${n0}).`; }
+    { const dm = raw.trim().match(/^(?:удали|забудь)\s+пункт\s+(\d+)\W*$/i); if (dm) { const N = (L.notes = L.notes || []); const i = +dm[1] - 1; if (i >= 0 && i < N.length) { const [x] = N.splice(i, 1); touch(); return `📝 Удалил пункт ${dm[1]}: «${x.t.slice(0, 80)}»`; } return '📝 Пункта с таким номером нет.'; } }
+    const paras = body.replace(/\r\n?/g, '\n').split(/\n[ \t\u00a0]*\n+/).map(p => p.replace(/^\s+|\s+$/g, '')).filter(p => p.length);
     if (!paras.length) return null;
+    if (!verify) {
+        const N = (L.notes = L.notes || []); let added = 0, dup = 0;
+        paras.forEach(p => { const t = p.replace(/[ \t]*\n[ \t]*/g, '\n'); if (N.some(n => n.t === t)) dup++; else { N.push({ t, at: Date.now() }); added++; } });
+        if (N.length > 2000) N.splice(0, N.length - 2000);
+        touch();
+        return `📝 Запомнил пунктов: ${added}${dup ? ` (уже были: ${dup})` : ''}. Всего в памяти: ${N.length}.\n\n` + paras.slice(0, 20).map((p, i) => `${i + 1}. ${p.replace(/\s+/g, ' ').slice(0, 70)}${p.length > 70 ? '…' : ''}`).join('\n') + (paras.length > 20 ? `\n…и ещё ${paras.length - 20}` : '') + '\n\nСпросите меня по любому из них — отвечу из запомненного. «список» — показать, «удали пункт N» — убрать, «проверь: текст» — проверить на верность.';
+    }
     const out = []; const cnt = { true: 0, false: 0, partial: 0, other: 0 };
     const capped = paras.slice(0, 150);
     capped.forEach((p, i) => {
@@ -3373,6 +3384,17 @@ function analysisHandle(uid, raw, name) {
     return res;
 }
 
+
+function notesRecall(uid, raw) {
+    const N = L.notes; if (!N || !N.length) return null;
+    const q = nz(raw).replace(/[^a-zа-я0-9+#\s]/g, ' ').split(/\s+/).filter(w => w.length > 3);
+    if (!q.length || q.length > 14) return null;
+    if (!/\?\s*$/.test(raw) && !/^(что|кто|как|почему|зачем|где|когда|сколько|какой|какая|какое|какие|расскажи|скажи|знаешь|объясни|напомни)/.test(nz(raw).trim())) return null;
+    const qs = q.map(anStem); let best = [];
+    N.forEach(n => { const nt = nz(n.t); const hit = qs.filter(w => nt.includes(w)).length; if (hit >= Math.min(2, qs.length) && hit / qs.length >= 0.5) best.push([hit / qs.length + hit * 0.1, n]); });
+    if (!best.length) return null; best.sort((a, b) => b[0] - a[0]);
+    return '🧠 Из запомненного:\n\n' + best.slice(0, 3).map(x => x[1].t).join('\n\n');
+}
 function gameBuildMenu() {
     return '🎮 Какую игру сделать? Все варианты — готовый HTML-файл, который открывается в браузере (в том числе на телефоне):\n\n• змейка\n• кликер (с улучшениями)\n• найди пару (память)\n• понг против бота\n• flappy bird\n• арканоид\n• крестики-нолики (с умным ботом)\n• угадай число\n• тетрис\n• 2048\n• сапёр\n• космический шутер\n• поймай крота\n• бегун (как динозаврик)\n• виселица\n• четыре в ряд (с ботом)\n• саймон\n• кости\n\nИ приложения: заметки, помодоро-таймер, рисовалка, конвертер величин, викторина, список дел, калькулятор, секундомер, форма регистрации, лендинг.\n\nНапишите, например: «змейка на html» или «сделай арканоид». Нужно что-то своё — опишите правила, подскажу, как построить: цикл игры, управление, столкновения и счёт.';
 }
@@ -4017,7 +4039,7 @@ let L = { v: 1, users: {}, global: [], alias: {}, kw: {}, unknown: {}, stats: { 
 let STORE = null, saveT = null, CUR = null;
 function attach(get, set) {
     STORE = { get, set };
-    try { const d = get(); if (d && typeof d === 'object' && !Array.isArray(d)) { L = Object.assign(L, d); L.users = L.users || {}; L.global = L.global || []; L.alias = L.alias || {}; L.kw = L.kw || {}; L.unknown = L.unknown || {}; L.stats = L.stats || { taught: 0, promoted: 0 }; } } catch {}
+    try { const d = get(); if (d && typeof d === 'object' && !Array.isArray(d)) { L = Object.assign(L, d); L.users = L.users || {}; L.global = L.global || []; L.notes = L.notes || []; L.alias = L.alias || {}; L.kw = L.kw || {}; L.unknown = L.unknown || {}; L.stats = L.stats || { taught: 0, promoted: 0 }; } } catch {}
 }
 function flush() { if (saveT) { clearTimeout(saveT); saveT = null; } if (STORE) { try { STORE.set(L); } catch {} } }
 function touch() { if (!STORE || saveT) return; saveT = setTimeout(() => { saveT = null; try { STORE.set(L); } catch {} }, 2500); if (saveT.unref) saveT.unref(); }
@@ -4175,7 +4197,7 @@ function reply0(uid, text, name, ctx) {
     { const gm = raw.match(/^(привет(?:ствую)?|здравствуй(?:те)?|добрый (?:день|вечер|утро)|доброе утро|хай|ку|hello|hi|салют|приветик)[,!.\s]+([\s\S]{6,})$/i);
       if (gm && tokens(gm[2]).length >= 2 && !/^(как (дела|ты|жизнь)|что нового|как сам)/i.test(gm[2].trim())) return reply0(uid, gm[2], name, ctx); }
     const prevSeen = U0.lastSeen; U0.lastSeen = Date.now();
-    { const an = analysisHandle(uid, raw, name); if (an) return an; }
+    { const an = analysisHandle(uid, raw, name); if (an) return an; const nr = notesRecall(uid, raw); if (nr) return nr; }
     if (!s.lang) s.lang = profileLang(uid);
     if (!raw) return 'Напишите вопрос или пришлите код — отвечу 🙂';
     const clean = prepare(raw);          // без слов-паразитов («ну», «типо», «короче»…), сленг приведён к обычным словам
