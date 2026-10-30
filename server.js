@@ -2348,6 +2348,28 @@ K('game-physics', 'js', ['гравитация', 'прыжок персонаж�
 K('game-ai', 'js', ['ии в игре', 'враг преследует', 'бот в игре', 'поведение врага', 'pathfinding', 'поиск пути', 'a star', 'a*', 'враги двигаются', 'случайная генерация', 'процедурная генерация', 'генерация лабиринта', 'лабиринт', 'maze'], `🤖 Враги и генерация в играх\n\n${code('javascript', `// враг идёт к игроку\nfunction chase(e, p, speed, dt) {\n  const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;\n  e.x += dx / d * speed * dt; e.y += dy / d * speed * dt;\n}\n// стрельба по направлению\nconst ang = Math.atan2(target.y - y, target.x - x);\nbullets.push({ x, y, vx: Math.cos(ang) * 400, vy: Math.sin(ang) * 400 });\n\n// лабиринт: поиск в глубину (recursive backtracker) на сетке W×H\nfunction maze(W, H) {\n  const cells = Array.from({ length: H }, () => Array(W).fill(0).map(() => ({ v: 0, r: 1, d: 1 })));\n  const st = [[0, 0]]; cells[0][0].v = 1;\n  while (st.length) {\n    const [x, y] = st[st.length - 1];\n    const nb = [[1,0],[0,1],[-1,0],[0,-1]].map(([a, b]) => [x + a, y + b, a, b])\n      .filter(([a, b]) => a >= 0 && b >= 0 && a < W && b < H && !cells[b][a].v);\n    if (!nb.length) { st.pop(); continue; }\n    const [nx, ny, a, b] = nb[Math.floor(Math.random() * nb.length)];\n    if (a === 1) cells[y][x].r = 0; if (b === 1) cells[y][x].d = 0;\n    if (a === -1) cells[ny][nx].r = 0; if (b === -1) cells[ny][nx].d = 0;\n    cells[ny][nx].v = 1; st.push([nx, ny]);\n  }\n  return cells;   // r/d = 1 — есть стена справа/снизу\n}`)}\nПоиск кратчайшего пути на сетке — BFS или A* (см. «графы»).`);
 K('html-forms2', 'html', ['валидация формы', 'required', 'pattern', 'minlength', 'форма html', 'form html', 'отправка формы', 'formdata', 'placeholder', 'label for', 'checkvalidity'], `📝 HTML-формы и встроенная валидация\n\n${code('html', `<form id="f">\n  <label for="em">Почта</label>\n  <input id="em" name="email" type="email" required placeholder="a@b.ru">\n  <label for="pw">Пароль</label>\n  <input id="pw" name="pass" type="password" minlength="8" required>\n  <input name="phone" pattern="\\+?\\d{10,12}" title="10–12 цифр">\n  <select name="role"><option value="u">Пользователь</option><option value="a">Админ</option></select>\n  <button type="submit">Отправить</button>\n</form>\n<script>\nf.addEventListener('submit', e => {\n  e.preventDefault();                               // не перезагружать страницу\n  if (!f.checkValidity()) return f.reportValidity(); // встроенные подсказки браузера\n  const data = Object.fromEntries(new FormData(f)); // {email, pass, ...}\n  console.log(data);\n});\n</script>`)}\nvalidation в браузере — удобство; настоящую проверку всегда повторяйте на сервере.`);
 K('html-seo', 'html', ['meta теги', 'seo', 'title и description', 'open graph', 'og:image', 'favicon', 'viewport', 'мета теги', 'charset', 'lang атрибут', 'доступность', 'a11y', 'aria', 'alt текст'], `🔎 <head>, SEO и доступность\n\n${code('html', `<!DOCTYPE html>\n<html lang="ru">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">  <!-- адаптив на телефонах -->\n  <title>Название страницы до 60 символов</title>\n  <meta name="description" content="Описание для поисковиков, 120–160 символов">\n  <meta property="og:title" content="Заголовок при репосте">\n  <meta property="og:image" content="https://site.ru/cover.jpg">\n  <link rel="icon" href="favicon.ico">\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <header><nav aria-label="Главное меню">…</nav></header>\n  <main><h1>Один заголовок h1 на страницу</h1>\n    <img src="cat.jpg" alt="Рыжий кот на подоконнике" width="400" height="300" loading="lazy">\n    <button aria-label="Закрыть">✕</button>\n  </main>\n  <script src="app.js" defer></script>\n</body>\n</html>`)}\nДоступность: у img всегда alt (у декоративных alt=""), у полей — label, кнопки — <button>, а не <div onclick>, контраст текста не ниже 4.5:1, управление с клавиатуры.`);
+K('css-box', 'css', ['box model', 'блочная модель', 'box-sizing', 'padding margin', 'отступы', 'margin padding', 'border-box', 'внутренний отступ', 'внешний отступ', 'margin collapse'], `📦 Блочная модель CSS\n\n${code('css', `*, *::before, *::after { box-sizing: border-box; }   /* ставьте всегда */\n.card {\n  width: 300px;\n  padding: 16px;          /* со всех сторон */\n  padding: 8px 16px;      /* верх-низ / лево-право */\n  margin: 0 auto;         /* центр по горизонтали */\n  border: 1px solid #ccc;\n  border-radius: 8px;\n}\n.gap { margin-block: 1rem; padding-inline: 12px; }`)}\nУ каждого элемента: content → padding (внутри) → border → margin (снаружи). С box-sizing: border-box width включает padding и border — так проще считать. Вертикальные margin соседних блоков схлопываются (берётся больший).`);
+K('css-units', 'css', ['единицы css', 'px em rem', 'rem', 'em и rem', 'vh vw', 'проценты css', 'clamp', 'calc css', 'vw vh', 'адаптивный шрифт', 'размер шрифта', 'fr'], `📏 Единицы измерения CSS\n\n${code('css', `html { font-size: 100%; }              /* 16px по умолчанию */\nh1 { font-size: clamp(1.5rem, 4vw, 3rem); } /* адаптивный заголовок */\n.hero { min-height: 100dvh; }\n.box { width: calc(100% - 2rem); }\n.grid { display: grid; grid-template-columns: 1fr 2fr; }`)}\n• px — пиксели (фиксированно)\n• rem — относительно размера шрифта страницы (удобно для текста и отступов)\n• em — относительно шрифта текущего элемента\n• % — от размера родителя\n• vw/vh — процент ширины/высоты окна (100vh — вся высота; на телефонах лучше dvh)\n• fr — доля свободного места в grid\n• clamp(мин, желаемое, макс) — плавный диапазон`);
+K('css-text', 'css', ['шрифт', 'font-family', 'google fonts', 'межстрочный', 'line-height', 'text-overflow', 'многоточие', 'обрезать текст', 'text-transform', 'letter-spacing', 'веб шрифт', 'font-face', 'тень текста', 'text-shadow'], `🔤 Текст и шрифты в CSS\n\n${code('css', `body { font: 16px/1.5 "Inter", system-ui, -apple-system, Arial, sans-serif; color: #222; }\n@font-face { font-family: "My"; src: url("my.woff2") format("woff2"); font-display: swap; }\n.title { font-weight: 700; letter-spacing: .02em; text-transform: uppercase; text-shadow: 0 1px 2px #0004; }\n.one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* многоточие */\n.three-lines { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }`)}\nПодключение шрифта: Google Fonts (<link>) или свой через @font-face. Всегда указывайте запасные шрифты. Для читаемости: line-height 1.4–1.6, длина строки до 70 символов.`);
+K('css-pseudo', 'css', ['hover', ':hover', 'focus', 'псевдокласс', 'псевдоэлемент', '::before', '::after', 'nth-child', 'first-child', 'not селектор', ':has', 'placeholder стиль', 'активное состояние', 'при наведении', 'hover эффект', 'эффект при наведении', 'наведение', 'ховер'], `👆 Псевдоклассы и псевдоэлементы\n\n${code('css', `a:hover, button:hover { opacity: .85; }\ninput:focus-visible { outline: 2px solid #4c8dff; }\nbutton:active { transform: scale(.97); }\nli:nth-child(odd) { background: #f5f5f5; }\nli:first-child { font-weight: bold; }\nli:not(:last-child) { border-bottom: 1px solid #eee; }\n.card:has(img) { padding: 0; }            /* родитель по наличию потомка */\ninput::placeholder { color: #999; }\n.req::after { content: " *"; color: red; }\n::selection { background: gold; }`)}\nПсевдокласс (:) — состояние элемента, псевдоэлемент (::) — виртуальная часть. ::before/::after требуют content.`);
+K('css-responsive', 'css', ['адаптивная верстка', 'адаптив', 'mobile first', 'мобильная версия', 'под телефон', 'media query', 'брейкпоинт', 'responsive', 'адаптивный сайт', 'сайт для телефона', 'резиновая верстка'], `📱 Адаптивная вёрстка\n\n${code('css', `img, video { max-width: 100%; height: auto; }\n.cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }  /* без media! */\n.nav { display: flex; flex-direction: column; }\n@media (min-width: 768px) { .nav { flex-direction: row; } }\n@media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #eee; } }\n@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }`)}\nШаги: 1) <meta name="viewport"> в head; 2) mobile-first — сначала стили для телефона, затем расширения через min-width; 3) гибкие единицы (%, rem, fr) и max-width: 100% у картинок; 4) flex-wrap и grid auto-fit вместо жёстких колонок.`);
+K('css-dark', 'css', ['темная тема', 'тёмная тема', 'dark mode', 'переключатель темы', 'светлая и тёмная тема', 'prefers-color-scheme', 'theme switcher', 'смена темы', 'тема', 'темная', 'тёмную', 'тёмная', 'темную', 'dark', 'светлая тема'], `🌙 Тёмная тема с переключателем\n\n${code('html', `<style>\n  :root { --bg:#fff; --fg:#222; }\n  :root[data-theme="dark"] { --bg:#121212; --fg:#eee; }\n  body { background:var(--bg); color:var(--fg); transition: background .2s; }\n</style>\n<button id="t">🌓</button>\n<script>\n  const root = document.documentElement;\n  let th = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");\n  root.dataset.theme = th;\n  t.onclick = () => { th = th === "dark" ? "light" : "dark"; root.dataset.theme = th; localStorage.setItem("theme", th); };\n</script>`)}\nЦвета держим в CSS-переменных; тему переключаем атрибутом на <html> и запоминаем в localStorage.`);
+K('html-dom', 'js', ['createelement', 'queryselector', 'queryselectorall', 'innerhtml', 'textcontent', 'classlist', 'манипуляции с dom', 'добавить элемент на страницу', 'изменить текст на странице', 'найти элемент', 'getelementbyid', 'appendchild', 'удалить элемент', 'dom js', 'dom'], `🧩 DOM: найти и изменить элементы\n\n${code('javascript', `const el = document.querySelector(".card");          // первый по CSS-селектору\nconst all = document.querySelectorAll("li");          // NodeList\nel.textContent = "Новый текст";                         // безопасно\nel.classList.toggle("active");                          // add / remove / contains\nel.style.color = "red";  el.setAttribute("title", "подсказка");  el.dataset.id = 5;\n\nconst li = document.createElement("li");               // создать\nli.textContent = "пункт";\nlist.append(li);                                        // добавить в конец (prepend — в начало)\nli.remove();                                            // удалить\nlist.insertAdjacentHTML("beforeend", "<li>из HTML</li>");   // только для своих, доверенных строк`)}\nDOM — дерево элементов страницы, доступное из JavaScript. Вставляйте пользовательский текст через textContent, а не innerHTML (защита от XSS).`);
+K('html-script', 'html', ['defer', 'async script', 'где подключать script', 'подключить js', 'подключить css', 'script src', 'link rel stylesheet', 'порядок загрузки', 'domcontentloaded', 'module скрипт', 'type module', 'подключить', 'подключение js', 'js к html', 'css к html', 'подключить скрипт'], `📜 Подключение CSS и JS\n\n${code('html', `<head>\n  <link rel="stylesheet" href="style.css">\n  <script src="app.js" defer></script>          <!-- рекомендуется -->\n  <script type="module" src="main.js"></script>\n  <script async src="https://example.com/stats.js"></script>\n</head>\n<script>\n  document.addEventListener("DOMContentLoaded", () => { /* DOM готов */ });\n</script>`)}\nCSS подключайте в <head>, JS — в конце <body> или с defer. defer: скачивается параллельно, выполняется после разбора HTML по порядку. async: выполняется сразу как скачался (порядок не гарантирован; для аналитики). type="module" — отложен по умолчанию, свои import/export.`);
+K('html-svg', 'html', ['svg', 'svg картинка', 'векторная графика', 'иконка svg', 'path svg', 'circle svg', 'inline svg', 'векторные иконки', 'рисунок в html'], `🖼 SVG: векторная графика в HTML\n\n${code('html', `<svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Смайлик">\n  <circle cx="60" cy="60" r="50" fill="gold" stroke="#333" stroke-width="3"/>\n  <circle cx="42" cy="48" r="6"/><circle cx="78" cy="48" r="6"/>\n  <path d="M35 75 Q60 100 85 75" stroke="#333" stroke-width="4" fill="none" stroke-linecap="round"/>\n</svg>\n<style> svg:hover circle:first-child { fill: orange; } </style>`)}\nSVG масштабируется без потери качества, красится через CSS (fill, stroke) и анимируется. Встраивайте прямо в HTML.`);
+K('html-picture', 'html', ['picture', 'srcset', 'адаптивные картинки', 'формат webp', 'lazy loading', 'loading lazy', 'изображение html', 'img тег', 'оптимизация картинок', 'картинка на сайте', 'фон картинка', 'background-image', 'object-fit'], `🖼 Картинки в HTML: правильно\n\n${code('html', `<img src="cat.webp" alt="Кот на подоконнике" width="600" height="400" loading="lazy">\n<picture>\n  <source srcset="hero.avif" type="image/avif">\n  <source srcset="hero.webp" type="image/webp">\n  <img src="hero.jpg" alt="Герой" width="1200" height="600">\n</picture>\n<img srcset="s.jpg 400w, m.jpg 800w, l.jpg 1600w" sizes="(max-width: 600px) 100vw, 800px" src="m.jpg" alt="">\n<style>\n  .ava { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; }\n  .hero { background: url(bg.jpg) center / cover no-repeat; }\n</style>`)}\nВсегда: alt, width/height (чтобы страница не «прыгала»), loading="lazy" для картинок ниже экрана. Современные форматы — WebP/AVIF. object-fit: cover обрезает картинку под блок без искажений.`);
+K('html-details', 'html', ['details', 'summary', 'аккордеон', 'спойлер', 'раскрывающийся блок', 'faq блок', 'выпадающий список текста', 'tabs вкладки', 'вкладки на css', 'табы'], `📂 Аккордеон и вкладки без JS\n\n${code('html', `<details open>\n  <summary>Как оплатить?</summary>\n  <p>Картой или наличными.</p>\n</details>\n<style> details { border:1px solid #ddd; border-radius:8px; padding:8px 12px; margin:6px 0; } summary { cursor:pointer; font-weight:600; } </style>\n\n<!-- вкладки на JS -->\n<div class="tabs"><button data-t="a">Первая</button><button data-t="b">Вторая</button></div>\n<div id="a" class="pane">A</div><div id="b" class="pane" hidden>B</div>\n<script>\n  document.querySelector(".tabs").onclick = e => { const id = e.target.dataset.t; if (!id) return;\n    document.querySelectorAll(".pane").forEach(p => p.hidden = p.id !== id); };\n</script>`)}\n<details>/<summary> — раскрывающийся блок «из коробки», работает с клавиатуры и читается скринридерами. Вкладки можно сделать на радио-кнопках и :checked, но проще — JS переключает класс.`);
+K('html-iframe', 'html', ['iframe', 'встроить видео', 'вставить youtube', 'встроить карту', 'встроить страницу', 'sandbox iframe', 'embed', 'вставить карту', 'вставить видео с youtube', 'youtube', 'ютуб', 'видео с youtube', 'карту на сайт'], `🪟 iframe: вставка чужих страниц\n\n${code('html', `<iframe src="https://www.youtube.com/embed/VIDEO_ID" title="Видео" width="560" height="315"\n  loading="lazy" allowfullscreen referrerpolicy="no-referrer"></iframe>\n<iframe src="widget.html" sandbox="allow-scripts"></iframe>   <!-- минимум прав -->\n<style> .video { aspect-ratio: 16 / 9; width: 100%; } </style>`)}\nПодходит для видео YouTube, карт, виджетов. Для безопасности используйте sandbox и ограничивайте права. Многие сайты запрещают встраивание (X-Frame-Options / CSP frame-ancestors).`);
+K('html-dragdrop', 'js', ['drag and drop', 'перетаскивание', 'dragstart', 'drop', 'загрузка файла', 'input file', 'filereader', 'перетащить файл', 'файл загрузка в браузере', 'paste из буфера', 'clipboard', 'копировать в буфер'], `🧲 Файлы, перетаскивание и буфер обмена\n\n${code('html', `<input type="file" id="f" accept="image/*">\n<div id="drop" style="border:2px dashed #888;padding:30px">Перетащите файл сюда</div>\n<img id="pv" width="200">\n<script>\n  function show(file){ const r = new FileReader(); r.onload = () => pv.src = r.result; r.readAsDataURL(file); }\n  f.onchange = () => show(f.files[0]);\n  drop.ondragover = e => e.preventDefault();               // разрешаем drop\n  drop.ondrop = e => { e.preventDefault(); show(e.dataTransfer.files[0]); };\n  navigator.clipboard.writeText("скопировано");            // нужен https и действие пользователя\n</script>`)}\nБраузер умеет читать выбранные файлы локально (без сервера), принимать перетаскивание и копировать текст.`);
+K('html-template', 'js', ['web components', 'custom element', 'customelements', 'template тег', 'shadow dom', 'свой тег', 'компонент без фреймворка', 'vanilla js компонент', 'свой тег', 'создать тег', 'кастомный тег', 'новый тег', 'создать компонент'], `🧱 Свои HTML-теги (Web Components)\n\n${code('html', `<user-card name="Аня"></user-card>\n<script>\n  class UserCard extends HTMLElement {\n    connectedCallback() {\n      const root = this.attachShadow({ mode: "open" });\n      root.innerHTML = \`<style>div{padding:8px;border:1px solid #ccc;border-radius:8px}</style>\n                        <div>👤 \${this.getAttribute("name")}</div>\`;\n    }\n  }\n  customElements.define("user-card", UserCard);   // имя обязательно с дефисом\n</script>`)}\nCustom Elements позволяют создать собственный тег без фреймворка; Shadow DOM изолирует стили.`);
+K('css-layout-sticky', 'css', ['sticky', 'липкая шапка', 'фиксированная шапка', 'position fixed', 'overflow', 'скролл внутри блока', 'scroll-behavior', 'плавная прокрутка', 'scroll snap', 'z-index', 'слои', 'перекрытие', 'шапка', 'шапку', 'липкую шапку', 'липкая', 'прилипает', 'залипает'], `📌 Липкая шапка, скролл и слои\n\n${code('css', `header { position: sticky; top: 0; z-index: 10; background: #fff; }\nhtml { scroll-behavior: smooth; }                  /* плавные якоря */\n.list { max-height: 300px; overflow-y: auto; }      /* прокрутка внутри блока */\n.slider { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }\n.slider > * { flex: 0 0 80%; scroll-snap-align: center; }\n.modal { position: fixed; inset: 0; z-index: 100; background: #0008; display: grid; place-items: center; }`)}\nsticky прилипает при прокрутке (родитель не должен иметь overflow: hidden). z-index работает только у позиционированных элементов и внутри своего контекста наложения.`);
+K('css-bem', 'css', ['bem', 'именование классов', 'методология css', 'организация css', 'css reset', 'normalize', 'tailwind', 'bootstrap', 'css фреймворк', 'sass', 'scss', 'препроцессор', 'css-in-js'], `🗂 Организация CSS и фреймворки\n\n${code('css', `.card { padding: 16px; border-radius: 8px; }\n.card__title { font-size: 1.25rem; }\n.card--accent { border-color: var(--accent); }\n/* нативная вложенность */\n.menu { display: flex; gap: 8px;\n  & a { color: inherit; }\n  & a:hover { text-decoration: underline; }\n}`)}\n• BEM: блок__элемент--модификатор (.card__title--big) — предсказуемые классы без конфликтов\n• Reset/нормализация: * { box-sizing: border-box; margin: 0 }\n• Tailwind — утилитарные классы прямо в HTML (class="flex gap-4 p-4"); быстро, но шумная разметка\n• Bootstrap — готовые компоненты и сетка; узнаваемый вид\n• Sass/SCSS — вложенность, переменные, миксины (компилируется в CSS); сегодня многое есть в обычном CSS: переменные, вложенность (&), :has()\nДля маленьких проектов хватает чистого CSS с переменными.`);
+K('html-struct-site', 'html', ['структура сайта', 'многостраничный сайт', 'навигация сайта', 'меню сайта', 'шапка и подвал', 'header footer', 'сайт визитка', 'как сделать сайт', 'сайт с нуля', 'создать сайт', 'свой сайт', 'портфолио', 'страница портфолио'], `🌐 Как сделать сайт с нуля\n\n${code('text', `my-site/\n  index.html\n  about.html\n  css/style.css\n  js/app.js\n  img/`)}\n${code('html', `<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>Моё портфолио</title><link rel="stylesheet" href="css/style.css"></head>\n<body>\n  <header><nav><a href="index.html">Главная</a> <a href="about.html">Обо мне</a></nav></header>\n  <main><h1>Привет, я Аня</h1><p>Делаю сайты.</p></main>\n  <footer>© 2026</footer>\n  <script src="js/app.js" defer></script>\n</body>\n</html>`)}\nПлан: 1) структура файлов; 2) HTML-каркас (шапка, main, подвал); 3) стили (сначала мобильная версия); 4) немного JS (меню, формы); 5) проверка в DevTools на разных экранах; 6) публикация на GitHub Pages / Netlify / Vercel (бесплатно, перетащили папку — сайт в сети).\nГотовые заготовки у меня есть: напишите «лендинг» или «форма регистрации».`);
+K('html-cheat', 'html', ['список тегов', 'все теги html', 'какие есть теги', 'теги html', 'основные теги', 'div span', 'блочные строчные', 'block inline', 'display inline', 'что такое div', 'div и span', 'div', 'span', 'div span', 'отличается div'], `📚 Основные теги HTML — шпаргалка\n\n• Структура: html, head, body, header, nav, main, section, article, aside, footer\n• Текст: h1–h6, p, strong (важное), em (акцент), br, hr, blockquote, code, pre\n• Списки: ul/ol + li, dl/dt/dd\n• Ссылки и медиа: a, img, picture, video, audio, iframe, svg, canvas\n• Формы: form, label, input, textarea, select/option, button, fieldset\n• Таблицы: table, thead, tbody, tr, th, td\n• Универсальные: div (блочный контейнер), span (строчный, внутри текста)\nБлочные элементы занимают всю строку (div, p, h1, ul), строчные — по размеру содержимого (span, a, strong). Меняется через CSS: display: block | inline | inline-block | flex | grid | none.\nПредпочитайте смысловые теги вместо div там, где они подходят — это важно для SEO и доступности.`);
+K('site-request', 'html', ['сделай сайт', 'сделай мне сайт', 'нужен сайт', 'мне нужен сайт', 'хочу сайт', 'создай сайт', 'хочу сделать сайт', 'напиши сайт', 'сайт для', 'сайт визитка', 'свой сайт', 'сделать сайт'], `🌐 Сделаю сайт — выберите тип:\n\n• «лендинг» — одностраничный продающий сайт (шапка, блоки, форма)\n• «портфолио» / «сайт визитка» — о себе и работах\n• «форма регистрации» — с проверкой полей\n• «заметки», «список дел», «калькулятор» — приложения\n• «игра» — любая из моего списка\n\nНапишите, например: «лендинг для кофейни» — дам готовый HTML-файл, который можно сразу открыть и потом поменять тексты. Что за сайт нужен и для кого?`);
+K('nav-menu', 'html', ['меню сайта', 'навигация', 'навигационное меню', 'меню на сайте', 'сделать меню', 'бургер меню', 'burger menu', 'выпадающее меню', 'dropdown', 'меню навигации', 'шапка сайта с меню', 'nav меню', 'горизонтальное меню', 'мобильное меню'], `🧭 Меню на сайте\n\n${code('html', `<nav class="menu">\n  <a href="#home">Главная</a>\n  <a href="#about">О нас</a>\n  <a href="#contact">Контакты</a>\n  <button id="burger" aria-label="Меню" aria-expanded="false">☰</button>\n</nav>\n<style>\n  .menu { display: flex; gap: 16px; align-items: center; padding: 12px 20px; background: #222; }\n  .menu a { color: #fff; text-decoration: none; }\n  .menu a:hover { color: #4c8dff; }\n  #burger { display: none; margin-left: auto; font-size: 24px; background: none; color: #fff; border: 0; }\n  @media (max-width: 600px) {\n    .menu a { display: none; width: 100%; }\n    .menu { flex-wrap: wrap; }\n    .menu.open a { display: block; }       /* показываем при открытии */\n    #burger { display: block; }\n  }\n</style>\n<script>\n  burger.onclick = () => { const o = document.querySelector(".menu").classList.toggle("open"); burger.setAttribute("aria-expanded", o); };\n</script>`)}\nВыпадающее подменю: родитель position: relative, подменю position: absolute + показ по :hover / :focus-within.`);
+K('chat-app', 'js', ['сделать чат', 'сделай чат', 'чат на js', 'чат на node', 'чат на websocket', 'написать чат', 'свой мессенджер', 'мессенджер на js', 'websocket чат', 'онлайн чат', 'чат в реальном времени', 'создать чат'], `💬 Чат в реальном времени (WebSocket)\n\nСервер (Node.js: npm i ws):\n${code('javascript', `const WebSocket = require('ws');\nconst wss = new WebSocket.Server({ port: 8080 });\nwss.on('connection', ws => {\n  ws.on('message', data => {\n    const msg = String(data).slice(0, 500);                 // ограничиваем размер\n    wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });   // рассылка всем\n  });\n});`)}\nКлиент (HTML):\n${code('html', `<div id="log"></div>\n<input id="in"> <button id="send">Отправить</button>\n<script>\n  const ws = new WebSocket("ws://localhost:8080");\n  ws.onmessage = e => { const p = document.createElement("p"); p.textContent = e.data; log.append(p); };   // textContent — защита от XSS\n  send.onclick = () => { if (in.value.trim()) { ws.send(in.value); in.value = ""; } };\n</script>`)}\nДальше: имена пользователей, комнаты, история в БД, авторизация, проверка длины и частоты сообщений, wss:// (HTTPS) в продакшене.`);
+K('learn-html', 'html', ['как выучить html', 'с чего начать html', 'изучить html', 'научиться верстать', 'научиться html', 'html для начинающих', 'html с нуля', 'учить html', 'учим html', 'обучение html', 'roadmap фронтенд', 'путь фронтендера', 'стать фронтендером'], `🎓 Как выучить HTML/CSS/JS за пару месяцев\n\n1) HTML: теги, ссылки, картинки, списки, формы, семантика (неделя)\n2) CSS: селекторы, блочная модель, flexbox, grid, адаптив (2–3 недели)\n3) Практика: сверстайте 3 страницы — визитку, лендинг, интернет-магазин (карточки)\n4) JavaScript: переменные, функции, DOM, события, fetch (1–2 месяца)\n5) Проекты: список дел, калькулятор, игра, погода по API\n6) Git + публикация на GitHub Pages\n7) Дальше: React/Vue, TypeScript, Node.js\n\nПравило: 30% теории, 70% практики; каждый день хоть 30 минут. Напишите «сделай игру» или «лендинг» — дам рабочие примеры, которые можно разобрать по строчкам.`);
 // ---- Алгоритмы и теория
 K('bigo', null, ['o(n', 'сложность алгоритм', 'big o', 'асимптотик', 'временная сложность', 'вычислительная сложность'], `📈 Сложность алгоритмов (Big O)\n\nO(1) — константа: доступ к элементу массива по индексу\nO(log n) — бинарный поиск\nO(n) — один проход по данным\nO(n log n) — хорошая сортировка (merge, quick, встроенная)\nO(n²) — вложенные циклы, пузырьковая сортировка\nO(2ⁿ) — наивные перебор подмножеств, рекурсивный Фибоначчи\nO(n!) — перебор перестановок\n\nПравило: смотрим, как растёт время при росте входа, константы отбрасываем. Для 10⁶ элементов O(n²) — это ~10¹² операций, то есть слишком долго.`);
 K('recursion', null, ['рекурси', 'recursion', 'стек вызовов', 'stack overflow', 'переполнение стека'], `🔁 Рекурсия\n\nФункция вызывает сама себя. Нужны две вещи: базовый случай (когда остановиться) и шаг, приближающий к нему.\n\n${code('javascript', `function sum(n) {\n  if (n === 0) return 0;      // базовый случай\n  return n + sum(n - 1);      // шаг рекурсии\n}\nsum(4); // 4 + 3 + 2 + 1 + 0 = 10`)}\n\nБез базового случая получите «Maximum call stack size exceeded» (stack overflow). Глубокую рекурсию заменяйте циклом или явным стеком.`);
@@ -2514,7 +2536,7 @@ function smallTalk(n, toks, st, name) {
     if (/(какой язык (лучше|выбрать|учить)|посоветуй язык|с какого языка)/.test(n)) return '🧭 Выбор языка зависит от цели:\n• Сайты и боты — JavaScript\n• Данные, автоматизация, старт «с нуля» — Python\n• Игры — C#/C++\n• Android — Kotlin, iOS — Swift\n• Сервера под нагрузкой — Go/Java\nНе знаете цели — берите Python или JavaScript. Напишите «python или javascript» — сравню.';
     if (/(сколько тебе лет|когда ты (родился|появился)|где ты живешь|где ты живёшь)/.test(n)) return 'Я программа: живу на сервере этого мессенджера, а «возраст» — со дня последнего перезапуска 😄';
     if (/(ты (любишь|нравится)|твой любимый язык|любимый язык)/.test(n)) return 'Любимчиков нет, но JavaScript и Python мне ближе всего — на них я могу показать больше всего примеров 🙂';
-    if (/^(да|ага|угу|ок|окей|ok|okay|хорошо|ладно|понятно|ясно|понял|поняла)\W*$/.test(n)) return pick(['Отлично! Что дальше? 🙂', 'Хорошо. Есть ещё вопросы по коду?', 'Принято 👍 Пишите, если что-то понадобится.']);
+    if (/^(да|ага|угу|ок|окей|ok|okay|хорошо|ладно|понятно|ясно|понял|поняла)\W*$/.test(n)) return pick(['Отлично! Над чем сейчас работаете? 🙂', 'Если понадобится помощь с кодом — пишите, я рядом.', 'Отлично! Что дальше? 🙂', 'Хорошо. Есть ещё вопросы по коду?', 'Принято 👍 Пишите, если что-то понадобится.']);
     if (/^(нет|неа|не надо|не нужно)\W*$/.test(n)) return 'Хорошо, не буду. Если что — просто напишите вопрос 🙂';
     if (/\b(люблю тебя|ты мне нравишься)\b/.test(n)) return 'Я всего лишь бот, но мне приятно 😄 Давайте лучше напишем что-нибудь полезное!';
     return null;
@@ -2537,6 +2559,200 @@ TASKS.notes = {"kw": ["заметки", "приложение заметки", "
 TASKS.paint = {"kw": ["рисовалка", "paint", "рисовать", "холст для рисования", "графический редактор", "приложение для рисования"], "title": "🎨 Приложение «Рисовалка» (весь код в одном HTML-файле)", "html": "<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title> Рисовалка</title><style>body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#16181d;color:#eee;font-family:sans-serif}button{padding:8px 14px;border:0;border-radius:6px;background:#4c8dff;color:#fff;cursor:pointer;font-size:16px}input{padding:8px;border-radius:6px;border:1px solid #444;background:#222;color:#eee} canvas{background:#fff;border-radius:6px;touch-action:none;max-width:95vw}.bar{margin:8px;display:flex;gap:8px;align-items:center}</style></head><body><div class=\"bar\"><input type=\"color\" id=\"col\" value=\"#000000\"><input type=\"range\" id=\"sz\" min=\"1\" max=\"40\" value=\"4\"><button id=\"clr\">Очистить</button><button id=\"sv\">Сохранить PNG</button></div><canvas id=\"c\" width=\"600\" height=\"400\"></canvas><script>\nconst c=document.getElementById('c'),x=c.getContext('2d');x.lineCap='round';let d=false,lx,ly;\nfunction pos(e){const r=c.getBoundingClientRect();return[(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]}\nc.addEventListener('pointerdown',e=>{d=true;[lx,ly]=pos(e)});\naddEventListener('pointerup',()=>d=false);\nc.addEventListener('pointermove',e=>{if(!d)return;const[a,b]=pos(e);x.strokeStyle=document.getElementById('col').value;x.lineWidth=document.getElementById('sz').value;x.beginPath();x.moveTo(lx,ly);x.lineTo(a,b);x.stroke();lx=a;ly=b});\ndocument.getElementById('clr').onclick=()=>x.clearRect(0,0,c.width,c.height);\ndocument.getElementById('sv').onclick=()=>{const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download='picture.png';a.click()};\n</script></body></html>", "note": "Сохраните как paint.html и откройте в браузере. Работает мышью и пальцем (pointer events). Идеи: ластик, отмена, заливка."};
 TASKS.converter = {"kw": ["конвертер", "конвертер величин", "перевод единиц", "конвертер единиц", "unit converter"], "title": "🔄 Приложение «Конвертер величин» (весь код в одном HTML-файле)", "html": "<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title> Конвертер величин</title><style>body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#16181d;color:#eee;font-family:sans-serif}button{padding:8px 14px;border:0;border-radius:6px;background:#4c8dff;color:#fff;cursor:pointer;font-size:16px}input{padding:8px;border-radius:6px;border:1px solid #444;background:#222;color:#eee} select,input{margin:4px;font-size:16px}</style></head><body><h2>Конвертер</h2><div><input id=\"v\" type=\"number\" value=\"1\"> <select id=\"k\"></select></div><div id=\"out\"></div><script>\nconst U={'Длина':{'м':1,'км':1000,'см':0.01,'миля':1609.344,'фут':0.3048,'дюйм':0.0254},'Масса':{'кг':1,'г':0.001,'т':1000,'фунт':0.45359237,'унция':0.0283495},'Объём':{'л':1,'мл':0.001,'галлон (США)':3.785411784}};\nconst k=document.getElementById('k');for(const g in U)for(const u in U[g]){const o=document.createElement('option');o.value=g+'|'+u;o.textContent=g+': '+u;k.appendChild(o)}\nfunction calc(){const[g,u]=k.value.split('|'),v=parseFloat(document.getElementById('v').value),o=document.getElementById('out');o.innerHTML='';if(isNaN(v))return;\nfor(const t in U[g]){if(t===u)continue;const p=document.createElement('p');p.textContent=v+' '+u+' = '+(v*U[g][u]/U[g][t]).toPrecision(6)+' '+t;o.appendChild(p)}\nconst T=document.createElement('p');T.textContent='Температура: '+v+' °C = '+(v*9/5+32).toFixed(1)+' °F';o.appendChild(T)}\ndocument.getElementById('v').oninput=calc;k.onchange=calc;calc();\n</script></body></html>", "note": "Сохраните как converter.html и откройте в браузере. Добавьте свои единицы в объект U. Валюты требуют API курсов, поэтому здесь их нет."};
 TASKS.quizapp = {"kw": ["викторина на html", "квиз на html", "тест с вопросами", "приложение викторина", "опросник"], "title": "❓ Приложение «Викторина» (весь код в одном HTML-файле)", "html": "<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title> Викторина</title><style>body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#16181d;color:#eee;font-family:sans-serif}button{padding:8px 14px;border:0;border-radius:6px;background:#4c8dff;color:#fff;cursor:pointer;font-size:16px}input{padding:8px;border-radius:6px;border:1px solid #444;background:#222;color:#eee} .o{display:block;width:320px;margin:6px;text-align:left;background:#2a2d36}.ok{background:#2a8a3a!important}.bad{background:#b33!important}</style></head><body><h2 id=\"q\"></h2><div id=\"a\"></div><p id=\"s\"></p><script>\nconst Q=[['Какой тег создаёт ссылку?',['<a>','<link>','<href>'],0],['Что делает console.log?',['Выводит в консоль','Удаляет файл','Рисует кнопку'],0],['Какое свойство CSS меняет цвет текста?',['color','font-color','text-style'],0],['Сколько бит в байте?',['8','4','16'],0],['Что такое DOM?',['Дерево элементов страницы','База данных','Язык разметки'],0]];\nlet i=0,sc=0;const sh=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(v=>v[1]);\nfunction show(){if(i>=Q.length){document.getElementById('q').textContent='Готово!';document.getElementById('a').innerHTML='';document.getElementById('s').textContent='Результат: '+sc+' из '+Q.length;return}\nconst[q,o,r]=Q[i];document.getElementById('q').textContent=(i+1)+'. '+q;const a=document.getElementById('a');a.innerHTML='';\nsh(o.map((t,j)=>[t,j===r])).forEach(([t,ok])=>{const b=document.createElement('button');b.className='o';b.textContent=t;b.onclick=()=>{[...a.children].forEach(x=>x.disabled=true);b.classList.add(ok?'ok':'bad');if(ok)sc++;setTimeout(()=>{i++;show()},700)};a.appendChild(b)});\ndocument.getElementById('s').textContent='Счёт: '+sc}\nshow();\n</script></body></html>", "note": "Сохраните как quizapp.html и откройте в браузере. Вопросы — массив Q: [текст, [варианты], индекс правильного]. Варианты перемешиваются."};
+
+const HEAD=(t,bg)=>`<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${t}</title><style>body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#10121a;color:#eee;font-family:sans-serif;user-select:none}canvas{background:${bg};border:2px solid #445;max-width:96vw;max-height:78vh;touch-action:none}button{padding:8px 16px;border:0;border-radius:6px;background:#4c8dff;color:#fff;font-size:16px;cursor:pointer;margin:6px}</style></head><body><h2>${t} · счёт: <span id="s">0</span> · рекорд: <span id="b">0</span></h2>`;
+const BEST=`let best=0;try{best=+localStorage.getItem('best_'+document.title)||0}catch(e){}document.getElementById('b').textContent=best;
+function saveBest(sc){if(sc>best){best=sc;try{localStorage.setItem('best_'+document.title,best)}catch(e){}document.getElementById('b').textContent=best}}`;
+const T={};
+T.racing=(o)=>HEAD(o.title,o.bg)+`<canvas id="c" width="360" height="540"></canvas><p>← → / A D или касание левой/правой половины · пробел — заново</p><script>
+const c=document.getElementById('c'),x=c.getContext('2d');${BEST}
+const LANES=3,LW=120,P='${o.player}',E=['${o.enemy}','${o.enemy2}'],G='${o.good}';
+let lane,px,obs,score,speed,over,tick,off=0,target;
+function reset(){lane=1;px=lane*LW+LW/2;target=px;obs=[];score=0;speed=5;over=false;tick=0;upd()}
+function upd(){document.getElementById('s').textContent=Math.floor(score)}
+function move(d){if(over)return;lane=Math.max(0,Math.min(LANES-1,lane+d));target=lane*LW+LW/2}
+function loop(){tick++;if(!over){speed=5+score/150;score+=speed/10;off=(off+speed)%40;px+=(target-px)*.25;
+if(tick%Math.max(25,60-Math.floor(score/40))===0){const l=Math.floor(Math.random()*LANES);obs.push({l,y:-40,e:Math.random()<.2?G:E[Math.floor(Math.random()*2)]})}
+obs.forEach(o=>o.y+=speed);
+obs.forEach(o=>{if(!o.d&&Math.abs(o.l*LW+LW/2-px)<40&&Math.abs(o.y-460)<40){o.d=1;if(o.e===G){score+=30}else{over=true;saveBest(Math.floor(score))}}});
+obs=obs.filter(o=>o.y<600&&!o.d);upd()}
+x.fillStyle='${o.road}';x.fillRect(0,0,360,540);
+x.fillStyle='${o.line}';for(let l=1;l<LANES;l++)for(let y=-40;y<560;y+=40)x.fillRect(l*LW-3,y+off,6,22);
+x.font='44px serif';x.textAlign='center';x.textBaseline='middle';
+obs.forEach(o=>x.fillText(o.e,o.l*LW+LW/2,o.y));x.fillText(P,px,460);
+if(over){x.fillStyle='rgba(0,0,0,.65)';x.fillRect(0,0,360,540);x.fillStyle='#fff';x.font='24px sans-serif';x.fillText('Авария! Счёт: '+Math.floor(score),180,240);x.font='18px sans-serif';x.fillText('Пробел или касание — заново',180,285)}
+requestAnimationFrame(loop)}
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(k==='arrowleft'||k==='a')move(-1);else if(k==='arrowright'||k==='d')move(1);else if(k===' ')reset();if(k.startsWith('arrow')||k===' ')e.preventDefault()});
+c.addEventListener('pointerdown',e=>{if(over){reset();return}const r=c.getBoundingClientRect();move(e.clientX-r.left<r.width/2?-1:1)});
+reset();loop();
+</script></body></html>`;
+T.catcher=(o)=>HEAD(o.title,o.bg)+`<canvas id="c" width="400" height="520"></canvas><p>Двигайте мышью/пальцем или ← → · пробел — заново · жизни: <span id="l">3</span></p><script>
+const c=document.getElementById('c'),x=c.getContext('2d');${BEST}
+const P='${o.player}',GOOD=['${o.good}','${o.good2}'],BAD='${o.enemy}';
+let px,items,score,lives,over,tick,keys={};
+function reset(){px=200;items=[];score=0;lives=3;over=false;tick=0;upd()}
+function upd(){document.getElementById('s').textContent=score;document.getElementById('l').textContent=lives}
+function loop(){tick++;if(!over){
+if(keys.arrowleft||keys.a)px-=7;if(keys.arrowright||keys.d)px+=7;px=Math.max(25,Math.min(375,px));
+if(tick%Math.max(18,45-Math.floor(score/5))===0){const bad=Math.random()<.3;items.push({x:25+Math.random()*350,y:-30,v:2+Math.random()*2+score/40,e:bad?BAD:GOOD[Math.floor(Math.random()*2)],bad})}
+items.forEach(i=>i.y+=i.v);
+items.forEach(i=>{if(!i.d&&Math.abs(i.x-px)<38&&Math.abs(i.y-470)<35){i.d=1;if(i.bad){lives--;if(lives<=0){over=true;saveBest(score)}}else score++;upd()}
+else if(!i.d&&i.y>540){i.d=1;if(!i.bad){lives--;if(lives<=0){over=true;saveBest(score)}upd()}}});
+items=items.filter(i=>!i.d)}
+x.clearRect(0,0,400,520);x.font='36px serif';x.textAlign='center';x.textBaseline='middle';
+items.forEach(i=>x.fillText(i.e,i.x,i.y));x.font='52px serif';x.fillText(P,px,475);
+if(over){x.fillStyle='rgba(0,0,0,.65)';x.fillRect(0,0,400,520);x.fillStyle='#fff';x.font='24px sans-serif';x.fillText('Конец! Счёт: '+score,200,250);x.font='18px sans-serif';x.fillText('Пробел или касание — заново',200,290)}
+requestAnimationFrame(loop)}
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=1;if(e.key===' ')reset();if(e.key.startsWith('Arrow')||e.key===' ')e.preventDefault()});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=0);
+function mv(cx){const r=c.getBoundingClientRect();px=(cx-r.left)*400/r.width}
+c.addEventListener('mousemove',e=>mv(e.clientX));c.addEventListener('touchmove',e=>{mv(e.touches[0].clientX);e.preventDefault()},{passive:false});
+c.addEventListener('pointerdown',e=>{if(over)reset()});
+reset();loop();
+</script></body></html>`;
+T.platformer=(o)=>HEAD(o.title,o.bg)+`<canvas id="c" width="640" height="400"></canvas><p>← → ходить, пробел/↑ — прыжок (двойной), касание: левый край/правый край/центр · собирайте ${o.good}, избегайте ${o.enemy}</p><script>
+const c=document.getElementById('c'),x=c.getContext('2d');${BEST}
+const P='${o.player}',COIN='${o.good}',EN='${o.enemy}',G=1800,JUMP=-620,SP=240;
+let p,plats,coins,ens,score,over,camX,keys={},last=performance.now(),lastX=0;
+function gen(from,to){let cx=from;while(cx<to){const w=100+Math.random()*120,y=240+Math.random()*120;plats.push({x:cx,y,w,h:16});
+if(Math.random()<.8)coins.push({x:cx+w/2,y:y-30});if(Math.random()<.35)ens.push({x:cx+w*.6,y:y-20,dir:1,x0:cx+10,x1:cx+w-10});cx+=w+50+Math.random()*80;lastX=cx}}
+function reset(){p={x:60,y:200,vx:0,vy:0,on:false,j:0};plats=[{x:0,y:340,w:300,h:16}];coins=[];ens=[];score=0;over=false;camX=0;lastX=300;gen(300,1400);upd()}
+function upd(){document.getElementById('s').textContent=score}
+function jump(){if(over){reset();return}if(p.on||p.j<2){p.vy=JUMP;p.on=false;p.j++}}
+function loop(now){const dt=Math.min((now-last)/1000,.04);last=now;
+if(!over){p.vx=((keys.arrowright||keys.d)?1:0)*SP-((keys.arrowleft||keys.a)?1:0)*SP;
+p.vy+=G*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.on=false;
+plats.forEach(b=>{if(p.x+12>b.x&&p.x-12<b.x+b.w&&p.y+16>=b.y&&p.y+16-p.vy*dt<=b.y+4&&p.vy>=0){p.y=b.y-16;p.vy=0;p.on=true;p.j=0}});
+coins=coins.filter(k=>{if(Math.hypot(k.x-p.x,k.y-p.y)<28){score+=10;upd();return false}return true});
+ens.forEach(e=>{e.x+=e.dir*50*dt;if(e.x>e.x1||e.x<e.x0)e.dir*=-1;if(Math.hypot(e.x-p.x,e.y-p.y)<26){if(p.vy>100&&p.y<e.y-6){e.dead=1;p.vy=-400;score+=25;upd()}else{over=true;saveBest(score)}}});
+ens=ens.filter(e=>!e.dead);
+if(p.y>460){over=true;saveBest(score)}
+camX=Math.max(camX,p.x-200);if(lastX<camX+900)gen(lastX,lastX+700);plats=plats.filter(b=>b.x+b.w>camX-100)}
+x.clearRect(0,0,640,400);x.save();x.translate(-camX,0);
+x.fillStyle='${o.road}';plats.forEach(b=>x.fillRect(b.x,b.y,b.w,b.h));
+x.font='28px serif';x.textAlign='center';x.textBaseline='middle';
+coins.forEach(k=>x.fillText(COIN,k.x,k.y));ens.forEach(e=>x.fillText(EN,e.x,e.y));x.font='32px serif';x.fillText(P,p.x,p.y);x.restore();
+if(over){x.fillStyle='rgba(0,0,0,.65)';x.fillRect(0,0,640,400);x.fillStyle='#fff';x.font='24px sans-serif';x.textAlign='center';x.fillText('Конец! Счёт: '+score+' · пробел — заново',320,200)}
+requestAnimationFrame(loop)}
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys[k]=1;if(k===' '||k==='arrowup'||k==='w'){jump();e.preventDefault()}});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=0);
+c.addEventListener('pointerdown',e=>{const r=c.getBoundingClientRect(),f=(e.clientX-r.left)/r.width;if(f<.25){keys.arrowleft=1;keys.arrowright=0}else if(f>.75){keys.arrowright=1;keys.arrowleft=0}else jump()});
+addEventListener('pointerup',()=>{keys.arrowleft=0;keys.arrowright=0});
+reset();requestAnimationFrame(loop);
+</script></body></html>`;
+T.maze=(o)=>HEAD(o.title,o.bg)+`<canvas id="c" width="480" height="480"></canvas><p>Стрелки / WASD или свайпы · дойдите до ${o.good} · уровень: <span id="lv">1</span></p><script>
+const c=document.getElementById('c'),x=c.getContext('2d');${BEST}
+const P='${o.player}',GOAL='${o.good}';let N,S,cells,px,py,level=1,moves=0;
+function build(){N=5+level*2;if(N>25)N=25;S=480/N;cells=Array.from({length:N},()=>Array.from({length:N},()=>({v:0,r:1,d:1})));
+const st=[[0,0]];cells[0][0].v=1;while(st.length){const[cx,cy]=st[st.length-1];
+const nb=[[1,0],[0,1],[-1,0],[0,-1]].map(([a,b])=>[cx+a,cy+b,a,b]).filter(([a,b])=>a>=0&&b>=0&&a<N&&b<N&&!cells[b][a].v);
+if(!nb.length){st.pop();continue}const[nx,ny,a,b]=nb[Math.floor(Math.random()*nb.length)];
+if(a===1)cells[cy][cx].r=0;if(b===1)cells[cy][cx].d=0;if(a===-1)cells[ny][nx].r=0;if(b===-1)cells[ny][nx].d=0;cells[ny][nx].v=1;st.push([nx,ny])}
+px=0;py=0;document.getElementById('lv').textContent=level;draw()}
+function can(dx,dy){if(dx===1)return !cells[py][px].r;if(dx===-1)return px>0&&!cells[py][px-1].r;if(dy===1)return !cells[py][px].d;if(dy===-1)return py>0&&!cells[py-1][px].d}
+function step(dx,dy){if(!can(dx,dy))return;px+=dx;py+=dy;moves++;if(px===N-1&&py===N-1){const sc=level*100-Math.min(moves,level*50);document.getElementById('s').textContent=(+document.getElementById('s').textContent+Math.max(sc,10));saveBest(+document.getElementById('s').textContent);level++;moves=0;build();return}draw()}
+function draw(){x.clearRect(0,0,480,480);x.strokeStyle='${o.line}';x.lineWidth=3;x.lineCap='round';x.beginPath();
+for(let j=0;j<N;j++)for(let i=0;i<N;i++){if(cells[j][i].r){x.moveTo((i+1)*S,j*S);x.lineTo((i+1)*S,(j+1)*S)}if(cells[j][i].d){x.moveTo(i*S,(j+1)*S);x.lineTo((i+1)*S,(j+1)*S)}}
+x.moveTo(0,0);x.lineTo(480,0);x.moveTo(0,0);x.lineTo(0,480);x.stroke();
+x.font=(S*.7)+'px serif';x.textAlign='center';x.textBaseline='middle';x.fillText(GOAL,(N-.5)*S,(N-.5)*S);x.fillText(P,(px+.5)*S,(py+.5)*S)}
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();const m={arrowleft:[-1,0],a:[-1,0],arrowright:[1,0],d:[1,0],arrowup:[0,-1],w:[0,-1],arrowdown:[0,1],s:[0,1]}[k];if(m){step(...m);e.preventDefault()}});
+let tx,ty;c.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY});
+c.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;if(Math.max(Math.abs(dx),Math.abs(dy))<15)return;Math.abs(dx)>Math.abs(dy)?step(dx>0?1:-1,0):step(0,dy>0?1:-1)});
+build();
+</script></body></html>`;
+
+
+const THEMES = [
+    [/космос|космич|звезд|планет|галактик|ракет|нло|пришельц|инопланет/, { n: 'Космос', player: '🚀', enemy: '☄️', enemy2: '👾', good: '⭐', good2: '🪐', bg: '#070720', road: '#1a1a3a', line: '#8888ff' }],
+    [/море|морск|океан|подводн|рыб|акул|корабл|пират|остров/, { n: 'Море', player: '🐠', enemy: '🦈', enemy2: '🪼', good: '🐚', good2: '🦐', bg: '#0b3d6b', road: '#1c5a8c', line: '#9fd8ff' }],
+    [/динозавр|юрск|мезозой|рекс/, { n: 'Динозавры', player: '🦖', enemy: '🌋', enemy2: '🪨', good: '🍖', good2: '🥚', bg: '#3b2f1a', road: '#5b4a2a', line: '#c9b27a' }],
+    [/зомби|апокалипс|мертв|мёртв|кладбищ|ужас|страш/, { n: 'Зомби', player: '🧑‍🚀', enemy: '🧟', enemy2: '💀', good: '💉', good2: '🔦', bg: '#0f1a0f', road: '#223322', line: '#88aa88' }],
+    [/кот|кошк|кошек|котик|котен|кошач|мяу/, { n: 'Котики', player: '🐱', enemy: '🐶', enemy2: '🧹', good: '🐟', good2: '🥛', bg: '#2a2236', road: '#463a5a', line: '#c9b8e8' }],
+    [/собак|пес|пёс|щенок|щенк/, { n: 'Собачки', player: '🐶', enemy: '🐱', enemy2: '🦴', good: '🦴', good2: '🍖', bg: '#2a3a1f', road: '#456a2f', line: '#bfe39a' }],
+    [/еда|еду|фрукт|пицц|бургер|конфет|сладост|торт|вкусн|кухн|повар/, { n: 'Еда', player: '🧑‍🍳', enemy: '🌶️', enemy2: '🧅', good: '🍕', good2: '🍰', bg: '#3a2a1a', road: '#5a4026', line: '#ffd9a0' }],
+    [/футбол|мяч|спорт|баскетбол|гол/, { n: 'Спорт', player: '⚽', enemy: '🧤', enemy2: '🟥', good: '🏆', good2: '🥅', bg: '#14501f', road: '#1f7a30', line: '#ffffff' }],
+    [/робот|андроид|кибер|будущ|технолог|неон/, { n: 'Роботы', player: '🤖', enemy: '⚡', enemy2: '🔥', good: '🔋', good2: '⚙️', bg: '#0a1a24', road: '#183446', line: '#4de1ff' }],
+    [/замок|рыцар|дракон|магия|маг |волшеб|фэнтези|фентези|средневеков/, { n: 'Фэнтези', player: '🧙', enemy: '🐉', enemy2: '👹', good: '💎', good2: '🪄', bg: '#241a33', road: '#3d2d57', line: '#d7b8ff' }],
+    [/лес|природ|грибы|гриб|дерев|животн|зверюшк|белк|заяц|ёж|еж /, { n: 'Лес', player: '🐿️', enemy: '🦊', enemy2: '🕸️', good: '🌰', good2: '🍄', bg: '#12301a', road: '#1f5028', line: '#a6d98a' }],
+    [/самолет|самолёт|авиац|небо|облак|пилот|вертолет|вертолёт|полет|полёт/, { n: 'Небо', player: '✈️', enemy: '⛈️', enemy2: '🦅', good: '☁️', good2: '⭐', bg: '#1b4f8a', road: '#3a7bc0', line: '#ffffff' }],
+    [/зим|снег|новый год|ёлк|елк|мороз|рождеств|снеговик/, { n: 'Зима', player: '🎅', enemy: '🧊', enemy2: '☃️', good: '🎁', good2: '❄️', bg: '#1b2c44', road: '#3a5578', line: '#e6f2ff' }],
+    [/хэллоуин|хеллоуин|тыкв|ведьм|призрак|приведен/, { n: 'Хэллоуин', player: '🧛', enemy: '👻', enemy2: '🕷️', good: '🎃', good2: '🍬', bg: '#1a0f26', road: '#33204a', line: '#ff9a3c' }],
+    [/гонк|гонч|гоноч|гонщ|машин|авто|мото|байк|трасс|дорог|такси|race|racing/, { n: 'Гонки', player: '🏎️', enemy: '🚧', enemy2: '🛢️', good: '⭐', good2: '⛽', bg: '#1d2430', road: '#3a3f4a', line: '#f2f2f2' }],
+    [/деньг|монет|золот|сокровищ|клад|богат/, { n: 'Сокровища', player: '🧑‍🦱', enemy: '🐍', enemy2: '🕷️', good: '🪙', good2: '💎', bg: '#2a2410', road: '#5a4a1a', line: '#ffd24d' }],
+    [/школ|учеб|урок|студент|математик|знани/, { n: 'Школа', player: '🎒', enemy: '📝', enemy2: '⏰', good: '📚', good2: '⭐', bg: '#20304a', road: '#34507a', line: '#d9e8ff' }],
+];
+const GENRES = [
+    ['racing', /гонк|гонч|гоноч|гонщ|машин|автомоб|мотоцикл|байк|трасс|такси|race|racing|заезд/],
+    ['maze', /лабиринт|maze|найди выход|найти выход|выход из|пройти путь/],
+    ['platformer', /платформер|платформ|прыга|прыжк|марио|mario|приключен|бегать и прыгать|ходилк|перепрыг/],
+    ['catcher', /лов(и|ить|ля)|поймай|поймать|собир(ай|ать)|падающ|корзин|catch|собрать|лови/],
+];
+function customGame(n) {
+    const wantsGame = /(игр|game|гонк|платформер|лабиринт|ходилк|аркад|приложен)/.test(n);
+    const ask = /(сдела|напиш|созда|хочу|нужн|придума|давай|можешь|умеешь|сможешь|накидай|запили|собери|сваргань|скинь|покажи)/.test(n);
+    if (!wantsGame || !(ask || /^(игр|гонк|платформер|лабиринт)/.test(n))) return null;
+    let genre = null; for (const [g, re] of GENRES) if (re.test(n)) { genre = g; break; }
+    let theme = null; for (const [re, t] of THEMES) if (re.test(n + ' ')) { theme = t; break; }
+    if (!genre && !theme) return null;
+    if (!genre) genre = /(космос|космич|ракет)/.test(n) ? 'catcher' : /(лес|море|подводн|еда|фрукт|кот|собак|зим|хэллоуин)/.test(n) ? 'catcher' : /(замок|рыцар|дракон|сокровищ|клад|зомби|робот)/.test(n) ? 'platformer' : 'catcher';
+    if (!theme) theme = THEMES.find(t => t[1].n === { racing: 'Гонки', maze: 'Сокровища', platformer: 'Фэнтези', catcher: 'Еда' }[genre])[1];
+    const gw = { racing: 'гонка', maze: 'лабиринт', platformer: 'платформер', catcher: 'лови и уворачивайся' }[genre];
+    const o = Object.assign({}, theme, { title: theme.n.toLowerCase() === gw || (genre === 'racing' && theme.n === 'Гонки') ? theme.n : theme.n + ' — ' + gw });
+    // для лабиринта цель — сокровище, а не «бонус»
+    const html = T[genre](o);
+    const G = { racing: 'Гонка', maze: 'Лабиринт', platformer: 'Платформер', catcher: 'Ловля предметов' }[genre];
+    const how = { racing: 'Стрелки ←/→ или касание левой/правой половины. Подбирайте бонусы ' + o.good + ', объезжайте препятствия — скорость растёт.', maze: 'Стрелки/WASD или свайпы. Каждый уровень — новый лабиринт побольше.', platformer: 'Стрелки — ходьба, пробел — прыжок (можно дважды), прыжок сверху убивает врага ' + o.enemy + '.', catcher: 'Двигайте мышью/пальцем или ←/→. Ловите ' + o.good + ' и ' + o.good2 + ', не трогайте ' + o.enemy + '. Три жизни.' }[genre];
+    return `✅ ${o.player} Игра «${o.title}» (${G}, тема: ${theme.n.toLowerCase()}) — весь код в одном HTML-файле\n\n${code('html', html)}\n\n💾 Сохраните как game.html и откройте в браузере (работает и на телефоне). ${how}\n\n🛠 Как поменять под себя: эмодзи героя/врагов — в начале скрипта (константы P, E/BAD/GOOD), цвета — в стиле canvas. Хотите другую тему или жанр? Напишите, например: «игру про динозавров, где надо ловить еду» или «платформер про космос». Рекорд сохраняется в браузере.`;
+}
+
+
+function appTemplate(title, icon, withAmount, unit) {
+    return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>
+body{margin:0;min-height:100vh;background:#10121a;color:#eee;font-family:sans-serif;display:flex;justify-content:center;padding:20px}
+#app{width:min(520px,100%)}h1{font-size:24px}.row{display:flex;gap:8px;margin:10px 0}input[type=text],input[type=number]{flex:1;padding:10px;border-radius:8px;border:1px solid #445;background:#1b1e29;color:#eee;font-size:16px}
+button{padding:10px 14px;border:0;border-radius:8px;background:#4c8dff;color:#fff;font-size:16px;cursor:pointer}button.x{background:#444}
+.it{display:flex;align-items:center;gap:10px;background:#1b1e29;padding:10px;border-radius:8px;margin:6px 0}.it span{flex:1;word-break:break-word}.it.done span{text-decoration:line-through;opacity:.5}
+.tabs button{background:#2a2d3a;margin-right:6px}.tabs button.on{background:#4c8dff}#sum{margin-top:12px;font-size:18px}</style></head><body><div id="app">
+<h1>${icon} ${title}</h1>
+<div class="row"><input id="t" type="text" placeholder="Новая запись" maxlength="100">${withAmount ? '<input id="a" type="number" placeholder="' + unit + '" style="max-width:110px" step="any">' : ''}<button id="add">+</button></div>
+<div class="tabs"><button data-f="all" class="on">Все</button><button data-f="open">Активные</button><button data-f="done">Готово</button></div>
+<div id="list"></div><div id="sum"></div><button class="x" id="clr" style="margin-top:10px">Удалить выполненные</button></div>
+<script>
+const KEY='app_'+document.title;let items=[],f='all';
+try{items=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){items=[]}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(items))}catch(e){}};
+function render(){const l=document.getElementById('list');l.innerHTML='';
+items.forEach((it,i)=>{if(f==='open'&&it.d||f==='done'&&!it.d)return;const r=document.createElement('div');r.className='it'+(it.d?' done':'');
+const cb=document.createElement('input');cb.type='checkbox';cb.checked=it.d;cb.onchange=()=>{it.d=cb.checked;save();render()};
+const sp=document.createElement('span');sp.textContent=it.t+(${withAmount ? 'it.a!=null?" — "+it.a+" ' + unit + '":""' : '""'});
+const x=document.createElement('button');x.className='x';x.textContent='✕';x.onclick=()=>{items.splice(i,1);save();render()};r.append(cb,sp,x);l.appendChild(r)});
+const total=items.reduce((s,i)=>s+(+i.a||0),0);document.getElementById('sum').textContent=${withAmount ? "'Итого: '+Math.round(total*100)/100+' " + unit + "'" : "'Записей: '+items.length+' · выполнено: '+items.filter(i=>i.d).length"};}
+function add(){const t=document.getElementById('t');if(!t.value.trim())return;const it={t:t.value.trim(),d:false};${withAmount ? "const a=document.getElementById('a');if(a.value!=='')it.a=+a.value;a.value='';" : ''}items.unshift(it);t.value='';save();render()}
+document.getElementById('add').onclick=add;document.getElementById('t').onkeydown=e=>{if(e.key==='Enter')add()};
+document.getElementById('clr').onclick=()=>{items=items.filter(i=>!i.d);save();render()};
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{f=b.dataset.f;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));render()});
+render();
+</script></body></html>`;
+}
+const APPKINDS = [
+    [/(?:^|\s)(?:расход|трат|бюджет|финанс|денег|деньги|кошел)/, 'Учёт расходов', '💰', true, '₽'],
+    [/(?:^|\s)(?:покупк|покупок|магазин|продукт|корзин)/, 'Список покупок', '🛒', true, '₽'],
+    [/(?:^|\s)(?:привыч|трекер|челлендж)/, 'Трекер привычек', '✅', false, ''],
+    [/(?:^|\s)(?:трениров|спорт|фитнес|упражнен|вес)/, 'Дневник тренировок', '🏋️', true, 'кг'],
+    [/(?:^|\s)(?:задач|дел|план|todo|напомин)/, 'Планировщик задач', '📋', false, ''],
+    [/(?:^|\s)(?:книг|читат|фильм|сериал|аниме|игр.* список)/, 'Мой список для чтения и просмотра', '📚', false, ''],
+    [/(?:^|\s)(?:рецепт|еда|блюд|меню)/, 'Книга рецептов', '🍳', false, ''],
+    [/(?:^|\s)(?:долг|должн)/, 'Учёт долгов', '🤝', true, '₽'],
+    [/(?:^|\s)(?:вода|питьё|пить)/, 'Трекер воды', '💧', true, 'мл'],
+];
+function customApp(n) {
+    if (!/(приложен|трекер|учёт|учет|планировщик|дневник|органайзер|менеджер)/.test(n)) return null;
+    if (!/(сдела|напиш|созда|хочу|нужн|придума|можешь|умеешь|накидай|запили|собери|скинь|покажи)/.test(n) && !/^(приложение|трекер|учёт|учет|планировщик|дневник)/.test(n)) return null;
+    for (const [re, t, ic, am, u] of APPKINDS) if (re.test(n)) return { t, ic, am, u };
+    const m = n.match(/(?:приложение|трекер|дневник|планировщик|учет|учёт)\s+(?:для|про|по|на тему)?\s*([а-яёa-z0-9 ]{3,40})$/);
+    if (m && !/(игр|сайт|калькулятор|заметк|таймер|рисов|конвертер|викторин)/.test(m[1])) { const w = m[1].trim(); return { t: 'Приложение: ' + w, ic: '🗂', am: /(сумм|деньг|цен|расход|доход|вес|кол)/.test(n), u: '' }; }
+    return null;
+}
 
 function gameBuildMenu() {
     return '🎮 Какую игру сделать? Все варианты — готовый HTML-файл, который открывается в браузере (в том числе на телефоне):\n\n• змейка\n• кликер (с улучшениями)\n• найди пару (память)\n• понг против бота\n• flappy bird\n• арканоид\n• крестики-нолики (с умным ботом)\n• угадай число\n• тетрис\n• 2048\n• сапёр\n• космический шутер\n• поймай крота\n• бегун (как динозаврик)\n• виселица\n• четыре в ряд (с ботом)\n• саймон\n• кости\n\nИ приложения: заметки, помодоро-таймер, рисовалка, конвертер величин, викторина, список дел, калькулятор, секундомер, форма регистрации, лендинг.\n\nНапишите, например: «змейка на html» или «сделай арканоид». Нужно что-то своё — опишите правила, подскажу, как построить: цикл игры, управление, столкновения и счёт.';
@@ -2874,6 +3090,15 @@ const SLANG = [
     [WB('баг|баги|багов|косяк|косяки|глюк|глюки'), 'ошибка'],
     [WB('кодить|кодим|кодинг|программить'), 'программировать'],
     [WB('гайд|мануал|туториал|тутор'), 'инструкция'],
+    [WB('ничего не понял|ничего не поняла|ничего не понятно|ничего не ясно|нифига не понял|нифига не понятно|вообще не понял|вообще не понятно|я не понял|я не поняла|не понятно|непонятно|не ясно|неясно'), 'не понял'],
+    [WB('верстка|вёрстка|верстать|сверстать|сверстай|свёрстать'), 'html css'],
+    [WB('тэг|тэги|тега|тегов'), 'тег'],
+    [WB('кнопка|кнопку|кнопочка|кнопочку'), 'кнопка button'],
+    [WB('сайтик|сайтец|вебсайт|веб сайт|веб-сайт'), 'сайт'],
+    [WB('прикол|приколы'), 'шутка'],
+    [WB('шарю|разбираюсь'), 'знаю'],
+    [WB('короче|кароче'), ''],
+    [WB('вообще|прям|реально|буквально|типа|как бы|эээ+|ммм+'), ''],
 ];
 function prepare(text) {
     const orig = String(text);
@@ -3322,6 +3547,8 @@ function reply0(uid, text, name, ctx) {
     ctx = ctx || {}; CUR = uid;
     const U0 = userMem(uid);
     if (!s.name && U0.name) s.name = U0.name;
+    { const gm = raw.match(/^(привет(?:ствую)?|здравствуй(?:те)?|добрый (?:день|вечер|утро)|доброе утро|хай|ку|hello|hi|салют|приветик)[,!.\s]+([\s\S]{6,})$/i);
+      if (gm && tokens(gm[2]).length >= 2 && !/^(как (дела|ты|жизнь)|что нового|как сам)/i.test(gm[2].trim())) return reply0(uid, gm[2], name, ctx); }
     const prevSeen = U0.lastSeen; U0.lastSeen = Date.now();
     if (!s.lang) s.lang = profileLang(uid);
     if (!raw) return 'Напишите вопрос или пришлите код — отвечу 🙂';
@@ -3374,6 +3601,8 @@ function reply0(uid, text, name, ctx) {
     // викторина
     if (s.quiz) { const r = quizHandle(s, n, raw); if (r) return r; }
     // ── разговор: кризис, игры, продолжение диалога
+    { const ca = !findTask(tokens(clean), clean) ? customApp(n) : null; if (ca) { s.quiz = null; s.chatLast = 'appgen'; return `✅ ${ca.ic} ${ca.t} — приложение (весь код в одном HTML-файле)\n\n${code('html', appTemplate(ca.t, ca.ic, ca.am, ca.u || 'ед.'))}\n\n💾 Сохраните как app.html и откройте в браузере. Данные хранятся в вашем браузере (localStorage), есть вкладки «Все/Активные/Готово»${ca.am ? ' и подсчёт итога' : ''}. Хотите другое — напишите, например: «трекер привычек» или «учёт расходов».`; } }
+    { const cg0 = customGame(n); if (cg0 && !findTask(tokens(clean), clean)) { s.quiz = null; s.chatLast = 'gamegen'; return cg0; } }
     { const ce = chatTalk(uid, raw, clean, n, s, name, 'early', false, null); if (ce) { s.quiz = null; return ce; } }
     if (!/(html|хтмл|приложени|сайт|страниц|напиши|сделай)/.test(n) && (/^(квиз|викторина|тест знаний|проверь меня|задай вопрос|дай задачку|дай вопрос|поиграем|давай поиграем|давай викторину|экзамен)(?![а-яё])/.test(n) || /^\/quiz\b/.test(n))) return quizStart(s);
 
@@ -3494,12 +3723,13 @@ function reply0(uid, text, name, ctx) {
             if (next) { const out = renderTask(s.task, next, s.lang); shown.add(renderTask.last); s.shown = shown; return out; }
             return 'Все варианты этой задачи я уже показал 🙂 Спросите про другую задачу или уточните, что усложнить.';
         }
+        if (/не понял|не поняла/.test(n)) { if (s.topic && !s.simpleTried) { s.simpleTried = 1; const r2 = reply0(uid, 'объясни проще', name, ctx); s.simpleTried = 0; if (r2) return 'Давайте проще 🙂\n\n' + r2; } if (!s.topic) return 'Простите, что было непонятно 🙏 Напишите вопрос ещё раз своими словами или скажите, что именно не ясно — объясню по-другому, с примером.'; }
         if (s.topic) {
             const cur = KB.find(e => e.id === s.topic);
             const rel = KB.filter(e => e.id !== s.topic && (!cur || !cur.lang || e.lang === cur.lang)).sort(() => Math.random() - 0.5).slice(0, 4);
             return `Могу раскрыть тему подробнее, если уточните, что именно непонятно (например: «как это использовать в реальном проекте» или «покажи пример на python»).\n\nСмежные темы: ${rel.map(titleOf).join('; ')}.`;
         }
-        return 'Продолжить с чего? Задайте вопрос по коду, и я отвечу 🙂';
+        return 'Продолжить с чего? 🙂 Напишите тему или вопрос — например, «объясни замыкания» или «сделай игру».';
     }
 
     // сравнения «A или B», «чем отличается A от B»
@@ -3535,6 +3765,7 @@ function reply0(uid, text, name, ctx) {
     }
 
     // 4. задача с готовым кодом
+    { const cg = customGame(n); if (cg && !findTask(toks, clean)) { s.chatLast = 'gamegen'; setLast(s, 'task', 'custom', clean, toks); return cg; } }
     if (/(сдела|напиш|созда|хочу|нужн|придума|помоги сдела|покажи)/.test(n) && /(игр[ауыу]|игрушк|game)/.test(n) && !findTask(toks, clean) && !/(угадай|квиз|викторин|поиграем)/.test(n)) { s.chatLast = 'gamemenu'; return gameBuildMenu(); }
     if (/(сдела|напиш|созда|хочу|нужн|придума)/.test(n) && /(приложени|программ[уа] для браузера|веб ?приложени|мини ?приложени)/.test(n) && !findTask(toks, clean)) { s.chatLast = 'gamemenu'; return gameBuildMenu(); }
     const taskId = findTask(toks, clean);
@@ -4227,7 +4458,7 @@ function chatTalk(uid, raw, clean, n0, s, name, phase, prog, langId) {
                         color: 'Хороший выбор! Запомнил 🎨', food: 'Звучит вкусно! 😋 Запомнил.', music: 'Классный вкус 🎶 Запомнил.', film: 'Хороший выбор 🎬 Запомнил.', game: 'Неплохо! 🎮 Если захотите, можем сыграть во что-нибудь простое.', book: 'Достойный выбор 📚 Запомнил.', pet: 'Здорово! 🐾 Запомнил.', season: 'Хороший выбор! Запомнил 🌤', number: 'Красивое число! Запомнил ✨', holiday: 'Отличный праздник! 🎉', drink: 'Хороший выбор ☕', about: 'Приятно познакомиться поближе 🙂 Запомнил.', name: null, meaning: 'Спасибо, что поделились — это важная мысль 💛',
                     };
                     const r = REACT[cx.key];
-                    if (cx.key === 'name') { const nm = ans.split(/\s+/)[0]; if (/^[А-ЯЁA-Zа-яёa-z]{2,20}$/.test(nm)) { const nm2 = nm[0].toUpperCase() + nm.slice(1); s.name = nm2; userMem(uid).name = nm2; touch(); return `Приятно познакомиться, ${nm2}! 🤝 Чем займёмся?`; } return null; }
+                    if (cx.key === 'name') { const nm = ans.split(/\s+/)[0]; if (ans.split(/\s+/).length <= 3 && !/^(мне|меня|я|у|не|да|нет|ты|что|как|а|ну|это|тут|там|почему|помоги|помогите|привет|хай|скучно|сайт|ничего|просто|где|кто|зачем|можно|давай|хочу|надо|нужно|ладно|ок|окей|спасибо)$/i.test(nm) && /^[А-ЯЁA-Zа-яёa-z]{2,20}$/.test(nm)) { const nm2 = nm[0].toUpperCase() + nm.slice(1); s.name = nm2; userMem(uid).name = nm2; touch(); return `Приятно познакомиться, ${nm2}! 🤝 Чем займёмся?`; } return null; }
                     if (r) return r;
                 }
             } else if (cx.type === 'opinion') {
@@ -4436,6 +4667,31 @@ function chatTalk(uid, raw, clean, n0, s, name, phase, prog, langId) {
 function chatFallback(uid, raw, clean, s, name) {
     const nn = cn(clean || raw), toks = tokens(nn), first = (s.name || name || '').split(/\s+/)[0];
     { const g0 = gkLookup(nn); if (g0 && g0.unknown) return `Про «${cut(g0.unknown, 40)}» у меня пока нет данных 🤔 Я силён в программировании и знаю лишь немного общих фактов. Если вы знаете ответ, научите меня: «запомни: ${cut(clean, 50)} = ...» — запомню для вас.`; }
+    // «ты умеешь/можешь делать ...?» — отвечаем по существу
+    if (/(^|\s)(ты |вы )?(умеешь|можешь|способен|способна|сумеешь|знаешь)(\s+ли)?\s+(делать|сделать|писать|написать|создавать|создать|строить|верстать|программировать|кодить|решать|объяснять|знать|html|css|js|игр)/.test(nn) && toks.length <= 12) {
+        if (/игр/.test(nn)) return 'Да 🎮 Могу написать готовую игру одним HTML-файлом (змейка, тетрис, 2048, сапёр, шутер, платформер-основа, виселица, четыре в ряд и др.) и объяснить, как сделать свою. ' + '\n\n' + gameBuildMenu();
+        if (/(html|хтмл|сайт|страниц|верст|css)/.test(nn)) return 'Да 🌐 Знаю HTML и CSS: теги, формы, семантику, flex/grid, адаптив, тёмную тему, анимации, SVG, доступность. Могу написать страницу, лендинг, форму, приложение (заметки, таймер, калькулятор...) и разобрать ваш код. Что сделать?';
+        if (/(код|программ|js|python|питон|javascript|скрипт|алгоритм)/.test(nn)) return 'Да 💻 Пишу и объясняю код на JavaScript, Python, SQL, Bash и других языках, нахожу ошибки в присланном коде, разбираю тексты ошибок, решаю уравнения. Что нужно?';
+        return 'Многое: программирование, HTML-игры и приложения, разбор ошибок, вычисления, общение, факты, загадки и игры. Напишите «что ты умеешь» — покажу полный список, или сразу опишите задачу 🙂';
+    }
+    if (/^(можно |дай |покажи |приведи |а )?(мне )?(ещё |еще )?(пример|примеры|образец)\??$/.test(nn)) return 'Пример чего? 🙂 Назовите тему — например, «пример цикла на python», «пример формы html» или «пример запроса sql».'
+    // обращение к боту за помощью / «с ним», «с этим», «про это» — опираемся на контекст диалога
+    {
+        const askHelp = /(помо(жешь|жете|гешь|чь|ги|гите|щь)|поможешь|выручишь|выручи|подскажешь|сможешь|можешь|способен|умеешь ли|сделаешь|справишься|займешься|займёшься|глянешь|посмотришь)/.test(nn);
+        const ref = /(^|\s)(с ним|с ней|с этим|с этой|с этой штукой|с таким|про это|про него|про нее|про неё|над этим|в этом|этим|этой|это)(?=\s|$)/.test(nn);
+        if (askHelp && toks.length <= 12) {
+            let tp = null; if (s.topic) { try { tp = topicTitle(s.topic); } catch (e) {} }
+            const subj = s.subj && s.subj.length < 40 ? s.subj : null;
+            const ctx = tp ? `с темой «${tp}»` : subj ? `с «${subj}»` : '';
+            if (ref && ctx) return pickNew(s, [`Конечно, помогу ${ctx} 🙂 Что именно не получается? Пришлите код (в блоке \`\`\`) и текст ошибки — разберу.`, `Да, давайте разберём вместе (${ctx.replace('с ', '')}). Опишите, что нужно получить, и где застряли.`]);
+            if (ref) return pickNew(s, ['Конечно помогу 🙂 Только уточните, с чем именно: что это — код, ошибка, сайт, игра? Опишите задачу или пришлите код/ошибку.', 'С радостью! А с чем «с ним»? Напишите, что у вас есть и что не получается 🙂']);
+            return pickNew(s, ['Постараюсь помочь 🙂 Расскажите задачу: что нужно сделать, на каком языке, и что уже пробовали. Код можно прислать в блоке ```.', 'Да, конечно! Опишите задачу — код, ошибка, вёрстка, игра, алгоритм, SQL, Git — я разберусь.']);
+        }
+        if (ref && toks.length <= 8 && (s.topic || s.subj)) {
+            const e = s.topic ? KB.find(k => k.id === s.topic) : null;
+            if (e && /(что|как|почему|зачем|объясни|расскажи|подробн|ещё|еще)/.test(nn)) return `Вы про «${titleOf(e)}»? Вот коротко ещё раз:\n\n${e.text.split('\n\n').slice(0, 2).join('\n\n')}\n\nЧто именно непонятно — напишите, объясню проще («объясни проще»).`;
+        }
+    }
     const isQ = /\?\s*$/.test(raw.trim()) || /^(кто|что|как|почему|зачем|где|когда|сколько|какой|какая|какое|какие|чей|откуда|куда|ли )/.test(nn) || / ли(?=\s|$)/.test(nn);
     const kw = toks.filter(t => t.length > 3 && !STOP.has(t)).slice(-2).join(' ');
     if (isQ) {
@@ -4462,6 +4718,15 @@ function chatFallback(uid, raw, clean, s, name) {
 // ═════════════════════════════ ПОНИМАНИЕ КОНТЕКСТА ═════════════════════════════
 // ── синонимы: разные слова об одном и том же
 const SYN = [
+    ['тег', 'элемент', 'разметка', 'html', 'хтмл'],
+    ['картинк', 'изображен', 'фото', 'img', 'иконк'],
+    ['кнопк', 'button', 'клик', 'нажат'],
+    ['ссылк', 'link', 'гиперссылк', 'переход'],
+    ['отступ', 'padding', 'margin', 'промежуток', 'зазор', 'gap'],
+    ['цвет', 'color', 'фон', 'background', 'раскрас'],
+    ['анимац', 'движен', 'transition', 'переход плавн', 'плавн'],
+    ['адаптив', 'мобильн', 'телефон', 'экран', 'responsive'],
+    ['игр', 'game', 'геймплей'],
     ['ошибк', 'баг', 'исключен', 'exception', 'error', 'эксепшн', 'краш', 'сбой', 'глюк'],
     ['функци', 'метод', 'процедур', 'function', 'func'],
     ['массив', 'список', 'array', 'list', 'коллекци'],
